@@ -12,8 +12,10 @@ _HOLD_ONE = 1 << 16  # one held sample in the downsampling accumulator
 class BitCrush(Unit):
     """Fewer levels and fewer samples: the sound of early digital hardware.
 
-    bits sets the number of levels, 2 ** bits spread evenly over [-1, 1]. Rounding to
-    them adds an error that spreads over the whole spectrum, about 6 dB quieter per bit.
+    bits sets the number of levels: 2 ** bits - 1 of them, spread evenly over [-1, 1]
+    and including 0, as in a signed integer without its most negative value (3 levels
+    at 1 and 2 bits). Silence stays silent. Rounding to the levels adds an error that
+    spreads over the whole spectrum, about 6 dB quieter per bit.
     downsample holds each sample for that many samples, which lowers the effective
     sample rate to RATE / downsample: components above half of it fold back as
     aliasing, and images of the signal appear around multiples of it.
@@ -40,10 +42,11 @@ class BitCrush(Unit):
 
     def block(self, n: int) -> np.ndarray:
         x = self.src.block(n)
-        steps = np.maximum(np.round(2.0 ** self._param("bits", n)), 2.0) - 1.0
+        # levels -half/half .. half/half: an odd count, so 0 is one of them
+        half = np.maximum(np.round(2.0 ** (self._param("bits", n) - 1.0)) - 1.0, 1.0)
         if x.ndim == 2:
-            steps = steps[:, None]
-        q = (np.round((np.clip(x, -1.0, 1.0) + 1.0) / 2.0 * steps) / steps * 2.0 - 1.0).astype(np.float32)
+            half = half[:, None]
+        q = (np.round(np.clip(x, -1.0, 1.0) * half) / half).astype(np.float32)
         if n == 0:
             return q
         inc = np.round(_HOLD_ONE / self._param("downsample", n).astype(np.float64)).astype(np.int64)
