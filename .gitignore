@@ -6,3 +6,4 @@ dist/
 book/build/
 book/site/
 book/print/
+book/.scriptorium/

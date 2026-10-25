@@ -8,7 +8,7 @@ Euterpe is a Python library for composing music by writing code. It has four lay
 - `euterpe/io.py`: write and read audio files.
 - `euterpe/lint/`: rules that measure audio (and later scores).
 - `euterpe/book.py`: `listen` and `show`, used only by the book's executed code blocks.
-- `book/`: the book, in scriptorium Markdown (`book/scriptorium.yaml`). Each chapter's code blocks run when the book builds, from `book/`, and write their sounds and figures under `book/build/`.
+- `book/`: the book, in scriptorium Markdown (`book/scriptorium.yaml`). Each chapter's code blocks run when the book builds, from `book/`, and write their sounds and figures under build/ inside book/
 - `tests/`: one test file per module; `tests/helpers.py` holds spectrum helpers.
 
 ## Constraints
