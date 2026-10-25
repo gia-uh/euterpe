@@ -1,0 +1,21 @@
+# Euterpe, the book. Every code block runs when the book builds, from this
+# directory; the sounds and figures it writes land in build/.
+theme: book
+base-url: https://gia-uh.github.io/euterpe/
+execute: {timeout: 120}
+
+vars:
+  title: "Euterpe"
+  subtitle: "Music for programmers, from the physics of a wave up"
+
+files:
+  - chapters/00-preface.md
+  - chapters/01-what-sound-is.md
+
+outputs:
+  site:
+    format: docs
+    dir: site
+    repo-url: https://github.com/gia-uh/euterpe
+  print:
+    format: pdf
