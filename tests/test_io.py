@@ -3,6 +3,7 @@ import pytest
 
 from euterpe.io import FORMATS, read, write
 from euterpe.sound import Sine, render
+from tests.helpers import band_db
 
 
 @pytest.mark.parametrize("ext", sorted(FORMATS))
@@ -30,9 +31,6 @@ def test_render_to_returns_the_path(tmp_path):
 
 
 def test_an_mp3_keeps_frequencies_up_to_20_khz(tmp_path):
-    from euterpe.sound import Sine
-    from tests.helpers import band_db
-
     y, _ = read(write(render(Sine(19_000.0) * 0.5, 1.0), tmp_path / "high.mp3"))
     assert band_db(y, 18_900, 19_100) > -3
 
