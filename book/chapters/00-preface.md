@@ -6,7 +6,7 @@ Each idea comes in three steps. A few sentences say what it is. A code block mak
 
 ## Running the examples
 
-Every example is a complete program. To run them yourself, install Euterpe and the book's extras from a clone of the repository:
+Most examples are complete programs. A few build on the block just before them, and the text says so where they do; to run one of those, put it after the blocks it builds on, in the same file. To run the examples yourself, install Euterpe and the book's extras from a clone of the repository:
 
 ```bash
 git clone https://github.com/gia-uh/euterpe

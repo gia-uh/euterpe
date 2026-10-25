@@ -8,7 +8,7 @@ Air at sea level presses on everything with about 101 325 pascals. A sound is a 
 
 Your eardrum moves with the pressure, and the inner ear turns that motion into nerve signals. So a sound, for our purposes, is one number that changes over time: the pressure at one point. A microphone measures that number, a loudspeaker produces it, and a program can compute it.
 
-The simplest sound repeats one shape forever. The shape is a sine wave, and the number of times it repeats each second is its frequency, measured in hertz (Hz). Here is a sine wave at 440 Hz, two seconds long, at half of full volume. Euterpe calls a sound source a *unit*: `Sine(440.0)` is one, `* 0.5` scales it, and `listen` renders it to a file and puts a player on this page.
+The simplest sound repeats one shape forever. The shape is a sine wave, and the number of times it repeats each second is its frequency, measured in hertz (Hz). Here is a sine wave at 440 Hz, two seconds long, at half of full scale, the largest value a sound file can hold. Euterpe calls a sound source a *unit*: `Sine(440.0)` is one, `* 0.5` scales it, and `listen` renders it to a file and puts a player on this page.
 
 ```python {run}
 from euterpe.book import listen
@@ -18,7 +18,7 @@ tone = Sine(440.0) * 0.5
 listen(tone, 2.0, "01-sine-440", "A sine wave at 440 Hz", id="sine-440")
 ```
 
-This is the A that orchestras tune to. A sine is the plainest tone there is: it sounds like a tuning fork or a soft whistle. Every other sound in this book is built from sines, or analysed as a sum of them, so it is worth knowing well.
+This is the note musicians call A, the one orchestras tune to (chapter 2 explains note names). A sine is the plainest tone there is: it sounds like a tuning fork or a soft whistle. Every other sound in this book is built from sines, or analysed as a sum of them, so it is worth knowing well.
 
 One cycle at 440 Hz lasts 1/440 of a second, about 2.27 milliseconds. In that time the sound travels 343 / 440 = 0.78 metres, which is the length of one wave in the air. Here are the first 5 milliseconds as a plot:
 
@@ -40,7 +40,7 @@ ax.axhline(0, color="grey", linewidth=0.5)
 show(fig, "01-sine-plot", "The first 5 ms of the 440 Hz sine: a little over two cycles")
 ```
 
-The vertical axis is not in pascals. Inside a computer a sound is a number between −1 and 1, and the loudspeaker and its volume knob decide how many pascals that becomes. A value of 1 is *full scale*, the largest the file can hold. The sine above reaches 0.5, half of full scale.
+The vertical axis is not in pascals. Inside a computer a sound is a number between −1 and 1, and the loudspeaker and its volume knob decide how many pascals that becomes. That is why a value of 1 is called *full scale*: it means the most the file can hold, not a pressure. The sine above reaches 0.5, half of full scale.
 
 ## Samples
 
@@ -137,7 +137,7 @@ The 5th harmonic, 50 000 Hz, is heard at 2 000 Hz, far below the note itself. Fo
 
 To hear it, here is a saw computed the direct way: take the position in the cycle, from 0 to 1, and scale it to run from −1 to 1. This is a new unit written in a few lines. A unit's `block(n)` returns its next `n` samples, and `_param("freq", n)` gives the frequency for each of them.
 
-```python {run continue}
+```python {run}
 import numpy as np
 
 from euterpe.sound import RATE, Param, Unit
@@ -163,7 +163,7 @@ class NaiveSaw(Unit):
         return (2 * position - 1).astype(np.float32)
 ```
 
-Both saws now sweep from 1 000 Hz up to 23 000 Hz in four seconds. The frequency is itself a unit: half a cycle of a slow sine, scaled to the range. The first sweep is Euterpe's `Saw`, which smooths each drop over two samples with a correction called polyBLEP, so that much less is left above 24 000 Hz to fold. The second is the naive saw.
+This block and the next three use `NaiveSaw`, so they continue from it: to run one yourself, put it after this block in the same file. Both saws now sweep from 1 000 Hz up to 23 000 Hz in four seconds. The frequency is itself a unit: half a cycle of a slow sine, scaled to the range. The first sweep is Euterpe's `Saw`, which smooths each drop over two samples with a correction called polyBLEP, so that much less is left above 24 000 Hz to fold. The second is the naive saw.
 
 ```python {run continue}
 from euterpe.book import listen
@@ -211,13 +211,16 @@ def folded_share(x, f, below, above):
     band = (freqs >= below) & (freqs < above)
     return power[band & ~harmonic].sum() / power.sum()
 
+shares = {}
 for name, unit in [("Saw (polyBLEP)", Saw(3_300.0)), ("naive saw", NaiveSaw(3_300.0))]:
     x = render(unit, 1.0)
-    low, high = folded_share(x, 3_300.0, 0, 12_000), folded_share(x, 3_300.0, 12_000, 24_000)
-    print(f"- {name}: {100 * low:.3f} % folded below 12 000 Hz, {100 * high:.2f} % above")
+    shares[name] = folded_share(x, 3_300.0, 0, 12_000), folded_share(x, 3_300.0, 12_000, 24_000)
+    print(f"- {name}: {100 * shares[name][0]:.4f} % folded below 12 000 Hz, {100 * shares[name][1]:.3f} % above")
+low, high = (shares["naive saw"][i] / shares["Saw (polyBLEP)"][i] for i in (0, 1))
+print(f"- polyBLEP leaves {low:.0f} times less below 12 000 Hz and {high:.0f} times less above")
 ```
 
-Below 12 000 Hz, where hearing is most sensitive, polyBLEP leaves about six hundred times less folded energy than the naive saw. Above 12 000 Hz the reduction is smaller, about twenty times, because a correction two samples wide cannot act sharply near the Nyquist frequency. Better methods exist and cost more computation; for the notes of real music, polyBLEP is enough.
+Below 12 000 Hz, where hearing is most sensitive, polyBLEP leaves several hundred times less folded energy than the naive saw. Above 12 000 Hz the reduction is far smaller, because a correction two samples wide cannot act sharply near the Nyquist frequency. Better methods exist and cost more computation; for the notes of real music, polyBLEP is enough.
 
 ## How fine each sample is
 
@@ -275,9 +278,13 @@ import numpy as np
 
 from euterpe.io import read
 
+# Replaced by lint_audio from chapter 2 on. A failure stops the build.
+failures = []
 for path in sorted(Path("build/audio").glob("01-*.mp3")):
     x, rate = read(path)
     peak = float(np.abs(x).max())
     if rate != 48_000 or peak >= 0.999:
-        print(f"**level check failed:** {path.name} has peak {peak:.3f} at {rate} Hz")
+        failures.append(f"{path.name} has peak {peak:.3f} at {rate} Hz")
+if failures:
+    raise SystemExit("level check failed: " + "; ".join(failures))
 ```
