@@ -114,11 +114,14 @@ def _square(t, dt, duty):
 
 
 class Triangle(_Oscillator):
-    """A triangle wave between -1 and 1: only the odd harmonics of freq, at amplitude 1/k²
-    (12 dB lower per octave), so it sounds softer than a square.
+    """A triangle wave: only the odd harmonics of freq, at amplitude 1/k² (12 dB lower per
+    octave), so it sounds softer than a square.
 
-    It is the integral of the band-limited square. The integrator leaks slightly
-    (pole 0.9995) so no offset can build up.
+    It is the integral of the band-limited square, scaled so the ideal wave spans -1 to 1.
+    The integrator leaks slightly (pole 0.9995) so no offset can build up. Its peak is
+    below 1 at both ends of the range: 0.97 at 20 Hz, where the leak flattens each ramp,
+    0.99 from 100 Hz to 440 Hz, 0.92 at 2 kHz and 0.67 at 8 kHz, where band-limiting
+    rounds the corners (a triangle with no harmonic above 24 kHz cannot reach 1 there).
     """
 
     params = (_FREQ,)
