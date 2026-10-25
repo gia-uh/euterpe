@@ -11,7 +11,6 @@ most of that energy. Samples whose frequency is at or above RATE / 2 are zero.
 from __future__ import annotations
 
 import numpy as np
-from scipy.signal import lfilter
 
 from euterpe.sound.core import RATE, Param, Unit
 
@@ -29,6 +28,18 @@ def _blep(t: np.ndarray, dt: np.ndarray) -> np.ndarray:
     b = t > 1.0 - dt
     x = (t[b] - 1.0) / dt[b]
     out[b] = x * x + x + x + 1.0
+    return out
+
+
+def _blamp(t: np.ndarray, dt: np.ndarray) -> np.ndarray:
+    """The polyBLAMP residual for a unit change of slope (per sample) at phase 0: the
+    integral of the polyBLEP residual, (1 - u)³ / 6 after the corner, (1 + u)³ / 6 before."""
+    out = np.zeros_like(t)
+    dt = np.maximum(dt, 1e-12)
+    a = t < dt
+    out[a] = (1.0 - t[a] / dt[a]) ** 3 / 6.0
+    b = t > 1.0 - dt
+    out[b] = (1.0 + (t[b] - 1.0) / dt[b]) ** 3 / 6.0
     return out
 
 
@@ -117,26 +128,20 @@ class Triangle(_Oscillator):
     """A triangle wave: only the odd harmonics of freq, at amplitude 1/k² (12 dB lower per
     octave), so it sounds softer than a square.
 
-    It is the integral of the band-limited square, scaled so the ideal wave spans -1 to 1.
-    The integrator leaks slightly (pole 0.9995) so no offset can build up. Its peak is
-    below 1 at both ends of the range: 0.97 at 20 Hz, where the leak flattens each ramp,
-    0.99 from 100 Hz to 440 Hz, 0.92 at 2 kHz and 0.67 at 8 kHz, where band-limiting
-    rounds the corners (a triangle with no harmonic above 24 kHz cannot reach 1 there).
+    It rises from -1 to 1 in the first half of each cycle and falls back in the second.
+    The two corners are rounded with polyBLAMP (the integral of polyBLEP), which removes
+    most of the energy that would fold back. Slow triangles, as LFOs, reach ±1 exactly;
+    higher up the rounding lowers the peak (0.98 at 440 Hz, 0.94 at 2 kHz, 0.78 at 8 kHz), as it must
+    for a wave with no component above 24 kHz.
     """
 
     params = (_FREQ,)
-    _POLE = 0.9995
 
     def __init__(self, freq: float | Unit = 440.0):
         self._set_params(freq=freq)
         self.reset()
 
-    def reset(self) -> None:
-        super().reset()
-        self._zi = np.array([-self._POLE])  # start at -1, at the bottom of the ramp
-
     def _naive(self, t, dt, n):
-        slope = 4.0 * dt * _square(t, dt, np.full(n, 0.5))
-        slope[dt >= 0.5] = 0.0
-        out, self._zi = lfilter([1.0], [1.0, -self._POLE], slope, zi=self._zi)
-        return out
+        out = np.where(t < 0.5, 4.0 * t - 1.0, 3.0 - 4.0 * t)
+        # the slope changes by +8 per cycle at the bottom (phase 0), by -8 at the top (0.5)
+        return out + 8.0 * dt * (_blamp(t, dt) - _blamp((t - 0.5) % 1.0, dt))

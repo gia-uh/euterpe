@@ -35,3 +35,25 @@ def test_above_nyquist_is_silence():
 def test_block_size_does_not_change_a_modulated_oscillator():
     for make in (lambda: Saw(Sine(3.0) * 200 + 440), lambda: Triangle(Sine(5.0) * 100 + 300)):
         assert np.array_equal(render(make(), 0.5), render(make(), 0.5, block=37))
+
+
+def _off_harmonic_share(x, f):
+    """The share of x's energy that is neither DC nor at harmonics 1-7 of f."""
+    spectrum = np.abs(np.fft.rfft(x * np.hanning(len(x)))) ** 2
+    freqs = np.fft.rfftfreq(len(x), 1 / 48_000)
+    keep = (np.min(np.abs(freqs[:, None] - f * np.arange(0, 8)), axis=1) < 20)
+    return spectrum[~keep].sum() / spectrum.sum()
+
+
+def test_a_square_has_little_aliasing():
+    assert _off_harmonic_share(render(Square(3_300.0, duty=0.3), 1.0), 3_300.0) < 0.005
+
+
+def test_a_triangle_has_little_aliasing():
+    # a naive triangle already leaves only 3e-4 here (harmonics fall as 1/k²); polyBLAMP, 9e-6
+    assert _off_harmonic_share(render(Triangle(3_300.0), 1.0), 3_300.0) < 5e-5
+
+
+def test_a_slow_triangle_reaches_full_scale():
+    for f in (1.0, 0.1):
+        assert abs(render(Triangle(f), 1.5 / f).max() - 1.0) < 0.02, f   # the top of the first ramp
