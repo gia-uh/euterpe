@@ -1,0 +1,13 @@
+# Mechanical checks on the docs. The tests themselves run in CI (.github/workflows/ci.yml):
+# rift has no rule that runs a command.
+
+rules:
+
+  - name: "every file path named in the docs exists"
+    extract:
+      file:
+        - "AGENTS.md"
+        - "README.md"
+      regex: '`((?:euterpe|tests|book|docs)/[A-Za-z0-9_./-]+)`'
+    require:
+      exists: true
