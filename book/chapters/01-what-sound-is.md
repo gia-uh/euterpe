@@ -8,7 +8,7 @@ Air at sea level presses on everything with about 101 325 pascals. A sound is a 
 
 Your eardrum moves with the pressure, and the inner ear turns that motion into nerve signals. So a sound, for our purposes, is one number that changes over time: the pressure at one point. A microphone measures that number, a loudspeaker produces it, and a program can compute it.
 
-The simplest sound repeats one shape forever. The shape is a sine wave, and the number of times it repeats each second is its frequency, measured in hertz (Hz). Here is a sine wave at 440 Hz, two seconds long, at half of full scale, the largest value a sound file can hold. Euterpe calls a sound source a *unit*: `Sine(440.0)` is one, `* 0.5` scales it, and `listen` renders it to a file and puts a player on this page.
+The simplest sound repeats one shape forever. The shape is a sine wave, and the number of times it repeats each second is its frequency, measured in hertz (Hz). Here is a sine wave at 440 Hz, two seconds long, at half of full scale (full scale is the largest value a sound file can hold). Euterpe calls a sound source a *unit*: `Sine(440.0)` is one, `* 0.5` scales it, and `listen` renders it to a file and puts a player on this page.
 
 ```python {run}
 from euterpe.book import listen
@@ -189,7 +189,7 @@ from euterpe.sound import RATE, render
 
 fig, axes = plt.subplots(1, 2, figsize=(8, 3), sharey=True, dpi=60)
 for ax, (title, unit) in zip(axes, [("Saw (polyBLEP)", Saw(sweep())), ("naive saw", NaiveSaw(sweep()))]):
-    ax.specgram(render(unit * 0.5, 4.0), NFFT=1024, Fs=RATE, noverlap=0, vmin=-120, cmap="magma")
+    ax.specgram(render(unit * 0.5, 4.0), NFFT=1024, Fs=RATE, noverlap=0, vmin=-90, cmap="magma")
     ax.set_title(title)
     ax.set_xlabel("time (s)")
 axes[0].set_ylabel("frequency (Hz)")
@@ -220,7 +220,7 @@ low, high = (shares["naive saw"][i] / shares["Saw (polyBLEP)"][i] for i in (0, 1
 print(f"- polyBLEP leaves {low:.0f} times less below 12 000 Hz and {high:.0f} times less above")
 ```
 
-Below 12 000 Hz, where hearing is most sensitive, polyBLEP leaves several hundred times less folded energy than the naive saw. Above 12 000 Hz the reduction is far smaller, because a correction two samples wide cannot act sharply near the Nyquist frequency. Better methods exist and cost more computation; for the notes of real music, polyBLEP is enough.
+Below 12 000 Hz, where hearing is most sensitive, polyBLEP leaves several hundred times less folded energy than the naive saw. Above 12 000 Hz the reduction is far smaller, because a correction two samples wide cannot act sharply near the Nyquist frequency. Better methods exist and cost more computation: computing the wave at several times the sample rate and filtering before dropping the extra samples (oversampling), or longer corrections such as minBLEP. For the notes of real music, polyBLEP is enough.
 
 ## How fine each sample is
 
@@ -266,7 +266,7 @@ Rounding is a change in the shape of the wave, so it adds frequencies that were 
 
 ## Exercises
 
-1. In the first example, change `440.0` to `220.0`, then to `880.0`. Each doubling of the frequency sounds like the same note, one step higher. Chapter 2 calls that step an octave.
+1. In the first example, change `440.0` to `220.0`, then to `880.0`. Each doubling of the frequency sounds like the same note, only higher. Chapter 2 calls a doubling an octave.
 2. In the sweep example, change `11_000 + 12_000` to `4_000 + 5_000`, a sweep from 1 000 to 9 000 Hz. Does the naive saw still produce falling tones? Use the `fold` table to predict which harmonics of a 9 000 Hz saw land below 9 000 Hz.
 3. In the `BitCrush` example, add `downsample=8` and listen. Each sample is now held for 8 samples, so the sample rate is in effect 6 000 Hz and its Nyquist frequency 3 000 Hz. Holding adds copies of the tone around each multiple of 6 000 Hz: 5 560 and 6 440 Hz, 11 560 and 12 440 Hz, and so on. Then replace `Sine` with `Saw`, in the import line too: which harmonics of the 440 Hz saw now fold back below 3 000 Hz?
 
@@ -278,7 +278,8 @@ import numpy as np
 
 from euterpe.io import read
 
-# Replaced by lint_audio from chapter 2 on. A failure stops the build.
+# Replaced by lint_audio from chapter 2 on. A failure prints on the page as a block error;
+# it stops the build only once scriptorium can refuse block errors.
 expected = ["01-sine-440", "01-sweep-polyblep", "01-sweep-naive", "01-bits-16", "01-bits-6", "01-bits-4", "01-bits-2"]
 failures = [f"{name}.mp3 is missing" for name in expected if not Path(f"build/audio/{name}.mp3").is_file()]
 for path in sorted(Path("build/audio").glob("01-*.mp3")):
