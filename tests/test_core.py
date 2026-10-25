@@ -53,3 +53,9 @@ def test_mono_plus_stereo_is_stereo():
             return np.zeros((n, 2), np.float32)
     x = render(Mix(Ramp(), Two()), 4 / RATE)
     assert x.shape == (4, 2) and np.array_equal(x[:, 0], x[:, 1])
+
+
+def test_a_unit_used_twice_is_refused():
+    r = Ramp()
+    with pytest.raises(ValueError, match=r"Ramp is used twice"):
+        render(r + r * 0.5, 0.01)

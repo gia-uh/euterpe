@@ -159,6 +159,21 @@ def rng(seed: int) -> np.random.Generator:
     return np.random.Generator(np.random.PCG64(seed))
 
 
+def _check_not_shared(top: Unit) -> None:
+    """Refuse a graph that pulls one stateful unit along two paths: each pull would advance
+    its state, so the samples would depend on the block size."""
+    seen: set[int] = set()
+    stack = [top]
+    while stack:
+        u = stack.pop()
+        if isinstance(u, Const):
+            continue
+        if id(u) in seen:
+            raise ValueError(f"{type(u).__name__} is used twice in the graph; build a second one")
+        seen.add(id(u))
+        stack.extend(u.inputs())
+
+
 def render(
     unit: Unit, seconds: float, *, to: str | Path | None = None, block: int = BLOCK
 ) -> np.ndarray | Path:
@@ -170,6 +185,7 @@ def render(
         raise ValueError(f"render needs seconds >= 0, got {seconds}")
     if block < 1:
         raise ValueError(f"render needs block >= 1, got {block}")
+    _check_not_shared(unit)
     unit.reset()
     total = round(seconds * RATE)
     parts = []
