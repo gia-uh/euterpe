@@ -20,8 +20,9 @@ FORMATS = {
 }
 
 # libsndfile's default MP3 is about 85 kbps and cuts everything above 17.5 kHz;
-# constant 160-170 kbps keeps the spectrum up to 20.5 kHz
-_MP3 = {"bitrate_mode": "CONSTANT", "compression_level": 0.5}
+# constant 264 kbps keeps the spectrum up to 20.5 kHz; from compression level 0.3 up the
+# encoder also lowers the level, by 0.18 dB at 0.3 and 0.45 dB at 0.5
+_MP3 = {"bitrate_mode": "CONSTANT", "compression_level": 0.2}
 
 
 def write(samples: np.ndarray, path: str | Path, *, rate: int = RATE) -> Path:
