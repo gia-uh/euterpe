@@ -28,6 +28,8 @@ def test_triangle_has_only_odd_harmonics():
 
 def test_above_nyquist_is_silence():
     assert np.abs(render(Saw(Const(30_000.0)), 0.1)).max() == 0.0
+    for unit in (Square(Const(30_000.0), duty=0.3), Sine(Const(30_000.0), phase=0.25), Triangle(Const(30_000.0))):
+        assert np.abs(render(unit, 0.1)).max() == 0.0, type(unit).__name__
 
 
 def test_block_size_does_not_change_a_modulated_oscillator():
