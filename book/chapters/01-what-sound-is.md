@@ -226,17 +226,17 @@ Below 12 000 Hz, where hearing is most sensitive, polyBLEP leaves several hundre
 
 Each sample is a number, and a file stores it with a fixed number of bits. With b bits a sample can take 2 to the power b different values (`2 ** b` in Python). CD audio uses 16 bits, 65 536 values; Euterpe computes with 32-bit floats and writes 24-bit WAV files. Rounding every sample to the nearest allowed value is called *quantisation*. The rounding error is a small, noisy signal added to the sound, and each bit removed makes it about 6 dB louder (chapter 2 explains decibels).
 
-`BitCrush` rounds each sample to `2 ** bits` levels spread evenly between −1 and 1. Here is the 440 Hz sine with 16, 6, 4 and 2 bits:
+`BitCrush` rounds each sample to `2 ** bits - 1` levels spread evenly between −1 and 1. That is one level fewer than the bits allow, so that the levels are symmetric and 0 is one of them: silence stays silent. Here is the 440 Hz sine with 16, 6, 4 and 2 bits:
 
 ```python {run}
 from euterpe.book import listen
 from euterpe.sound import BitCrush, Sine
 
 for bits in (16, 6, 4, 2):
-    listen(BitCrush(Sine(440.0), bits=bits) * 0.5, 2.0, f"01-bits-{bits}", f"The 440 Hz sine with {bits} bits: {2 ** bits} levels", id=f"bits-{bits}")
+    listen(BitCrush(Sine(440.0), bits=bits) * 0.5, 2.0, f"01-bits-{bits}", f"The 440 Hz sine with {bits} bits: {2 ** bits - 1} levels", id=f"bits-{bits}")
 ```
 
-At 16 bits it sounds like the sine at the top of the chapter. At 6 bits a faint hiss and buzz sit under the tone. At 4 bits the tone is harsh, and at 2 bits, four levels, the wave is a staircase of four steps and sounds close to a square wave. The plot shows one cycle of each:
+At 16 bits it sounds like the sine at the top of the chapter. At 6 bits a faint hiss and buzz sit under the tone. At 4 bits the tone is harsh, and at 2 bits there are only three levels, −1, 0 and 1: the wave jumps between them and sounds close to a square wave. The plot shows one cycle of each:
 
 ```python {run}
 import matplotlib.pyplot as plt
@@ -279,7 +279,8 @@ import numpy as np
 from euterpe.io import read
 
 # Replaced by lint_audio from chapter 2 on. A failure stops the build.
-failures = []
+expected = ["01-sine-440", "01-sweep-polyblep", "01-sweep-naive", "01-bits-16", "01-bits-6", "01-bits-4", "01-bits-2"]
+failures = [f"{name}.mp3 is missing" for name in expected if not Path(f"build/audio/{name}.mp3").is_file()]
 for path in sorted(Path("build/audio").glob("01-*.mp3")):
     x, rate = read(path)
     peak = float(np.abs(x).max())
