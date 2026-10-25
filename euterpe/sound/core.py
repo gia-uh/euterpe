@@ -138,7 +138,7 @@ class Gain(Unit):
     (an envelope, a slow sine) spreads each component into sidebands at the gain's frequencies.
     """
 
-    params = (Param("gain", "", -100.0, 100.0, default=1.0),)
+    params = (Param("gain", "", -1e6, 1e6, default=1.0),)  # also scales modulators, in Hz
 
     def __init__(self, src: Unit, gain: float | Unit):
         self.src = src
