@@ -19,6 +19,10 @@ FORMATS = {
     ".ogg": ("OGG", "VORBIS"),
 }
 
+# libsndfile's default MP3 is about 85 kbps and cuts everything above 17.5 kHz;
+# constant 160-170 kbps keeps the spectrum up to 20.5 kHz
+_MP3 = {"bitrate_mode": "CONSTANT", "compression_level": 0.5}
+
 
 def write(samples: np.ndarray, path: str | Path, *, rate: int = RATE) -> Path:
     """Write samples rendered at 48 kHz to path, in the format its extension names.
@@ -36,7 +40,7 @@ def write(samples: np.ndarray, path: str | Path, *, rate: int = RATE) -> Path:
         x = np.clip(resample_poly(x, rate // g, RATE // g, axis=0), -1.0, 1.0).astype(np.float32)
     path.parent.mkdir(parents=True, exist_ok=True)
     fmt, subtype = FORMATS[ext]
-    sf.write(path, x, rate, format=fmt, subtype=subtype)
+    sf.write(path, x, rate, format=fmt, subtype=subtype, **(_MP3 if ext == ".mp3" else {}))
     return path
 
 
