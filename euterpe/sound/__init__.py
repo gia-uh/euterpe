@@ -9,12 +9,13 @@ from euterpe.sound.shape import BitCrush
 from euterpe.sound.synth import Additive
 
 __all__ = [
-    "Additive",
     "ADSR",
+    "Additive",
     "Allpass",
+    "BLOCK",
     "Biquad",
     "BitCrush",
-    "BLOCK",
+    "RATE",
     "Comb",
     "Const",
     "EnvelopeFollower",
@@ -23,9 +24,6 @@ __all__ = [
     "Mix",
     "OnePole",
     "Param",
-    "RATE",
-    "render",
-    "rng",
     "Saw",
     "Segments",
     "Sine",
@@ -33,4 +31,6 @@ __all__ = [
     "Triangle",
     "Unit",
     "WhiteNoise",
+    "render",
+    "rng",
 ]
