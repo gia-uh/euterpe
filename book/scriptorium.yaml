@@ -15,8 +15,9 @@ files:
   - chapters/03-timbre.md
   - chapters/04-envelopes.md
   - chapters/05-filters.md
-  - chapters/06-fm-noise-models.md
-  - chapters/07-effects.md
+  - chapters/06-fm-noise-wavetables.md
+  - chapters/07-physical-models.md
+  - chapters/08-effects.md
 
 outputs:
   site:
