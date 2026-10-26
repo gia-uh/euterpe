@@ -32,18 +32,26 @@ class View:
         """A matplotlib Figure, or None for a view that only plays."""
         return None
 
+    def _context(self):
+        try:
+            import matplotlib
+        except ImportError as e:  # the view extra is missing
+            raise ImportError("drawing a view needs matplotlib: pip install 'euterpe[view]'") from e
+        from euterpe.view.style import fonts, rc
+
+        fonts()
+        return matplotlib.rc_context(rc())
+
+    def figure(self):
+        """The drawn matplotlib Figure in the house style, or None; the caller closes it."""
+        with self._context():
+            return self.draw()
+
     def svg(self) -> bytes | None:
         if self._svg is None:
-            try:
-                import matplotlib
-            except ImportError as e:  # the view extra is missing
-                raise ImportError("drawing a view needs matplotlib: pip install 'euterpe[view]'") from e
             import matplotlib.pyplot as plt
 
-            from euterpe.view.style import fonts, rc
-
-            fonts()
-            with matplotlib.rc_context(rc()):
+            with self._context():
                 fig = self.draw()
                 if fig is None:
                     return None

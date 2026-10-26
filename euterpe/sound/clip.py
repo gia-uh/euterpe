@@ -40,10 +40,30 @@ class Clip:
         return self.samples if dtype is None else self.samples.astype(dtype)
 
     def view(self):
-        """The default view: what display(clip) shows."""
-        from euterpe.view.base import listen
+        """The default view: what display() shows."""
+        from euterpe.view import default
 
-        return listen(self)
+        return default(self)
+
+    def waveform(self, **kw):
+        from euterpe.view import waveform
+
+        return waveform(self, **kw)
+
+    def spectrum(self, **kw):
+        from euterpe.view import spectrum
+
+        return spectrum(self, **kw)
+
+    def spectrogram(self, **kw):
+        from euterpe.view import spectrogram
+
+        return spectrogram(self, **kw)
+
+    def level(self, **kw):
+        from euterpe.view import level
+
+        return level(self, **kw)
 
     def _repr_mimebundle_(self, include=None, exclude=None):
         return self.view()._repr_mimebundle_(include, exclude)
