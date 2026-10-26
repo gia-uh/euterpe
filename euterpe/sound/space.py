@@ -12,7 +12,7 @@ from scipy.linalg import hadamard
 from scipy.fft import irfft, next_fast_len, rfft
 from scipy.signal import lfilter
 
-from euterpe.sound.core import RATE, Param, Unit, rng
+from euterpe.sound.core import LN60, RATE, Param, Unit, _after, rng
 from euterpe.sound.filters import _as_frames as _frames
 from euterpe.sound.filters import _out
 from euterpe.sound.osc import Sine
@@ -62,6 +62,13 @@ class _Moving(Unit):
 
     _lfo: Unit | None = None
     _invert = False  # mix the delayed copy in upside down while feedback is negative
+
+    @property
+    def duration(self) -> float | None:
+        """The source's plus the longest delay, repeated until a feedback has fallen 60 dB."""
+        fb = abs(self._fixed("feedback", 0.99)) if "feedback" in self._values else 0.0
+        trips = LN60 / -np.log(fb) if 0 < fb < 1 else 1.0
+        return _after(self.src.duration, float((self._cap / RATE) * (trips + 1)))
 
     def __init__(self, src: Unit, longest: float, **values):
         self.src = src
@@ -287,6 +294,11 @@ class FDNReverb(Unit):
     )
     channels = 2
 
+    @property
+    def duration(self) -> float | None:
+        """The source's plus the RT60 and the longest line, since the tail starts at a level near 1."""
+        return _after(self.src.duration, self._values["decay"] * 1.3 + self._cap / RATE)
+
     def __init__(
         self,
         src: Unit,
@@ -375,6 +387,11 @@ class ConvolutionReverb(Unit):
     params = (Param("decay", "s", 0.1, 10.0, "log", default=2.0), Param("mix", "", 0.0, 1.0, default=0.25))
     channels = 2
 
+    @property
+    def duration(self) -> float | None:
+        """The source's plus the impulse response, which lasts 1.5 times decay."""
+        return _after(self.src.duration, 1.5 * self._values["decay"])
+
     def __init__(self, src: Unit, decay: float = 2.0, mix: float | Unit = 0.25, seed: int = 0):
         _numbers("ConvolutionReverb", decay=decay)
         self.src = src
@@ -442,6 +459,11 @@ class Pan(Unit):
     params = (Param("pos", "", -1.0, 1.0, default=0.0),)
     channels = 2
 
+    @property
+    def duration(self) -> float | None:
+        """The source's: this unit adds no tail."""
+        return self.src.duration
+
     def __init__(self, src: Unit, pos: float | Unit = 0.0):
         self.src = src
         self._set_params(pos=pos)
@@ -469,6 +491,11 @@ class Width(Unit):
 
     params = (Param("width", "", 0.0, 2.0, default=1.0),)
     channels = 2
+
+    @property
+    def duration(self) -> float | None:
+        """The source's: this unit adds no tail."""
+        return self.src.duration
 
     def __init__(self, src: Unit, width: float | Unit = 1.0):
         self.src = src

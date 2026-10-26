@@ -10,7 +10,7 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from euterpe.sound.core import RATE, Param, Unit
+from euterpe.sound.core import LN60, RATE, Param, Unit, _after
 
 _TIME = ("s", 0.0, 30.0, "log")
 _BOW = 6.0  # curve = 1 bends a segment like exp(-6 p): 95 % of the way after half its time
@@ -48,6 +48,12 @@ class ADSR(Unit):
         Param("gate", "s", 0.0, 3600.0, default=1.0),
         Param("curve", "", -1.0, 1.0, default=0.0),
     )
+
+    @property
+    def duration(self) -> float | None:
+        """gate + release, when both are numbers."""
+        g, r = self._values["gate"], self._values["release"]
+        return None if isinstance(g, Unit) or isinstance(r, Unit) else g + r
 
     def __init__(
         self,
@@ -90,6 +96,11 @@ class Segments(Unit):
     segment's duration); a sudden step spreads it over every frequency.
     """
 
+    @property
+    def duration(self) -> float | None:
+        """The last point's time when its level is 0; otherwise the level holds forever."""
+        return float(self.times[-1]) if self.levels[-1] == 0 else None
+
     def __init__(self, points: Sequence[tuple[float, float]]):
         if not points:
             raise ValueError("Segments needs at least one (time, level) point")
@@ -126,6 +137,11 @@ class EnvelopeFollower(Unit):
     """
 
     params = (Param("attack", *_TIME, default=0.005), Param("release", *_TIME, default=0.1))
+
+    @property
+    def duration(self) -> float | None:
+        """The source's plus 60 dB of release."""
+        return _after(self.src.duration, LN60 * self._fixed("release", 2.0))
 
     def __init__(self, src: Unit, attack: float | Unit = 0.005, release: float | Unit = 0.1):
         self.src = src

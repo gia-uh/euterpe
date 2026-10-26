@@ -12,7 +12,7 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 from scipy.signal import lfilter
 
-from euterpe.sound.core import RATE, Param, Unit
+from euterpe.sound.core import LN60, RATE, Param, Unit, _after
 from euterpe.sound.filters import _as_frames as _frames
 from euterpe.sound.filters import _out
 
@@ -38,6 +38,11 @@ class BitCrush(Unit):
         Param("bits", "bits", 1.0, 16.0, default=8.0),
         Param("downsample", "samples", 1.0, 64.0, default=1.0),
     )
+
+    @property
+    def duration(self) -> float | None:
+        """The source's: this unit adds no tail."""
+        return self.src.duration
 
     def __init__(self, src: Unit, bits: float | Unit = 8, downsample: float | Unit = 1):
         self.src = src
@@ -97,6 +102,11 @@ class Shaper(Unit):
 
     params = (Param("drive", *_DRIVE, default=1.0),)
 
+    @property
+    def duration(self) -> float | None:
+        """The source's: this unit adds no tail."""
+        return self.src.duration
+
     def __init__(self, src: Unit, kind: Literal["tanh", "soft", "hard"], drive: float | Unit = 1.0):
         if kind not in _CURVES:
             raise ValueError(f"Shaper kind must be one of {', '.join(_CURVES)}, got {kind!r}")
@@ -127,6 +137,11 @@ class Saturator(Unit):
     """
 
     params = (Param("drive", *_DRIVE, default=2.0), Param("bias", "", 0.0, 1.0, default=0.1))
+
+    @property
+    def duration(self) -> float | None:
+        """The source's: this unit adds no tail."""
+        return self.src.duration
 
     def __init__(self, src: Unit, drive: float | Unit = 2.0, bias: float | Unit = 0.1):
         self.src = src
@@ -166,6 +181,11 @@ _RMS_TIME = 0.01  # the level detector averages the squared signal over about 10
 class _Dynamics(Unit):
     """A unit that measures its source's level in dB (an RMS over about 10 ms, the louder
     channel of a stereo source) and multiplies the source by a gain computed from it."""
+
+    @property
+    def duration(self) -> float | None:
+        """The source's plus the release."""
+        return _after(self.src.duration, self._fixed("release", 2.0))
 
     def __init__(self, src: Unit, **values):
         self.src = src

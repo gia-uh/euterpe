@@ -8,7 +8,7 @@ import numpy as np
 
 from scipy.signal import lfilter
 
-from euterpe.sound.core import RATE, Param, Unit, rng
+from euterpe.sound.core import LN60, RATE, Param, Unit, _after, rng
 
 _ONE = 1 << 32  # one cycle of phase in the fixed-point accumulators
 
@@ -149,6 +149,12 @@ class Pluck(Unit):
         Param("position", "", 0.0, 0.5, default=0.0),
     )
 
+    @property
+    def duration(self) -> float | None:
+        """Until the fundamental, which damping alone shrinks on each trip, falls from 0.9 to -60 dBFS."""
+        v = self._values
+        return float(np.log(1e-3 / 0.9) / (v["freq"] * np.log(v["damping"])))
+
     def __init__(
         self,
         freq: float,
@@ -220,6 +226,13 @@ class Modal(Unit):
     is struck once, by a single impulse at the start, and each mode starts as a sine at its
     amplitude. A mode at or above 24 000 Hz is left out.
     """
+
+    @property
+    def duration(self) -> float | None:
+        """The slowest mode's time to fall from its amplitude to -60 dBFS, after the excitation."""
+        tail = max((t * max(0.0, 3 + np.log10(abs(a))) / 3 for t, a in zip(self.decays, self.amps) if a), default=0.0)
+        start = 0.0 if self.excite is None else self.excite.duration
+        return _after(start, float(tail))
 
     def __init__(
         self,
