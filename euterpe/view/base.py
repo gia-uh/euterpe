@@ -22,6 +22,7 @@ class View:
     """Subclasses implement draw() and may set audio. caption and id travel as display metadata."""
 
     audio: Clip | None = None
+    width: float = 7.0  # inches; row() narrows its panels so the whole row keeps this width
 
     def __init__(self, *, caption: str | None = None, id: str | None = None):
         self.caption = caption
@@ -98,11 +99,13 @@ class View:
 class Player(View):
     """Audio only: an MP3 in the book, an audio tag in a notebook."""
 
-    def __init__(self, x: Unit | Clip, *, caption: str | None = None, id: str | None = None):
+    def __init__(self, x: Unit | Clip, seconds: float | None = None, caption: str | None = None, *,
+                 id: str | None = None):
         super().__init__(caption=caption, id=id)
-        self.audio = sources(x)[0]
+        self.audio = x.take(seconds) if isinstance(x, Unit) and seconds is not None else sources(x)[0]
 
 
-def listen(x: Unit | Clip, *, caption: str | None = None, id: str | None = None) -> Player:
-    """The player alone, for a unit (taken for its duration) or a clip."""
-    return Player(x, caption=caption, id=id)
+def listen(x: Unit | Clip, seconds: float | None = None, caption: str | None = None, *,
+           id: str | None = None) -> Player:
+    """The player alone: a unit for seconds (or its duration), or a clip."""
+    return Player(x, seconds, caption, id=id)

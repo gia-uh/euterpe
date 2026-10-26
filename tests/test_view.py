@@ -194,3 +194,33 @@ def test_waveform_reference_is_drawn_in_grey_under_each_panel():
 def test_waveform_marks_name_moments_in_time():
     fig = waveform(Pluck(220).take(0.5), marks=[(0.2, "gate ends")]).figure()
     assert any(t.get_text() == "gate ends" for t in fig.axes[0].texts)
+
+
+def test_listen_takes_seconds_and_caption_like_the_old_helper():
+    v = listen(Sine(440) * 0.5, 1.5, "A sine", id="s")
+    assert v.audio.seconds == 1.5 and v._repr_mimebundle_()[1] == {"caption": "A sine", "id": "s"}
+
+
+def _width_pt(svg: bytes) -> float:
+    import re
+    return float(re.search(rb'width="([\d.]+)(pt)?"', svg).group(1))
+
+
+def test_a_row_is_about_as_wide_as_one_figure():
+    one = waveform(Sine(440).take(0.01))
+    two = row(waveform(Sine(440).take(0.01)), waveform(Sine(440).take(0.01)))
+    assert _width_pt(two.svg()) < 1.3 * _width_pt(one.svg())
+
+
+def test_level_shows_at_most_80_db_below_the_peak():
+    from euterpe.sound import ADSR
+    ax = level(ADSR(attack=0.0, decay=0.5, sustain=0.0, gate=1.0).take(1.0)).figure().axes[0]
+    lo, hi = ax.get_ylim()
+    assert hi - lo <= 90
+
+
+def test_end_labels_do_not_overlap():
+    fig = waveform(*[Sine(440).take(0.005) for _ in range(3)], labels=["a", "b", "c"]).figure()
+    fig.canvas.draw()
+    boxes = [t.get_window_extent() for t in fig.axes[0].texts if t.get_text() in "abc"]
+    assert not any(a.overlaps(b) for i, a in enumerate(boxes) for b in boxes[i + 1:])

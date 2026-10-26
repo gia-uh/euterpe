@@ -47,12 +47,22 @@ def _mark_default(clips, ax) -> None:
 
 
 def _name_lines(ax, lines, labels) -> None:
-    """Each series named in its own ink at the right end of its line, instead of a legend."""
+    """Each series named in its own ink at the right end of its line, instead of a legend; labels
+    that would touch are pushed apart vertically."""
+    ax.autoscale_view()
+    gap = 13 * ax.figure.dpi / 72  # 13 pt between label centres: an 8.5 pt label with its line gap
+    ends = []
     for line, label in zip(lines, labels or []):
         x, y = line.get_xdata(), line.get_ydata()
         if len(x):
-            ax.annotate(label, (x[-1], y[-1]), xytext=(4, 0), textcoords="offset points", va="center",
-                        fontsize=8.5, fontstyle="italic", color=line.get_color())
+            ends.append((ax.transData.transform((x[-1], y[-1]))[1], x[-1], y[-1], label, line.get_color()))
+    ends.sort()
+    placed = []
+    for disp_y, x, y, label, color in ends:
+        target = disp_y if not placed else max(disp_y, placed[-1] + gap)
+        placed.append(target)
+        ax.annotate(label, (x, y), xytext=(4, (target - disp_y) * 72 / ax.figure.dpi), textcoords="offset points",
+                    va="center", fontsize=8.5, fontstyle="italic", color=color)
 
 
 def _period(x: np.ndarray, rate: int) -> float | None:
@@ -110,7 +120,7 @@ class Waveform(_Many):
         ms = hi - lo <= 0.1
         scale = 1000 if ms else 1
         k = len(self.clips) if self.separate else 1
-        fig, axes = plt.subplots(k, 1, figsize=(7.0, 2.4 if k == 1 else 0.6 + 1.1 * k), sharex=True,
+        fig, axes = plt.subplots(k, 1, figsize=(self.width, 2.4 if k == 1 else 0.6 + 1.1 * k), sharex=True,
                                  sharey=True, squeeze=False)
         axes = axes[:, 0]
         lines = []
@@ -157,7 +167,7 @@ class Default(View):
         if c.seconds <= 0.05:
             fig = Waveform(c).draw()
             return fig
-        fig, (a, b) = plt.subplots(1, 2, figsize=(7.0, 2.3), gridspec_kw={"width_ratios": [1.15, 1], "wspace": 0.28})
+        fig, (a, b) = plt.subplots(1, 2, figsize=(self.width, 2.3), gridspec_kw={"width_ratios": [1.15, 1], "wspace": 0.28})
         hop = max(1, len(x) // 600)
         env = np.abs(x[: len(x) // hop * hop]).reshape(-1, hop).max(axis=1)
         te = np.arange(len(env)) * hop / c.rate
@@ -231,7 +241,7 @@ class Spectrum(_Many):
 
         if self.f0:
             k = len(self.clips)
-            fig, axes = plt.subplots(k, 1, figsize=(7.0, 1.0 + 1.15 * k), sharex=True, squeeze=False,
+            fig, axes = plt.subplots(k, 1, figsize=(self.width, 1.0 + 1.15 * k), sharex=True, squeeze=False,
                                      gridspec_kw={"hspace": 0.35})
             axes = axes[:, 0]
             for i, (c, ax) in enumerate(zip(self.clips, axes)):
@@ -247,7 +257,7 @@ class Spectrum(_Many):
             axes[len(axes) // 2].set_ylabel("level (dB)", fontstyle="italic")
             _mark_default(self.clips, axes[0])
             return fig
-        fig, ax = plt.subplots(figsize=(7.0, 2.6))
+        fig, ax = plt.subplots(figsize=(self.width, 2.6))
         lines = []
         for i, c in enumerate(self.clips):
             x = _mono(c)
@@ -281,7 +291,7 @@ class Spectrogram(_Many):
         from scipy.signal import spectrogram as stft
 
         k = len(self.clips)
-        fig, axes = plt.subplots(1, k, figsize=(7.0, 2.8), sharey=True, squeeze=False,
+        fig, axes = plt.subplots(1, k, figsize=(self.width, 2.8), sharey=True, squeeze=False,
                                  gridspec_kw={"wspace": 0.12})
         for i, (c, ax) in enumerate(zip(self.clips, axes[0])):
             x = _mono(c)
@@ -317,7 +327,7 @@ class Level(_Many):
     def draw(self):
         import matplotlib.pyplot as plt
 
-        fig, ax = plt.subplots(figsize=(7.0, 2.4))
+        fig, ax = plt.subplots(figsize=(self.width, 2.4))
         lines = []
         for i, c in enumerate(self.clips):
             x = _mono(c)
@@ -328,6 +338,8 @@ class Level(_Many):
             (line,) = ax.step(t, db, where="post", color=SERIES[i % len(SERIES)], lw=1.1)
             lines.append(line)
         ax.set_xlim(0, max(c.seconds for c in self.clips))
+        top = max(float(np.nanmax(line.get_ydata())) for line in lines)
+        ax.set_ylim(max(ax.get_ylim()[0], top - 80), top + 3)
         _name_lines(ax, lines, self.labels)
         label_axis(ax, "time (s)", "level (dBFS)")
         _mark_default(self.clips, ax)

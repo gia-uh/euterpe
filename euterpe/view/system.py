@@ -63,7 +63,7 @@ class Response(View):
         import matplotlib.pyplot as plt
         from matplotlib.ticker import FuncFormatter
 
-        fig, ax = plt.subplots(figsize=(7.0, 2.6))
+        fig, ax = plt.subplots(figsize=(self.width, 2.6))
         imp = np.zeros(1)
         imp[0] = 1.0
         lines = []

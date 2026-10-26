@@ -22,6 +22,8 @@ class Row(View):
         if self._svg is None:
             parts, x, h, gap = [], 0.0, 0.0, 12.0
             for v in self.views:
+                v.width = self.width / len(self.views)
+                v._svg = None
                 s = v.svg()
                 if s is None:
                     continue
