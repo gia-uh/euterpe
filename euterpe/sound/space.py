@@ -160,7 +160,7 @@ class Chorus(_Moving):
 
 class Flanger(_Moving):
     """The source mixed with a copy delayed by 0.5 ms to 0.5 ms + depth seconds, the delay
-    sweeping rate times a second, part of the output fed back.
+    sweeping rate times a second, part of the delayed copy fed back.
 
     A delay of T seconds puts peaks at multiples of 1 / T Hz: at 0.5 ms every 2000 Hz, at
     2.5 ms every 400 Hz. Sweeping T slides the whole comb up and down the spectrum, the

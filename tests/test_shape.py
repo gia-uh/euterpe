@@ -33,6 +33,16 @@ def test_saturator_adds_even_harmonics():
     assert band_db(render(Saturator(Sine(200.0)), 1.0), 390, 410) > -40
 
 
+@pytest.mark.parametrize("drive, bias", [(2.0, 0.1), (1.0, 0.1), (4.0, 0.2), (10.0, 0.5), (30.0, 1.0)])
+def test_saturator_puts_a_full_scale_sine_at_minus_1_dbfs(drive, bias):
+    x = render(Saturator(Sine(220.0), drive=drive, bias=bias), 2.0)[48_000:]
+    assert abs(20 * np.log10(np.abs(x).max()) + 1.0) < 0.5
+
+
+def test_saturator_keeps_silence_silent():
+    assert np.abs(render(Saturator(Const(0.0), drive=10.0, bias=0.5), 0.1)).max() == 0.0
+
+
 def test_saturator_has_no_dc():
     x = render(Saturator(Sine(200.0), drive=10.0, bias=0.5), 2.0)
     assert abs(x[48_000:].mean()) < 1e-3

@@ -120,7 +120,8 @@ class Saturator(Unit):
     The bias shifts the wave before the curve, so the two halves bend differently: the curve is
     no longer odd, and even harmonics (2, 4, 6 times each frequency) join the odd ones, the
     warmer sound of tube amplifiers. The lopsided wave also has a component at 0 Hz, which a
-    highpass at 10 Hz removes. A full-scale input comes out at about -1 dBFS.
+    highpass at 10 Hz removes. The output is scaled so a full-scale sine, once that offset is
+    gone, peaks at -1 dBFS (0.891).
     """
 
     params = (Param("drive", *_DRIVE, default=2.0), Param("bias", "", 0.0, 1.0, default=0.1))
@@ -144,11 +145,17 @@ class Saturator(Unit):
         d = self._param("drive", n).astype(np.float64)[:, None]
         b = self._param("bias", n).astype(np.float64)[:, None]
         rest = np.tanh(d * b)
-        scale = np.maximum(np.tanh(d * (1 + b)) - rest, rest - np.tanh(d * (b - 1)))
+        # a full-scale sine through the curve: its offset (its mean over a cycle), which the
+        # highpass removes, and its peak on either side of that offset
+        offset = np.tanh(d * (_CYCLE + b)).mean(axis=1, keepdims=True)
+        scale = np.maximum(np.tanh(d * (1 + b)) - offset, offset - np.tanh(d * (b - 1)))
         y = (np.tanh(d * (x + b)) - rest) / scale
         p = self._p  # one-pole highpass at 10 Hz: y[n] = p * (y[n-1] + x[n] - x[n-1])
         y, self._zi = lfilter([p, -p], [1.0, -p], y, axis=0, zi=self._zi)
         return _out(_CEILING * y, self.channels)
+
+
+_CYCLE = np.sin(2 * np.pi * np.arange(256) / 256)  # one cycle of a sine, for Saturator's level
 
 
 _RMS_TIME = 0.01  # the level detector averages the squared signal over about 10 ms
