@@ -222,7 +222,7 @@ amp = np.abs(np.fft.rfft(x)) * 2 / len(x)
 print("  ".join(f"{20 * np.log10(amp[220 * k]):6.1f}" for k in range(1, 8)))
 ```
 
-The 2nd harmonic is now at −18.3 dB, nearly as loud as the 3rd at −16.7 dB, and the 4th and 6th are there too. The plot puts the four spectra side by side, the first ten harmonics of 220 Hz marked, odd ones in blue and even ones in orange:
+The 2nd harmonic is now at −15.0 dB, nearly as loud as the 3rd at −13.3 dB, and the 4th and 6th are there too. The plot puts the four spectra side by side, the first ten harmonics of 220 Hz marked, odd ones in blue and even ones in orange:
 
 ```python {run echo=false}
 import matplotlib.pyplot as plt
@@ -389,7 +389,7 @@ for name, unit in (("dry", dry()), ("compressed", held())):
     print(f"{name:>10}:", "  ".join(f"{db(x[i * 24000 : i * 24000 + 4800]):6.1f}" for i in range(6)))
 ```
 
-The dry note falls about 19 dB a second, from −31.0 dB at 0.5 s to −59.4 dB at 2 s. While the note is above the threshold, the compressor divides that fall by the ratio: 19 / 8 is about 2.4 dB a second, and the compressed note goes from −30.9 dB to −34.1 dB over the same 1.5 s. It holds its tail like a note that is still being played. Its start is quieter than the dry one, −25.8 dB against −19.6 dB: that first tenth of a second is what the compressor squeezes hardest. After 2.5 s the note nears the threshold and the compressor lets it fall at its own rate again.
+The dry note falls about 19 dB a second, from −31.0 dB at 0.5 s to −59.4 dB at 2 s. While the note is above the threshold, the compressor divides that fall by the ratio: 19 / 8 is about 2.4 dB a second, and the compressed note goes from −30.9 dB to −34.1 dB over the same 1.5 s, about 2.1 dB a second, close to the rule's 2.4. It holds its tail like a note that is still being played. Its start is quieter than the dry one, −25.8 dB against −19.6 dB: that first tenth of a second is what the compressor squeezes hardest. After 2.5 s the note nears the threshold and the compressor lets it fall at its own rate again.
 
 ### Limiter
 
@@ -590,7 +590,7 @@ from euterpe.sound import Chorus, Delay, FDNReverb, Limiter, Pan, Pluck, Saturat
 note = Pluck(147.0, damping=0.995, brightness=0.7)
 tone = Chorus(Saturator(note, drive=3.0, bias=0.2), rate=0.6, depth=0.002)
 space = FDNReverb(Pan(Delay(tone, time=0.375, feedback=0.4, mix=0.3), pos=-0.3), decay=2.5, mix=0.3)
-listen(Limiter(space * 0.9, ceiling=-1.0), 6.0, "A pluck at 147 Hz: saturator, chorus, delay, pan, reverb and limiter")
+listen(Limiter(space * 0.9, ceiling=-1.0), 7.0, "A pluck at 147 Hz: saturator, chorus, delay, pan, reverb and limiter")
 ```
 
 Change the order and the sound changes. Distortion after the reverb would distort every echo of the tail together, and each echo would intermodulate with the others; in the chain above, the chorus comes before the delay, so every echo repeats the shimmer of the note. With the delay first, each echo would pass through the chorus at a different moment of its sweep and shimmer differently.
