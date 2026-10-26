@@ -9,7 +9,7 @@ The book teaches music to a programmer who knows none, and it is also where a re
 A visible block is code the reader learns from and can retype and change. Two kinds qualify, when they are short and simple:
 
 - Euterpe code that makes or changes sound: units, parameters, `render`, `listen`.
-- Short numpy or scipy code that computes the physics or maths the chapter teaches. Chapter 1 shows the comparison of the 44 000 Hz and 4 000 Hz samples and the measurement of folded energy, because a reader who doubts the claim wants to run and change exactly that code.
+- Short numpy or scipy code that computes the physics or maths the chapter teaches. Chapter 1 shows the comparison of the 44 000 Hz and 4 000 Hz samples and the `fold` rule, because a reader who doubts the claim wants to run and change exactly that code.
 
 Utility code runs hidden, in `{run echo=false}` blocks: plotting and drawing (matplotlib), formatting of tables and text, bookkeeping, level checks. A hidden block that needs a variable from the block above it uses `{run continue echo=false}`.
 
