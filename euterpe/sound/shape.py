@@ -115,7 +115,9 @@ class Shaper(Unit):
 
 
 class Saturator(Unit):
-    """A tube-like saturator: tanh(drive * (x + bias)), with the bias taken out again.
+    """A tube-like saturator: tanh(drive / 2 * (x + bias)), with the bias taken out again.
+    drive is halved as in Shaper, so the same drive pushes a full-scale sine the same distance
+    into the curve in both.
 
     The bias shifts the wave before the curve, so the two halves bend differently: the curve is
     no longer odd, and even harmonics (2, 4, 6 times each frequency) join the odd ones, the
@@ -142,7 +144,7 @@ class Saturator(Unit):
 
     def block(self, n: int) -> np.ndarray:
         x = _frames(self.src.block(n))
-        d = self._param("drive", n).astype(np.float64)[:, None]
+        d = self._param("drive", n).astype(np.float64)[:, None] / 2
         b = self._param("bias", n).astype(np.float64)[:, None]
         rest = np.tanh(d * b)
         # a full-scale sine through the curve: its offset (its mean over a cycle), which the
