@@ -126,6 +126,12 @@ class Biquad(_Filter):
         tail = LN60 * self._fixed("q", 40.0) / (np.pi * self._fixed("cutoff", 20.0))
         return _after(self.src.duration, float(tail))
 
+    def response(self, **kw):
+        """This filter's gain over frequency, as a view."""
+        from euterpe.view import response
+
+        return response(self, **kw)
+
     def __init__(
         self,
         src: Unit,
@@ -156,6 +162,12 @@ class OnePole(_Filter):
     def duration(self) -> float | None:
         """The source's plus 60 dB of the pole's time constant, 1 / (2 pi cutoff)."""
         return _after(self.src.duration, float(LN60 / (2 * np.pi * self._fixed("cutoff", 20.0))))
+
+    def response(self, **kw):
+        """This filter's gain over frequency, as a view."""
+        from euterpe.view import response
+
+        return response(self, **kw)
 
     def __init__(self, src: Unit, cutoff: float | Unit, kind: Literal["lowpass", "highpass"] = "lowpass"):
         if kind not in ("lowpass", "highpass"):
@@ -280,6 +292,12 @@ class Formant(Unit):
         """The source's plus the ringing of the lowest, longest-ringing formant band."""
         f = min(min(v) for v in _VOWELS.values())
         return _after(self.src.duration, float(LN60 * _FORMANT_Q / (np.pi * f)))
+
+    def response(self, **kw):
+        """This filter's gain over frequency, as a view."""
+        from euterpe.view import response
+
+        return response(self, **kw)
 
     def __init__(self, src: Unit, vowel: Literal["a", "e", "i", "o", "u"]):
         if vowel not in _VOWELS:

@@ -107,6 +107,12 @@ class Shaper(Unit):
         """The source's: this unit adds no tail."""
         return self.src.duration
 
+    def curve(self, **kw):
+        """This shaper's input-to-output curve, as a view."""
+        from euterpe.view import curve
+
+        return curve(self, **kw)
+
     def __init__(self, src: Unit, kind: Literal["tanh", "soft", "hard"], drive: float | Unit = 1.0):
         if kind not in _CURVES:
             raise ValueError(f"Shaper kind must be one of {', '.join(_CURVES)}, got {kind!r}")
@@ -142,6 +148,12 @@ class Saturator(Unit):
     def duration(self) -> float | None:
         """The source's: this unit adds no tail."""
         return self.src.duration
+
+    def curve(self, **kw):
+        """This shaper's input-to-output curve, as a view."""
+        from euterpe.view import curve
+
+        return curve(self, **kw)
 
     def __init__(self, src: Unit, drive: float | Unit = 2.0, bias: float | Unit = 0.1):
         self.src = src

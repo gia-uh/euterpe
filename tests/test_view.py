@@ -108,3 +108,73 @@ def test_stereo_and_silence_draw_cleanly(clip, view):
 def test_every_view_marks_the_default_length(view):
     fig = view(Sine(440)).figure()
     assert any(t.get_text() == "1 s (default)" for ax in fig.axes for t in ax.texts)
+
+
+from euterpe.sound import Biquad, OnePole, Saturator, Shaper
+from euterpe.view import curve, figure, response, row
+
+
+def test_response_of_a_resonant_lowpass_peaks_near_its_cutoff():
+    v = response(Biquad(Sine(1), "lowpass", cutoff=800, q=12))
+    line = v.figure().axes[0].lines[0]
+    f, db = line.get_xdata(), line.get_ydata()
+    assert 700 < f[np.argmax(db)] < 900 and db.max() > 15
+
+
+def test_response_method_and_labels():
+    fig = OnePole(Sine(1), cutoff=500).response().figure()
+    assert any("500 Hz" in t.get_text() for t in fig.axes[0].texts)
+
+
+def test_response_refuses_a_moving_filter():
+    with pytest.raises(ValueError, match="fixed"):
+        response(Biquad(Sine(1), "lowpass", cutoff=Sine(1) * 100 + 500)).figure()
+
+
+def test_curve_of_a_hard_clipper_is_flat_beyond_its_knee():
+    # at drive 4, hard is 0.891 * min(2x, 1): a straight line up to x = 0.5, flat after
+    line = curve(Shaper(Sine(1), "hard", drive=4)).figure().axes[0].lines[-1]
+    x, y = line.get_xdata(), line.get_ydata()
+    at = lambda v: y[np.argmin(np.abs(x - v))]
+    assert at(0.25) == pytest.approx(0.4455, abs=0.01)
+    assert at(0.75) == pytest.approx(0.891, abs=0.01) and at(1.0) == pytest.approx(0.891, abs=0.01)
+
+
+def test_row_puts_views_side_by_side_with_one_caption():
+    v = row(waveform(Sine(440).take(0.01)), spectrum(Saw(220).take(0.3), f0=220), caption="two")
+    root = ET.fromstring(v.svg())
+    assert len([e for e in root if e.tag.endswith("svg")]) == 2
+    assert v._repr_mimebundle_()[1] == {"caption": "two"}
+
+
+def test_row_takes_audio_from_the_first_view_that_has_it():
+    assert row(waveform(Sine(440).take(0.01)), Pluck(220).take(0.5).view()).audio is not None
+
+
+def test_figure_wraps_a_drawing_in_the_house_style():
+    import matplotlib.pyplot as plt
+
+    def draw():
+        fig, ax = plt.subplots()
+        ax.plot([0, 1], [0, 1])
+        return fig
+
+    v = figure(draw, caption="hand-made")
+    assert b"<svg" in v.svg() and v._repr_mimebundle_()[1] == {"caption": "hand-made"}
+
+
+def test_a_notebook_shows_svg_and_audio():
+    nbformat = pytest.importorskip("nbformat")
+    from nbclient import NotebookClient
+
+    nb = nbformat.v4.new_notebook(cells=[nbformat.v4.new_code_cell("from euterpe.sound import Pluck\nPluck(220)")])
+    NotebookClient(nb, timeout=120, kernel_name="python3").execute()
+    html = nb.cells[0].outputs[0]["data"]["text/html"]
+    assert "<svg" in html and "<audio" in html
+
+
+def test_row_panels_do_not_overlap():
+    v = row(waveform(Sine(440).take(0.01)), waveform(Sine(440).take(0.01)))
+    inner = [e for e in ET.fromstring(v.svg()) if e.tag.endswith("svg")]
+    w0 = float(inner[0].get("width"))
+    assert float(inner[1].get("x")) >= w0 and not inner[0].get("width").endswith("pt")
