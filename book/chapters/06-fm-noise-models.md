@@ -86,7 +86,7 @@ The pitch stays at 220 Hz while the tone goes from a flute-like sine to a buzz l
 
 ### Ratios that are not whole numbers
 
-When the ratio is not a whole number, the sidebands are not harmonics of the carrier. With freq 200 Hz and ratio 1.4, the modulator is at 280 Hz, and the sidebands sit at 200 ± 280 k: 480, 760, 1 040 … and, mirrored, 80, 360, 640 … Hz. These are multiples of 40 Hz, too low a spacing to hear as a pitch, so the ear hears several pitches at once, as with chapter 3's metal bar.
+When the ratio is not a whole number, the sidebands are not harmonics of the carrier. With freq 200 Hz and ratio 1.4, the modulator is at 280 Hz, and the sidebands sit at 200 ± 280 k: 480, 760, 1 040 … and, mirrored, 80, 360, 640 … Hz. These are all multiples of 40 Hz, but only a few of them: the 2nd, 5th, 9th, 12th, 16th, 19th … harmonics of 40 Hz, with most of the series missing. The ear does not fuse such a sparse set into one tone at 40 Hz, so it hears several pitches at once, as with chapter 3's metal bar.
 
 ### An index that moves
 
@@ -138,7 +138,7 @@ A modulator that leans to one side also pushes the carrier off-centre, so feedba
 
 Chapter 5 used `WhiteNoise`, whose spectrum is flat: each band 100 Hz wide holds the same energy, on average, from 0 to 24 000 Hz. The ear does not hear in bands of equal width, though. It hears in octaves, and each octave is twice as wide as the one below it: 4 000 to 8 000 Hz is 4 000 Hz wide, 250 to 500 Hz only 250. So white noise puts more energy in each octave than in the one below, twice as much, 3 dB more, and it sounds bright, like hiss.
 
-Two other noises are named after colours of light. `PinkNoise(seed)` falls 3 dB per octave in each Hz, which exactly cancels the doubling width: every octave holds the same energy. `BrownNoise(seed)` falls 6 dB per octave. It is not named after the colour but after Robert Brown, who described the random motion of pollen grains in water: each sample is the last one plus a small random step, the way a grain wanders. The block measures each noise's level, in dB, in bands 10 % wide starting at six frequencies an octave apart:
+Two other noises are named after colours of light. The level per Hz of `PinkNoise(seed)` falls 3 dB per octave, which exactly cancels the doubling width: every octave holds the same energy. `BrownNoise(seed)` falls 6 dB per octave. It is not named after the colour but after Robert Brown, who described the random motion of pollen grains in water: each sample is the last one plus a small random step, the way a grain wanders. The block measures each noise's level, in dB, in bands 10 % wide starting at six frequencies an octave apart:
 
 ```python {run output=code}
 import numpy as np
@@ -276,7 +276,7 @@ A guitar string, plucked, starts with the shape the finger gave it. That shape r
 
 ### Step 1: noise in a delay line
 
-The pluck is a short burst of noise, one period long: at 220 Hz, 1/220 s, 4.5 ms. It goes into a comb whose delay is the same period and whose feedback is 0.996, so it circulates and comes back 220 times a second, losing 0.4 % at each trip. `Segments` makes the burst's envelope: 1 from the start to 1/220 s, then 0. The burst's 218 random samples do not average exactly 0, and the comb boosts 0 Hz as much as it boosts each harmonic, so a `OnePole` high-pass at 20 Hz removes that offset, as in chapter 5. The `ADSR` at the end, with no attack and full sustain, only fades the note out over 0.4 s from 2.4 s on, as a hand laid on the string would, so that the sound ends before the file does.
+The pluck is a short burst of noise, one period long: at 220 Hz, 1/220 s, 4.5 ms. It goes into a comb whose delay is the same period and whose feedback is 0.996, so it circulates and comes back 220 times a second, losing 0.4 % at each trip. `Segments` makes the burst's envelope: 1 from the start to 1/220 s, then 0. The burst's 219 random samples (from sample 0 to sample 218, where 1/220 s falls) do not average exactly 0, and the comb boosts 0 Hz as much as it boosts each harmonic, so a `OnePole` high-pass at 20 Hz removes that offset, as in chapter 5. The `ADSR` at the end, with no attack and full sustain, only fades the note out over 0.4 s from 2.4 s on, as a hand laid on the string would, so that the sound ends before the file does.
 
 ```python {run}
 from euterpe.book import listen
@@ -302,7 +302,7 @@ for k in (1, 5, 20, 50):
     print(f"harmonic {k:2} ({f:5} Hz): {20 * np.log10(per_trip ** 220):7.1f} dB in one second")
 ```
 
-The first harmonic loses 7.9 dB in a second and the fifth 12.6. The twentieth loses 88, so it falls 60 dB in under a second, and the fiftieth, at 11 000 Hz, loses 553: it is gone in about a tenth of a second. So the note starts bright and becomes rounder as it rings, which is the sound of a plucked string.
+The first harmonic loses 7.9 dB in a second and the fifth 12.6. The twentieth loses 88, so it falls 60 dB in under a second, and the fiftieth, at 11 000 Hz, loses 553: it is gone in about a tenth of a second. So the note starts bright and becomes rounder as it rings, which is the sound of a plucked string. The first sound in this chapter with the averaging filter in its loop is `Pluck`, after step 3; the spectrogram there sets it beside the comb of step 1.
 
 ### Step 3: the exact pitch
 
@@ -366,14 +366,14 @@ for damping in (0.99, 0.996, 0.999):
     listen(Pluck(220.0, damping=damping, seed=1) * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4) * 0.8, 3.0, f"A plucked A3, damping {damping}")
 ```
 
-At 0.99 the note is short and muffled, like a string damped by the palm of the hand. At 0.999 it rings like a harp. `brightness` is the softness of what plucks it, from a fingertip (dark) to a hard plectrum (bright). `Pluck` gives every burst the same energy (unless that would put its peak above 0.9), but a bright burst holds much of it in high harmonics, and step 2 showed that those are gone within a fraction of a second. So over the whole note a bright pluck is quieter. The gains 0.42, 0.5 and 1.0 compensate, so the three differ in tone and not in loudness, and the second block measures them:
+At 0.99 the note is short and muffled, like a string damped by the palm of the hand. At 0.999 it rings like a harp. `brightness` is the softness of what plucks it, from a fingertip (dark) to a hard plectrum (bright). `Pluck` gives every burst the same energy (unless that would put its peak above 0.9), but a bright burst holds much of it in high harmonics, and step 2 showed that those are gone within a fraction of a second. So over the whole note a bright pluck is quieter. The gains 0.49, 0.58 and 1.15 compensate, so the three differ in tone and not in loudness, and the second block measures them:
 
 ```python {run}
 from euterpe.book import listen
 from euterpe.sound import ADSR, Pluck
 
 plucks = {}
-for brightness, gain in ((0.1, 0.42), (0.5, 0.5), (0.9, 1.0)):
+for brightness, gain in ((0.1, 0.49), (0.5, 0.58), (0.9, 1.15)):
     plucks[brightness] = Pluck(220.0, brightness=brightness, seed=1) * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4) * gain
     listen(plucks[brightness], 3.0, f"A plucked A3, brightness {brightness}")
 ```
@@ -393,7 +393,7 @@ from euterpe.book import listen
 from euterpe.sound import ADSR, Pluck
 
 for position in (0.1, 0.25, 0.5):
-    listen(Pluck(220.0, damping=0.998, brightness=0.8, position=position, seed=1) * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4), 3.0, f"A plucked A3, position {position}")
+    listen(Pluck(220.0, damping=0.998, brightness=0.8, position=position, seed=1) * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4) * 1.05, 3.0, f"A plucked A3, position {position}")
 ```
 
 Strings are often played together. Five plucks at once are a strummed chord, held a little longer:
