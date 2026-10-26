@@ -139,6 +139,8 @@ class EnvelopeFollower(Unit):
         if x.ndim == 2:
             x = x.max(axis=1)
         # one-pole smoothing: each sample moves the level a fraction (1 - k) of the way to |x|
+        # The rise/fall switch makes this a per-sample Python loop, about 0.03 s of CPU per second
+        # of audio; dynamics (Compressor, Gate) that build on it may need a vectorised detector.
         rise = np.exp(-1.0 / np.maximum(self._param("attack", n) * RATE, 1e-12))
         fall = np.exp(-1.0 / np.maximum(self._param("release", n) * RATE, 1e-12))
         out = np.empty(n, np.float64)

@@ -122,7 +122,7 @@ listen(Saw(220.0) * ADSR(attack=0.002, decay=0.0, sustain=1.0, release=0.05, gat
 listen(Saw(220.0) * ADSR(attack=0.8, decay=0.0, sustain=1.0, release=0.05, gate=1.2) * 0.3, 1.5, "Attack 0.8 s")
 ```
 
-The short attack starts the note at once, with a firm edge but no click: 2 ms is 96 samples, enough to round off the jump. The long attack swells in, and the start of the note is hard to place in time. That is why players of fast music use instruments and sounds with short attacks.
+The short attack starts the note at once, with a firm edge but no click: 2 ms is 96 samples, enough to round off the jump. The long attack swells in, and the start of the note is hard to place in time. In fast music, with notes 0.1 s apart, an attack of 0.8 s would let each note reach only an eighth of its level before the next one starts, and the notes would blur together.
 
 Then the decay and the sustain. Both notes rise in 5 ms and fall for 0.6 s; the first falls to a sustain level of 0.8, the second to 0.1.
 
@@ -307,7 +307,7 @@ for t in (0.1, 0.3, 0.5, 0.7, 0.8):
     print(t, "s:", round(float(followed[int(t * RATE)]), 3), round(float(env[int(t * RATE)]), 3))
 ```
 
-`note_env` is a plain Python function that builds a new envelope each time it is called, so the sine and the comparison each get their own. The follower stays within 0.05 of the envelope. After each peak of the sine it falls at the pace its release allows until the next peak, 4.5 ms later, so it sits a little below the envelope while the level holds (0.846 against 0.9 at 0.1 s). When the envelope falls faster than the release, it lags above it (0.177 against 0.133 at 0.8 s). A shorter release would follow faster, but it would also start to follow each cycle of the sine.
+`note_env` is a plain Python function that builds a new envelope each time it is called, so the sine and the comparison each get their own. The follower stays within about 0.05 of the envelope. It follows the peaks of |src|, and |sin| peaks twice per cycle, every 2.3 ms at 220 Hz. After each peak the follower falls at the pace of its 0.1 s release, about 2 % by the next peak, and its 5 ms attack only partly climbs back in the short time |src| is above it. So it settles about 6 % low (0.846 against 0.9 at 0.1 s). When the envelope falls faster than the release, it lags above it (0.177 against 0.133 at 0.8 s). A shorter release would follow faster, but it would also start to follow each cycle of the sine.
 
 Producers use a follower to make one sound make room for another, a technique called *ducking* or *side-chaining*. Below, a held organ chord of two saws is multiplied by `1 - follower`, where the follower listens to a bass drum that strikes at 0.5 s. `Segments` places the drum at 0.5 s, since an `ADSR` always starts at 0:
 
@@ -328,7 +328,7 @@ listen(chord() + drum(), 2.0, "An organ chord and a drum")
 listen(chord() * duck + drum(), 2.0, "The same, the chord ducked by the drum's envelope")
 ```
 
-In the second, the chord drops out of the way for the duration of the drum and comes back as the drum fades, so the drum is heard more clearly at the same level. Chapter 7 builds compressors on the same follower.
+In the second, the chord drops by about 7 dB, to 0.45 of its level, when the drum strikes, and comes back as the drum fades, so the drum is heard more clearly at the same level. Chapter 7 builds compressors on the same follower.
 
 ## Summary
 
