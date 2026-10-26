@@ -15,6 +15,7 @@ files:
   - chapters/03-timbre.md
   - chapters/04-envelopes.md
   - chapters/05-filters.md
+  - chapters/06-fm-noise-models.md
 
 outputs:
   site:
