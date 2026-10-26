@@ -145,7 +145,7 @@ for freq in (100.0, 1_000.0, 3_000.0, 12_000.0):
 
 On most loudspeakers and headphones the 3 000 Hz sine sounds the loudest and the 100 Hz sine much quieter, although their samples swing equally far. The ear is most sensitive between about 2 000 and 5 000 Hz, where the ear canal resonates, and grows less sensitive towards low frequencies, and again above about 10 000 Hz. (Small loudspeakers also play 100 Hz weakly, which adds to the effect.)
 
-*Loudness* is how loud a sound seems, and it can be estimated from the samples. The standard method, ITU-R BS.1770, weights the frequencies with a filter called K-weighting: a high-pass filter cuts frequencies below about 40 Hz, and a shelf raises everything above about 2 000 Hz by up to 4 dB. Then it averages the power over blocks of 400 milliseconds, each overlapping the next by 75 %, and leaves out quiet blocks in two passes. First every block below −70 LUFS goes. Then every block more than 10 loudness units below the average of the remaining blocks goes, and the average of what is left is the result. So the silence between two notes does not lower a sound's loudness. The result is in *LUFS*, loudness units relative to full scale, where one loudness unit is one decibel. `A-LUFS` is this measurement. Here it is for a sine at gain 0.5, at frequencies across the range of hearing:
+*Loudness* is how loud a sound seems, and it can be estimated from the samples. The standard method, ITU-R BS.1770, weights the frequencies with a filter called K-weighting: a high-pass filter slopes gently down from a few hundred hertz and removes most of the energy below about 40 Hz, and a shelf raises everything above about 2 000 Hz by up to 4 dB. Then it averages the power over blocks of 400 milliseconds, each overlapping the next by 75 %, and leaves out quiet blocks in two passes. First every block below −70 LUFS goes. Then every block more than 10 loudness units below the average of the remaining blocks goes, and the average of what is left is the result. So the silence between two notes does not lower a sound's loudness. The result is in *LUFS*, loudness units relative to full scale, where one loudness unit is one decibel. `A-LUFS` is this measurement. Here it is for a sine at gain 0.5, at frequencies across the range of hearing:
 
 ```python {run echo=false}
 import matplotlib.pyplot as plt
@@ -237,6 +237,8 @@ The square still sounds brighter and buzzier than the sine, because it has harmo
 ```python {run echo=false}
 # Level check: lint every sound in build/audio, this chapter's and any written before it.
 # It prints nothing unless one has an error.
+# A failure prints on the page as a block error; it stops the build only once scriptorium
+# can refuse block errors.
 from pathlib import Path
 
 from euterpe.io import read

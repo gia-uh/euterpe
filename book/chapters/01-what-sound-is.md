@@ -295,6 +295,8 @@ Rounding changes the shape of the wave, so it adds frequencies that were not the
 ```python {run echo=false}
 # Level check: lint every sound in build/audio, this chapter's and any written before it.
 # It prints nothing unless one has an error.
+# A failure prints on the page as a block error; it stops the build only once scriptorium
+# can refuse block errors.
 from pathlib import Path
 
 from euterpe.io import read
