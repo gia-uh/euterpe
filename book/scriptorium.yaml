@@ -11,6 +11,7 @@ vars:
 files:
   - chapters/00-preface.md
   - chapters/01-what-sound-is.md
+  - chapters/02-pitch-and-loudness.md
 
 outputs:
   site:
