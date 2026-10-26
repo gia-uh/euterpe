@@ -44,7 +44,8 @@ def test_additive_is_the_same_in_any_block_size():
 def test_additive_with_a_modulated_freq_is_the_same_in_any_block_size():
     from euterpe.sound.osc import Sine
 
-    unit = Additive(Sine(3.0) * 300 + 500, [(1, 0.5), (2.01, 0.25), (5.3, 0.1)])
+    # partial 2 crosses 24 000 Hz six times a second, so a mask set per block would show here
+    unit = Additive(Sine(3.0) * 4_000 + 10_000, [(1, 0.5), (2, 0.25)])
     whole = render(unit, 0.5)
     assert np.array_equal(whole, render(unit, 0.5, block=1))
     assert np.array_equal(whole, render(unit, 0.5, block=37))
@@ -59,6 +60,12 @@ def test_additive_refuses_a_partial_with_ratio_zero_or_below():
 def test_additive_refuses_a_ratio_that_is_not_finite(ratio):
     with pytest.raises(ValueError, match="ratio"):
         Additive(200.0, [(1, 1.0), (ratio, 0.5)])
+
+
+@pytest.mark.parametrize("amp", [np.nan, np.inf])
+def test_additive_refuses_an_amplitude_that_is_not_finite(amp):
+    with pytest.raises(ValueError, match="amplitude"):
+        Additive(200.0, [(1, 1.0), (2, amp)])
 
 
 def test_additive_refuses_a_frequency_out_of_range():

@@ -31,6 +31,8 @@ class Additive(Unit):
         bad = ~(np.isfinite(ratios) & (ratios > 0))
         if np.any(bad):
             raise ValueError(f"Additive partial ratio must be finite and > 0, got {ratios[bad][0]}")
+        if not np.all(np.isfinite(amps)):
+            raise ValueError(f"Additive partial amplitude must be finite, got {amps[~np.isfinite(amps)][0]}")
         self.ratios, self.amps = ratios, amps
         self._set_params(freq=freq)
         self.reset()
