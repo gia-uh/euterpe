@@ -34,7 +34,10 @@ def _load(target: str, seed: int | None) -> Unit:
     if spec is None or not Path(path).is_file():
         raise _TargetError(f"cannot load {path}: no such file")
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    try:
+        spec.loader.exec_module(module)
+    except Exception as e:
+        raise _TargetError(f"cannot import {path}: {type(e).__name__}: {e}") from None
     fn = getattr(module, name, None)
     if not callable(fn):
         names = sorted(
@@ -52,12 +55,21 @@ def _load(target: str, seed: int | None) -> Unit:
     return unit
 
 
+def _check_seconds(seconds: float) -> None:
+    if seconds <= 0:
+        raise _TargetError(f"--seconds must be above 0, got {seconds:g}")
+
+
 def _render(args) -> int:
+    _check_seconds(args.seconds)
     samples = render(_load(args.target, args.seed), args.seconds)
-    out = write(samples, args.output, rate=args.rate)
+    try:
+        out = write(samples, args.output, rate=args.rate)
+    except ValueError as e:
+        raise _TargetError(str(e)) from None
     peak = float(np.abs(samples).max()) if samples.size else 0.0
     level = f"{20 * np.log10(peak):.1f} dBFS" if peak > 0 else "silent"
-    print(f"{out}: {args.seconds:.1f} s, peak {level}")
+    print(f"{out}: {args.seconds:g} s, peak {level}")
     if peak >= 1.0:
         print(f"euterpe: warning: {out} is clipped: the samples peak at {level}, above full scale", file=sys.stderr)
     return 0
@@ -67,6 +79,7 @@ def _lint(args) -> int:
     if _is_target(args.input):
         if args.seconds is None:
             raise _TargetError(f"linting {args.input} needs --seconds: how long to render it")
+        _check_seconds(args.seconds)
         samples, rate = render(_load(args.input, args.seed), args.seconds), RATE
     elif args.input.endswith(".py"):
         raise _TargetError(f"{args.input} needs a function to call: {args.input}:function")

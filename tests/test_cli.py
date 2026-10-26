@@ -34,7 +34,7 @@ def test_render_writes_the_file_and_reports_its_peak(piece, tmp_path, capsys):
     out = tmp_path / "tone.mp3"
     assert main(["render", f"{piece}:tone", "-o", str(out), "--seconds", "1"]) == 0
     assert out.is_file()
-    assert capsys.readouterr().out == f"{out}: 1.0 s, peak -6.0 dBFS\n"
+    assert capsys.readouterr().out == f"{out}: 1 s, peak -6.0 dBFS\n"
 
 
 def test_render_passes_the_seed_and_the_rate(piece, tmp_path):
@@ -87,3 +87,29 @@ def test_lint_input_it_cannot_read_exits_2(piece, tmp_path, monkeypatch, capsys,
 def test_a_function_that_needs_a_seed_exits_2_without_one(piece, tmp_path, capsys):
     assert main(["render", f"{piece}:seeded", "-o", str(tmp_path / "s.wav"), "--seconds", "1"]) == 2
     assert "--seed" in capsys.readouterr().err
+
+
+def test_an_unknown_output_extension_exits_2(piece, tmp_path, capsys):
+    assert main(["render", f"{piece}:tone", "-o", str(tmp_path / "a.xyz"), "--seconds", "1"]) == 2
+    assert ".wav" in capsys.readouterr().err
+
+
+def test_a_module_that_fails_to_import_exits_2(tmp_path, capsys):
+    bad = tmp_path / "bad.py"
+    bad.write_text("def tone(:\n")
+    assert main(["lint", f"{bad}:tone", "--seconds", "1"]) == 2
+    assert "SyntaxError" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("command", ["render", "lint"])
+@pytest.mark.parametrize("seconds", ["0", "-1"])
+def test_seconds_must_be_positive(piece, tmp_path, capsys, command, seconds):
+    args = [command, f"{piece}:tone", "--seconds", seconds] + (["-o", str(tmp_path / "x.wav")] if command == "render" else [])
+    assert main(args) == 2
+    assert "--seconds" in capsys.readouterr().err
+
+
+def test_render_prints_the_seconds_as_given(piece, tmp_path, capsys):
+    out = tmp_path / "q.wav"
+    assert main(["render", f"{piece}:tone", "-o", str(out), "--seconds", "0.25"]) == 0
+    assert capsys.readouterr().out.startswith(f"{out}: 0.25 s,")
