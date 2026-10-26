@@ -224,3 +224,10 @@ def test_a_modulating_rate_is_clipped_to_20_hz(make):
     from euterpe.sound.core import Const
 
     assert np.array_equal(render(make(Const(50.0)), 0.3), render(make(Const(20.0)), 0.3))
+
+
+@pytest.mark.parametrize("decay", [0.5, 2.0, 20.0])
+def test_fdn_response_has_energy_one_per_side(decay):
+    x = render(FDNReverb(Click(), decay=decay, mix=1.0), decay * 1.1)
+    energy_db = 10 * np.log10((x.astype(np.float64) ** 2).sum(axis=0))
+    assert np.all(np.abs(energy_db) < 1.5), energy_db

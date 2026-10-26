@@ -275,7 +275,8 @@ class FDNReverb(Unit):
     line lengths, 30 to 90 ms at size 1 (each moved up to 10 % by the seed): a bigger size is a
     bigger room, with sparser early echoes. damping is a one-pole lowpass in each line, so high
     frequencies die faster than low ones, as in a room with soft walls; decay holds for the low
-    frequencies. decay, size, damping and seed are numbers, since they set the lines.
+    frequencies. The output is scaled so the response to a click has an energy of 1 on each
+    side, as in ConvolutionReverb, so a wide-band source keeps about its level at any decay. decay, size, damping and seed are numbers, since they set the lines.
     """
 
     params = (
@@ -306,6 +307,21 @@ class FDNReverb(Unit):
         self._taps = self._h[[2, 4]].T  # two orthogonal mixes of the lines, left and right
         self._cap = int(self._len.max()) + 1
         self.reset()
+        self._taps = self._taps / np.sqrt(self._energy())
+        self.reset()
+
+    def _energy(self) -> float:
+        """The energy of the wet response to a click, averaged over the two sides. The network
+        runs for min(1.5 decay, 1) s; the rest of the tail is added from its decay rate, the low
+        frequencies' 60 dB per decay seconds, which is what is left once damping has acted."""
+        decay = self._values["decay"]
+        total = round(min(1.5 * decay, 1.0) * RATE)
+        x = np.zeros(total)
+        x[0] = 1.0
+        y = self._network(x)
+        energy = (y**2).sum(axis=0).mean()
+        last = (y[-4_800:] ** 2).sum(axis=0).mean() / 4_800  # energy per sample at the end
+        return energy + last * decay * RATE / (6 * np.log(10))
 
     def inputs(self) -> list[Unit]:
         return [self.src, *super().inputs()]
@@ -318,7 +334,11 @@ class FDNReverb(Unit):
 
     def block(self, n: int) -> np.ndarray:
         dry = self.src.block(n)
-        x = _mono(dry)
+        return _wet(dry, self._network(_mono(dry)), self._param("mix", n))
+
+    def _network(self, x: np.ndarray) -> np.ndarray:
+        """Run the mono input x through the lines, carrying their state; the wet stereo out."""
+        n = len(x)
         d = self._values["damping"]
         wet = np.empty((n, 2))
         lines = np.arange(8)
@@ -332,7 +352,7 @@ class FDNReverb(Unit):
             self._ring[now % self._cap] = (read * self._gain) @ self._h.T + x[i : i + size, None] * self._sign
             i += size
         self._done += n
-        return _wet(dry, wet, self._param("mix", n))
+        return wet
 
 
 _PART = 512  # the partition length of the convolution, in samples
