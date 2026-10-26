@@ -12,7 +12,7 @@ uv add git+https://github.com/gia-uh/euterpe
 
 ## Example
 
-A plucked A3, rendered to MP3. This is the target API: `Pluck` arrives later in milestone 1.
+A plucked A3, rendered to MP3.
 
 ```python
 from euterpe.sound import Pluck, render
@@ -20,8 +20,8 @@ from euterpe.sound import Pluck, render
 # Karplus-Strong: a burst of noise circulating in a delay line 1/220 s long
 note = Pluck(220.0, damping=0.996, seed=1)
 
-# two seconds at 48 kHz, written as MP3; render returns the path
-path = render(note, 2.0, to="pluck-a3.mp3")
+# two seconds at 48 kHz at half level, written as MP3; render returns the path
+path = render(note * 0.5, 2.0, to="pluck-a3.mp3")
 print(path)
 ```
 
