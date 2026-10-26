@@ -37,6 +37,11 @@ def test_a_follower_tracks_a_sine_amplitude():
     assert abs(render(EnvelopeFollower(Sine(440.0) * 0.5), 1.0)[-1] - 0.5) < 0.05
 
 
+def test_a_follower_falls_after_its_source_stops():
+    x = render(EnvelopeFollower(Sine(440.0) * ADSR(attack=0.0, decay=0.0, sustain=0.5, release=0.0, gate=0.5)), 0.7)
+    assert at(x, 0.6) < 0.5 * np.exp(-1) + 0.05
+
+
 def test_envelopes_render_the_same_in_any_block_size():
     for make in (
         lambda: ADSR(attack=0.01, decay=0.05, sustain=0.3, release=0.1, gate=0.2, curve=0.5),

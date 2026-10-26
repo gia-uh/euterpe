@@ -78,7 +78,7 @@ class ADSR(Unit):
         held = self._held(t, a, d, s, c)
         start = self._held(g, a, d, s, c)
         p = np.clip((t - g) / np.maximum(r, 1e-12), 0.0, 1.0)
-        released = np.where(t - g < r, start * (1.0 - _bend(p, c)), 0.0)
+        released = start * (1.0 - _bend(p, c))  # p = 1 once the release is over, so 0
         return np.where(t < g, held, released).astype(np.float32)
 
 
