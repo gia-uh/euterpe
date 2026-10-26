@@ -7,8 +7,8 @@ Near its end, chapter 2 played four waves at the same pitch, 220 Hz, and the sam
 Here are the four waves again, at 220 Hz and gain 0.5. 220 Hz is the note A3, one octave below A4.
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import Saw, Sine, Square, Triangle
+from euterpe.view import listen
 
 for wave in (Sine, Triangle, Square, Saw):
     display(listen(wave(220.0) * 0.5, 1.5, f"{wave.__name__} at 220 Hz"))
@@ -105,11 +105,10 @@ If a wave is a sum of sines, it can be built by adding sines. Euterpe's `Additiv
 Here is a 220 Hz tone built from its first three harmonics, at amplitudes 1, 1/2 and 1/3, then the same three harmonics with the second one turned up to 1:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import Additive
 
-display(listen(Additive(220.0, [(1, 1.0), (2, 0.5), (3, 0.33)]) * 0.3, 2.0, "Harmonics 1, 2 and 3 at 1, 1/2 and 1/3"))
-listen(Additive(220.0, [(1, 1.0), (2, 1.0), (3, 0.33)]) * 0.3, 2.0, "The same, with harmonic 2 as strong as the fundamental")
+display((Additive(220.0, [(1, 1.0), (2, 0.5), (3, 0.33)]) * 0.3).take(2.0, "Harmonics 1, 2 and 3 at 1, 1/2 and 1/3"))
+display((Additive(220.0, [(1, 1.0), (2, 1.0), (3, 0.33)]) * 0.3).take(2.0, "The same, with harmonic 2 as strong as the fundamental"))
 ```
 
 Both tones have the pitch of 220 Hz, and both are a little richer than a sine. The second sounds brighter and thinner, and a listener may hear its 440 Hz harmonic stand out. Still, there is one note, not three: when partials sit at whole multiples of one frequency, the ear fuses them into a single tone with the pitch of that frequency.
@@ -117,12 +116,11 @@ Both tones have the pitch of 220 Hz, and both are a little richer than a sine. T
 That fusion depends on the ratios being whole numbers. A free metal bar, struck, vibrates at frequencies with ratios near 1, 2.76, 5.40 and 8.93 to its lowest one. Here are those four partials at 220 Hz, next to harmonics 1, 3, 5 and 9 with the same amplitudes:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import Additive
 
 amps = [1.0, 0.6, 0.4, 0.25]
-display(listen(Additive(220.0, list(zip([1, 3, 5, 9], amps))) * 0.3, 2.0, "Harmonics 1, 3, 5 and 9"))
-listen(Additive(220.0, list(zip([1, 2.76, 5.40, 8.93], amps))) * 0.3, 2.0, "Partials at 1, 2.76, 5.40 and 8.93: a metal bar")
+display((Additive(220.0, list(zip([1, 3, 5, 9], amps))) * 0.3).take(2.0, "Harmonics 1, 3, 5 and 9"))
+display((Additive(220.0, list(zip([1, 2.76, 5.40, 8.93], amps))) * 0.3).take(2.0, "Partials at 1, 2.76, 5.40 and 8.93: a metal bar"))
 ```
 
 The first tone is one note. It has only odd harmonics, and strong ones, as the square does, so it sounds hollow like the square. The second sounds metallic, and it is hard to say what note it is. A sum of sines repeats when every one of them has finished a whole number of cycles. This block finds when that happens for the bar:
@@ -145,8 +143,8 @@ The spectrum table measured the saw's harmonics at 2/π × 1/k. That gives the r
 ```python {run}
 import numpy as np
 
-from euterpe.view import listen
 from euterpe.sound import Additive, Saw
+from euterpe.view import listen
 
 def saw_partials(n):
     return [(k, -2 / (np.pi * k)) for k in range(1, n + 1)]
@@ -229,11 +227,11 @@ The argument also runs the other way: a sum of odd harmonics alone always mirror
 ```python {run}
 import numpy as np
 
-from euterpe.view import listen
 from euterpe.sound import Additive, Square
+from euterpe.view import listen
 
 partials = [(k, 4 / (np.pi * k)) for k in range(1, 110, 2)]   # k = 1, 3, 5, ..., 109
-display(listen(Additive(220.0, partials) * 0.35, 1.5, "A square from its odd harmonics"))
+display((Additive(220.0, partials) * 0.35).take(1.5, "A square from its odd harmonics"))
 listen(Square(220.0) * 0.35, 1.5, "Square at 220 Hz, for comparison")
 ```
 
@@ -246,8 +244,8 @@ The triangle's odd harmonics have amplitude 8/(π²k²), and their signs alterna
 ```python {run}
 import numpy as np
 
-from euterpe.view import listen
 from euterpe.sound import Additive, Triangle
+from euterpe.view import listen
 
 odd = range(1, 110, 2)
 triangle = [(k, (-1) ** (k // 2) * 8 / (np.pi ** 2 * k ** 2)) for k in odd]

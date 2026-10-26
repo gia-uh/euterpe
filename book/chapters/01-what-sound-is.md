@@ -10,17 +10,16 @@ Your eardrum moves with the pressure, and the inner ear turns that motion into n
 
 The simplest sound repeats one shape forever. The shape is a sine wave, and the number of times it repeats each second is its frequency, measured in hertz (Hz). Here is a sine wave at 440 Hz, two seconds long, at half of full scale (full scale is the largest value a sound file can hold).
 
-Euterpe calls anything that produces sound a *unit*. `Sine(440.0)` is a unit. `Sine(440.0) * 0.5` builds a new unit that takes each value of the sine and multiplies it by 0.5; in the same way `a + b` builds a unit that adds two units value by value, and a plain number on either side counts as a constant. Building units computes nothing yet. `listen` computes two seconds of sound from the unit it is given and puts a player on this page.
+Euterpe calls anything that produces sound a *unit*. `Sine(440.0)` is a unit. `Sine(440.0) * 0.5` builds a new unit that takes each value of the sine and multiplies it by 0.5; in the same way `a + b` builds a unit that adds two units value by value, and a plain number on either side counts as a constant. Building units computes nothing yet. `take(2.0, ...)` computes two seconds of sound from the unit, with a caption, and `display` puts it on this page: a drawing and a player.
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import Sine
 
 tone = Sine(440.0) * 0.5
-listen(tone, 2.0, "A sine wave at 440 Hz")
+display(tone.take(2.0, "A sine wave at 440 Hz"))
 ```
 
-`listen` lives in `euterpe.view`, with the drawings that show a sound, apart from the sounds themselves in `euterpe.sound`. It returns a player: the book and a notebook show the last line of a block, and `display(listen(...))` shows one anywhere else.
+The drawing has two panels. The left one is the whole sound, its outline from the quietest to the loudest moment: for a steady sine, a flat band. The right one magnifies three cycles, taken a fifth of the way in, so you see the shape that repeats. The book shows every sound this way. When a drawing would only repeat the one before it, a block uses `listen` from `euterpe.view` instead, which gives the player alone. A notebook shows the last line of a cell by itself, and `display(...)` shows any other line, as the book does.
 
 A tone held at one steady frequency in a piece of music is a *note*. This one is the note musicians call A, the one orchestras tune to (chapter 2 explains note names). A sine is the plainest tone there is: it sounds like a tuning fork or a soft whistle. Every other sound in this book is built from sines, or analysed as a sum of them, so it is worth knowing well.
 
@@ -102,7 +101,6 @@ import numpy as np
 
 from euterpe.view import figure
 
-
 def draw():
     ms = np.linspace(0, 0.5, 4000)
     n = np.arange(25)
@@ -113,7 +111,6 @@ def draw():
     ax.set_xlabel("time (ms)", fontstyle="italic")
     ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.25), ncol=3, fontsize=8, frameon=False)
     return fig
-
 
 figure(draw, caption="Half a millisecond: a 44 000 Hz sine and a 4 000 Hz sine share their samples")
 ```
@@ -164,7 +161,6 @@ import numpy as np
 from euterpe.sound import Saw, render
 from euterpe.view import figure
 
-
 def draw():
     plain = render(Saw(1_100.0, antialias=False), 0.002)
     smooth = render(Saw(1_100.0), 0.002)
@@ -177,19 +173,18 @@ def draw():
     ax.legend(loc="lower left", frameon=False)
     return fig
 
-
 figure(draw, caption="Eight samples around one drop of a 1 100 Hz saw: polyBLEP moves the two samples next to the drop")
 ```
 
 Both saws below sweep from 1 000 Hz up to 23 000 Hz in four seconds (the captions write 1 000 Hz as 1 kHz, a kilohertz). Their frequency is not a number but a unit: a parameter may be either, and a saw given a unit reads its frequency from it again at every sample. The unit is half a cycle of a slow sine. `Sine(0.125)` completes one cycle every 8 seconds, so in 4 seconds it covers half a cycle. `phase`, from 0 to 1, sets where the sine starts: at phase 0 it starts at 0 and rises, and at phase 0.75 it starts three quarters through its cycle, at its lowest value, −1. Over the next half cycle it rises to 1. Times 11 000, that runs from −11 000 to 11 000; plus 12 000, from 1 000 to 23 000.
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import Saw, Sine
+from euterpe.view import listen
 
 sweep = Sine(0.125, phase=0.75) * 11_000 + 12_000      # 1 000 Hz to 23 000 Hz in 4 s
 
-display(listen(Saw(sweep) * 0.5, 4.0, "A saw sweeping from 1 to 23 kHz, band-limited"))
+display((Saw(sweep) * 0.5).take(4.0, "A saw sweeping from 1 to 23 kHz, band-limited"))
 listen(Saw(sweep, antialias=False) * 0.5, 4.0, "The same sweep without the correction: aliasing")
 ```
 
@@ -201,10 +196,8 @@ A *spectrogram* shows the same thing as a picture. It cuts the sound into short 
 from euterpe.sound import Saw, Sine
 from euterpe.view import spectrogram
 
-
 def sweep():
     return Sine(0.125, phase=0.75) * 11_000 + 12_000
-
 
 spectrogram(
     (Saw(sweep()) * 0.5).take(4.0),
@@ -225,11 +218,10 @@ A 32-bit float is finite too, so the samples Euterpe computes are already quanti
 `BitCrush` rounds each sample to `2 ** bits - 1` levels spread evenly between −1 and 1. That is one level fewer than the bits allow, so that the levels are symmetric and 0 is one of them: silence stays silent. With one level fewer there is one gap fewer, so its step is 2 / (2**bits − 2): 1 at 2 bits, where the levels are −1, 0 and 1. Here is the 440 Hz sine with 16, 6, 4 and 2 bits:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import BitCrush, Sine
 
 for bits in (16, 6, 4, 2):
-    display(listen(BitCrush(Sine(440.0), bits=bits) * 0.5, 2.0, f"The 440 Hz sine with {bits} bits"))
+    display((BitCrush(Sine(440.0), bits=bits) * 0.5).take(2.0, f"The 440 Hz sine with {bits} bits"))
 ```
 
 `BitCrush` acts on the full-scale sine, and `* 0.5` scales after. The order matters, because the levels stay between −1 and 1 whatever the input. At 2 bits they are −1, 0 and 1, and every sample of a half-scale sine is nearer to 0 than to either end: `BitCrush(Sine(440.0) * 0.5, bits=2)` rounds every sample to 0 and plays silence. Crushing first uses all the levels; scaling after turns them into −0.5, 0 and 0.5.

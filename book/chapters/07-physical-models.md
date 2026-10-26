@@ -11,12 +11,11 @@ A guitar string, plucked, starts with the shape the finger gave it. That shape r
 The pluck is a short burst of noise, one period long: at 220 Hz, 1/220 s, 4.5 ms. It goes into a comb whose delay is the same period and whose feedback is 0.996, so it circulates and comes back 220 times a second, losing 0.4 % at each trip. `Segments` (chapter 5) holds the noise at 1 for samples 0 to 218, the first 1/220 s, then at 0. A `OnePole` high-pass at 20 Hz removes the small offset of those 219 random samples, which the comb would otherwise build up. The `ADSR`, with no attack and full sustain, only fades the note out from 2.4 s, as a hand laid on the string would.
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, Comb, OnePole, Segments, WhiteNoise
 
 burst = WhiteNoise(seed=1) * Segments([(0.0, 1.0), (1 / 220, 1.0), (1 / 220, 0.0)])
 string = OnePole(Comb(burst, delay=1 / 220, feedback=0.996), 20.0, kind="highpass")
-listen(string * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4) * 0.25, 3.0, "A burst of noise circulating in a comb at 220 Hz")
+display((string * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4) * 0.25).take(3.0, "A burst of noise circulating in a comb at 220 Hz"))
 ```
 
 It has a pitch, 220 Hz, because the burst repeats every 1/220 s, and a sound that repeats f times a second has the harmonics of f (chapter 3). But it does not sound like a string. It buzzes, with a hard, electric edge, and its tone never changes as it fades, because the comb loses the same 0.4 % at every frequency.
@@ -55,11 +54,10 @@ How far each note is off depends on where its period falls between two loop leng
 `Pluck(freq, damping=0.996, brightness=0.5, position=0.0, seed=0)` is the burst, the delay line, the averaging filter and the allpass in one unit. Here it is with the default damping, the same 0.4 % lost per trip as the comb of step 1:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, Pluck
 
 note = Pluck(220.0, damping=0.996, seed=1)
-listen(note * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4) * 0.6, 3.0, "A plucked A3", id="pluck-a3")
+display((note * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4) * 0.6).take(3.0, "A plucked A3"))
 ```
 
 The line that makes `note` is the whole instrument. The `ADSR` is the same hand on the string as in step 1: left alone, at damping 0.996 the first harmonic loses 7.9 dB a second, so it takes 60 / 7.9 = 7.6 s to fall 60 dB. The spectrogram shows the difference from step 1: in the comb, every harmonic fades at the same rate; in the pluck, the high ones vanish first.
@@ -81,23 +79,21 @@ spectrogram(
 `damping` is the gain of one trip round the loop, between 0.9 and 0.9999. Above 1, each trip would make the sound louder and it would grow without end, so `Pluck` refuses it. The three plucks below differ only in damping:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, Pluck
 
 for damping in (0.99, 0.996, 0.999):
-    display(listen(Pluck(220.0, damping=damping, seed=1) * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4) * 0.6, 3.0, f"A plucked A3, damping {damping}"))
+    display((Pluck(220.0, damping=damping, seed=1) * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4) * 0.6).take(3.0, f"A plucked A3, damping {damping}"))
 ```
 
 At 0.99 the note is short and muffled, like a string damped by the palm of the hand. At 0.999 it rings like a harp. `brightness` is the softness of what plucks it, from a fingertip (dark) to a hard plectrum (bright). `Pluck` gives every burst the same energy (unless that would put its peak above 0.9), but a bright burst holds much of it in high harmonics, and step 2 showed that those are gone within a fraction of a second. So over the whole note a bright pluck is quieter. The gains 0.49, 0.58 and 1.15 compensate, so the three differ in tone and not in loudness, and match the plucked A3 above; the second block measures them:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, Pluck
 
 plucks = {}
 for brightness, gain in ((0.1, 0.49), (0.5, 0.58), (0.9, 1.15)):
     plucks[brightness] = Pluck(220.0, brightness=brightness, seed=1) * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4) * gain
-    display(listen(plucks[brightness], 3.0, f"A plucked A3, brightness {brightness}"))
+    display(plucks[brightness].take(3.0, f"A plucked A3, brightness {brightness}"))
 ```
 
 ```python {run continue output=code}
@@ -111,11 +107,10 @@ for brightness, unit in plucks.items():
 `position` is where the string is plucked, as a fraction of its length from one end, from 0 to 0.5. The k-th harmonic of a string vibrates in k segments, with still points between them, at 1/k, 2/k … of its length. A pluck at a point where a harmonic stands still cannot set that harmonic moving, so plucking at 1/n of the length removes every harmonic that has a still point there: the n-th, the 2n-th, the 3n-th and so on. `position=0.5` removes every even harmonic, and the tone turns hollow, as the square of chapter 3 does; `position=0.25` removes the 4th, 8th, 12th …; `position=0.1` the 10th, 20th …; and `position=0`, the default, removes nothing. Guitarists play near the bridge, at about 0.1, for a thin, bright tone, and over the sound hole, nearer 0.25, for a round one. The three plucks below use `brightness=0.8`, so the harmonics a position removes are loud enough to be missed, and `damping=0.998`, so they ring long enough to compare; the gain of 1.05 brings them to the level of the others:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, Pluck
 
 for position in (0.1, 0.25, 0.5):
-    display(listen(Pluck(220.0, damping=0.998, brightness=0.8, position=position, seed=1) * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4) * 1.05, 3.0, f"A plucked A3, position {position}"))
+    display((Pluck(220.0, damping=0.998, brightness=0.8, position=position, seed=1) * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4) * 1.05).take(3.0, f"A plucked A3, position {position}"))
 ```
 
 ## Modes: bars and bells
@@ -125,8 +120,8 @@ A struck object does not vibrate at one frequency or at harmonics, but in *modes
 `Modal(freqs, decays, amps)` makes each mode with a *resonator*: a filter of order 2 (chapter 5: it feeds back its last two outputs), tuned so that when it is struck it rings as a sine at one frequency and dies away. Each mode has a frequency in Hz, an amplitude and a decay time: the seconds it takes to fall by 60 dB, a thousandth of its starting level. With no other argument, all of them are struck at once, by a single sample of 1 at the start.
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import Modal
+from euterpe.view import listen
 
 ratios = [1, 2.76, 5.40, 8.93]
 bar = Modal([440 * r for r in ratios], decays=[1.2, 0.5, 0.25, 0.12], amps=[1.0, 0.5, 0.3, 0.2])
@@ -159,12 +154,11 @@ bar.take(2.0).spectrogram(lo=220, hi=6000, caption="The struck bar over time: ea
 A single sample is the hardest strike possible: it has every frequency at the same level, so every mode starts at its full amplitude. A soft mallet touches the bar for a few milliseconds and pushes less at high frequencies. `Modal` takes the strike as a fourth argument, `excite`, any unit. Here the excitation is 5 ms of noise through a low-pass at 1 500 Hz:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, Biquad, Modal, WhiteNoise
 
 mallet = Biquad(WhiteNoise(seed=1), "lowpass", cutoff=1500.0) * ADSR(attack=0.0, decay=0.005, sustain=0.0, release=0.0, gate=1.0)
 soft = Modal([440 * r for r in [1, 2.76, 5.40, 8.93]], decays=[1.2, 0.5, 0.25, 0.12], amps=[1.0, 0.5, 0.3, 0.2], excite=mallet)
-listen(soft * 0.1, 2.0, "The same bar struck with a soft mallet")
+display((soft * 0.1).take(2.0, "The same bar struck with a soft mallet"))
 ```
 
 The pitch and the decay are the same; the attack has lost its click, and the upper modes are quieter beside the lowest. The gain is 0.1 where the struck bar had 0.3, so the mallet must have made the bar ring louder, though at every instant it is far quieter than a sample of 1. A resonator rings for a long time, so it keeps adding up each part of its input that arrives in step with its ringing. A sample of 1 is one push. The mallet is 240 small pushes over 5 ms, and at the frequencies of the lower modes they add up to more than that one push. At the highest mode, 8.93 × 440 = 3 930 Hz, which the low-pass at 1 500 Hz weakens, they add up to less.
@@ -174,13 +168,12 @@ The pitch and the decay are the same; the attack has lost its click, and the upp
 A church bell is shaped so that its lowest modes fall close to the equal steps of chapter 2. Take the mode at the note the ear hears as 1. Below it is a mode an octave lower, at 0.5. Above it are a mode 3 steps up, at 2^(3/12) = 1.19 times (musicians call that distance a *minor third*), one 7 steps up, at 2^(7/12) = 1.50 times (a *fifth*), one an octave up, at 2, and higher modes above those. The ratios below are close to those of a tuned bell, and the low modes ring for many seconds:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import Modal
 
 ratios = [0.5, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.2]
 decays = [6.0, 4.0, 3.5, 3.0, 2.5, 1.5, 1.0, 0.6]
 amps = [0.6, 1.0, 0.7, 0.5, 0.8, 0.4, 0.3, 0.2]
-listen(Modal([220 * r for r in ratios], decays, amps) * 0.18, 5.0, "A bell with its prime at 220 Hz: eight modes")
+display((Modal([220 * r for r in ratios], decays, amps) * 0.18).take(5.0, "A bell with its prime at 220 Hz: eight modes"))
 ```
 
 The mode a minor third up gives a tuned bell its particular colour. Compare it with the FM bell of chapter 6: FM made inharmonic partials from two sines and one ratio, and put every one of them where the ratio placed it; the modal bell takes each frequency, level and decay from a list, so it can copy a real object that has been measured. FM is cheap and has few knobs. A modal model costs one filter per mode and can be as exact as the measurements behind it.

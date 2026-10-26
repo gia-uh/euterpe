@@ -106,6 +106,12 @@ def _period(x: np.ndarray, rate: int) -> float | None:
     lo, hi = rate // 2000, min(rate // 30, len(ac) - 1)
     if hi <= lo or ac[0] <= 0:
         return None
+    neg = np.flatnonzero(ac[:hi] < 0)  # past the first dip, so the lag-0 lobe is not taken for a period
+    if not len(neg):
+        return None
+    lo = max(lo, int(neg[0]))
+    if hi <= lo:
+        return None
     k = lo + int(np.argmax(ac[lo:hi]))
     return k / rate if ac[k] > 0.3 * ac[0] else None
 
@@ -190,6 +196,7 @@ class Default(View):
     def draw(self):
         import matplotlib.pyplot as plt
         from matplotlib.patches import ConnectionPatch, Rectangle
+        from matplotlib.ticker import MaxNLocator
 
         c = self.audio
         x = _mono(c)
@@ -208,9 +215,12 @@ class Default(View):
         a.set_ylim(-top, top)
         label_axis(a, "time (s)", "pressure")
         z0 = max(0.05, 0.2 * c.seconds)
+        quiet = env[min(len(env) - 1, int(z0 * c.rate / hop))] < 0.1 * env.max()
+        if quiet:  # the sound has died or not begun there: start just before its loud part
+            z0 = max(0.0, float(te[np.argmax(env >= 0.5 * env.max())]) - 0.002)
         z0 = min(z0, c.seconds - 0.01)
         i0 = round(z0 * c.rate)
-        period = _period(x[i0:], c.rate)
+        period = _period(x[i0:i0 + 2048] if quiet else x[i0:], c.rate)
         width = 3 * period if period else 0.01
         n = max(2, round(width * c.rate))
         seg = x[i0:i0 + n]
@@ -222,6 +232,7 @@ class Default(View):
         b.spines["left"].set_color(MADDER)
         b.spines["bottom"].set_color(MADDER)
         label_axis(b, "time (ms)")
+        b.xaxis.set_major_locator(MaxNLocator(4))
         a.add_patch(Rectangle((z0, -top), width, 2 * top, facecolor=MADDER, alpha=0.25, edgecolor=MADDER, lw=0.8))
         for y in (top, -top):
             fig.add_artist(ConnectionPatch((z0 + width, y), (0, (y / top + 1) / 2), "data", "axes fraction",

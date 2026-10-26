@@ -15,6 +15,6 @@ uv sync --group book
 uv run --with jupyterlab jupyter lab
 ```
 
-and paste a code block from a chapter into a notebook cell. `listen` gives a player and the views give drawings: the notebook shows the last line of a cell, and `display(...)` shows any other line, as the book does.
+and paste a code block from a chapter into a notebook cell. `display(sound.take(seconds, caption))` gives a drawing and a player, `listen` gives the player alone, and the views give other drawings: the notebook shows the last line of a cell, and `display(...)` shows any other line, as the book does.
 
 Each chapter ends with three exercises. Each one changes a number in an example; run it again and listen to what changed.

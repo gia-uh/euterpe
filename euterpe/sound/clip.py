@@ -11,12 +11,15 @@ from euterpe.sound.core import RATE
 
 class Clip:
     """Float32 samples, (n,) or (n, 2), at rate. defaulted is true when the length was the
-    1 s default because the unit never ends, so a view can say so."""
+    1 s default because the unit never ends, so a view can say so. caption goes under its
+    default view."""
 
-    def __init__(self, samples: np.ndarray, rate: int = RATE, *, defaulted: bool = False):
+    def __init__(self, samples: np.ndarray, rate: int = RATE, *, defaulted: bool = False,
+                 caption: str | None = None):
         self.samples = np.asarray(samples, np.float32)
         self.rate = rate
         self.defaulted = defaulted
+        self.caption = caption
 
     @classmethod
     def read(cls, path: str | Path) -> Clip:
@@ -43,7 +46,7 @@ class Clip:
         """The default view: what display() shows."""
         from euterpe.view import default
 
-        return default(self)
+        return default(self, caption=self.caption)
 
     def waveform(self, **kw):
         from euterpe.view import waveform

@@ -11,8 +11,8 @@ To make the jump as large as possible, the next sine starts at phase 0.25, a qua
 The first sound is silent until 0.25 s, jumps to full level, and jumps back to silence at 0.75 s. The second takes 10 ms to rise and 10 ms to fall.
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import Segments, Sine
+from euterpe.view import listen
 
 hard = Sine(440.0, phase=0.25) * Segments([(0.25, 0), (0.25, 1), (0.75, 1), (0.75, 0)]) * 0.5
 soft = Sine(440.0, phase=0.25) * Segments([(0.25, 0), (0.26, 1), (0.74, 1), (0.75, 0)]) * 0.5
@@ -101,11 +101,10 @@ Each pair below changes one stage and keeps the others short, on a saw at 220 Hz
 The attack first: 2 ms, and then 0.8 s.
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, Saw
 
-display(listen(Saw(220.0) * ADSR(attack=0.002, decay=0.0, sustain=1.0, release=0.05, gate=1.2) * 0.3, 1.5, "Attack 2 ms"))
-listen(Saw(220.0) * ADSR(attack=0.8, decay=0.0, sustain=1.0, release=0.05, gate=1.2) * 0.3, 1.5, "Attack 0.8 s")
+display((Saw(220.0) * ADSR(attack=0.002, decay=0.0, sustain=1.0, release=0.05, gate=1.2) * 0.3).take(1.5, "Attack 2 ms"))
+display((Saw(220.0) * ADSR(attack=0.8, decay=0.0, sustain=1.0, release=0.05, gate=1.2) * 0.3).take(1.5, "Attack 0.8 s"))
 ```
 
 The short attack starts the note at once, with a firm edge but no click: 2 ms is 96 samples, enough to round off the jump. The long attack swells in, and the start of the note is hard to place in time. In fast music, with notes 0.1 s apart, an attack of 0.8 s would let each note reach only an eighth of its level before the next one starts, and the notes would blur together.
@@ -113,11 +112,10 @@ The short attack starts the note at once, with a firm edge but no click: 2 ms is
 Then the decay and the sustain. Both notes rise in 5 ms and fall for 0.6 s; the first falls to a sustain level of 0.8, the second to 0.1.
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, Saw
 
-display(listen(Saw(220.0) * ADSR(attack=0.005, decay=0.6, sustain=0.8, release=0.05, gate=1.4) * 0.3, 1.5, "Decay 0.6 s to sustain 0.8"))
-listen(Saw(220.0) * ADSR(attack=0.005, decay=0.6, sustain=0.1, release=0.05, gate=1.4) * 0.3, 1.5, "Decay 0.6 s to sustain 0.1")
+display((Saw(220.0) * ADSR(attack=0.005, decay=0.6, sustain=0.8, release=0.05, gate=1.4) * 0.3).take(1.5, "Decay 0.6 s to sustain 0.8"))
+display((Saw(220.0) * ADSR(attack=0.005, decay=0.6, sustain=0.1, release=0.05, gate=1.4) * 0.3).take(1.5, "Decay 0.6 s to sustain 0.1"))
 ```
 
 With sustain 0.8 the decay is a small dip after the start; the note sounds held. With sustain 0.1 the note has a loud start, an *accent*, and then a quiet tail that lasts as long as the key is down.
@@ -125,11 +123,10 @@ With sustain 0.8 the decay is a small dip after the start; the note sounds held.
 Last, the release. Both notes hold full level until the gate ends at 0.5 s; the first then stops in 5 ms, the second fades over 1 s.
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, Saw
 
-display(listen(Saw(220.0) * ADSR(attack=0.005, decay=0.0, sustain=1.0, release=0.005, gate=0.5) * 0.3, 2.0, "Release 5 ms"))
-listen(Saw(220.0) * ADSR(attack=0.005, decay=0.0, sustain=1.0, release=1.0, gate=0.5) * 0.3, 2.0, "Release 1 s")
+display((Saw(220.0) * ADSR(attack=0.005, decay=0.0, sustain=1.0, release=0.005, gate=0.5) * 0.3).take(2.0, "Release 5 ms"))
+display((Saw(220.0) * ADSR(attack=0.005, decay=0.0, sustain=1.0, release=1.0, gate=0.5) * 0.3).take(2.0, "Release 1 s"))
 ```
 
 The short release ends the note the moment the key comes up. The long one lets the note ring on after it, the way a piano does with its sustain pedal down, or a voice in a large hall.
@@ -181,8 +178,8 @@ What `curve` computes: a stage that goes from level A to level B in T seconds is
 Exponential decays are the ones nature makes. A struck string, a bell or a drum skin loses a fixed fraction of its energy in each cycle of its vibration, so its level falls by the same number of dB every second. Here are the same plucked notes with a straight and with a curved decay:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, Triangle
+from euterpe.view import listen
 
 display(listen(Triangle(330.0) * ADSR(attack=0.002, decay=1.5, sustain=0.0, gate=2.0, curve=0.0) * 0.5, 2.0, "A 1.5 s decay, straight"))
 listen(Triangle(330.0) * ADSR(attack=0.002, decay=1.5, sustain=0.0, gate=2.0, curve=1.0) * 0.5, 2.0, "A 1.5 s decay, curve 1")
@@ -214,7 +211,6 @@ In a *percussive* instrument a single strike or pluck puts energy in, and the so
 The same saw at 220 Hz sounds like four different instruments under four envelopes:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, Saw
 
 shapes = {
@@ -224,7 +220,7 @@ shapes = {
     "a bowed swell": ADSR(attack=0.6, decay=0.3, sustain=0.7, release=0.6, gate=1.2, curve=0.5),
 }
 for name, env in shapes.items():
-    display(listen(Saw(220.0) * env * 0.3, 2.0, f"Saw at 220 Hz, {name}"))
+    display((Saw(220.0) * env * 0.3).take(2.0, f"Saw at 220 Hz, {name}"))
 ```
 
 The pluck and the tap are percussive; they differ only in their decay, 0.8 s against 0.12 s. The organ and the swell are sustained; they differ in their attack and release. Chapter 3 said timbre is the spectrum of a steady tone. A note is not steady, and the envelope is part of what tells instruments apart: the four notes above share one saw, so one spectrum, and still sound like four instruments.
@@ -238,33 +234,30 @@ An envelope is a unit, and chapter 2 showed that a unit can be the parameter of 
 The first example moves pitch. `ADSR(attack=0.0, decay=0.15, sustain=0.0, curve=0.7) * 200 + 50` starts at 250 and falls to 50 within 0.15 s. Used as the frequency of a sine, with a second, percussive envelope for the level, it makes a bass drum: the falling pitch is the thump. The two envelopes are separate units, because one unit may appear only once in a graph.
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, Sine
 
 pitch = ADSR(attack=0.0, decay=0.15, sustain=0.0, gate=1.0, curve=0.7) * 200 + 50
 level = ADSR(attack=0.001, decay=0.5, sustain=0.0, release=0.0, gate=1.0, curve=0.6)
-listen(Sine(pitch) * level * 0.8, 1.0, "A bass drum: a sine falling from 250 to 50 Hz")
+display((Sine(pitch) * level * 0.8).take(1.0, "A bass drum: a sine falling from 250 to 50 Hz"))
 ```
 
 `Segments` can draw any path, so it can move a pitch from one note to another. Here the frequency holds 220 Hz for 0.5 s, slides to 330 Hz over the next 0.5 s and holds there:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, Saw, Segments
 
 glide = Segments([(0.0, 220.0), (0.5, 220.0), (1.0, 330.0)])
-listen(Saw(glide) * ADSR(attack=0.01, gate=1.6, release=0.3) * 0.3, 2.0, "A saw sliding from 220 to 330 Hz")
+display((Saw(glide) * ADSR(attack=0.01, gate=1.6, release=0.3) * 0.3).take(2.0, "A saw sliding from 220 to 330 Hz"))
 ```
 
 An envelope can also move timbre. Chapter 3's exercise showed that the `duty` of a `Square` sets which harmonics it has. Here the duty starts at 0.5, a square with only odd harmonics, and an envelope moves it down to 0.1, a narrow pulse that lacks only every tenth harmonic, over the first second:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, Square
 
 duty = ADSR(attack=0.0, decay=1.0, sustain=0.0, gate=2.0) * 0.4 + 0.1
 pulse = Square(110.0, duty=duty) * ADSR(gate=1.6, release=0.3) * 0.3
-listen(pulse, 2.0, "A square whose duty moves from 0.5 to 0.1")
+display(pulse.take(2.0, "A square whose duty moves from 0.5 to 0.1"))
 ```
 
 The pitch stays at 110 Hz while the tone changes from hollow to thin and nasal. A sound whose timbre moves over the note sounds less like a machine than one whose timbre stays fixed.
@@ -303,7 +296,6 @@ The first column is the follower, the second the envelope. While the envelope ri
 Producers use a follower to make one sound make room for another, a technique called *ducking*, or *side-chaining*, because the level of one sound, fed in from the side, controls the gain of another. Below, a held organ chord of two saws is multiplied by `1 - follower`: units can be subtracted, and negated with `-unit`, with numbers or units on either side, just as they can be added and multiplied. The follower listens to a bass drum that strikes at 0.5 s. `Segments` places the drum at 0.5 s, since an `ADSR` always starts at 0:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, EnvelopeFollower, Saw, Segments, Sine
 
 def drum():
@@ -315,8 +307,8 @@ def chord():
     return (Saw(220.0) + Saw(330.0)) * ADSR(gate=1.6, release=0.3) * 0.15
 
 duck = 1 - EnvelopeFollower(drum(), attack=0.002, release=0.15)
-display(listen(chord() + drum(), 2.0, "An organ chord and a drum"))
-listen(chord() * duck + drum(), 2.0, "The same, the chord ducked by the drum's envelope")
+display((chord() + drum()).take(2.0, "An organ chord and a drum"))
+display((chord() * duck + drum()).take(2.0, "The same, the chord ducked by the drum's envelope"))
 ```
 
 How far does the chord drop? `duck` is a unit like any other, so it can be rendered on its own, and its smallest value is the lowest gain it gives the chord:
@@ -336,7 +328,7 @@ In the second player the chord drops to 0.45 of its level, about 7 dB, when the 
 
 - The envelope of a note is how its level changes over time. A jump in level contains every frequency and is heard as a click; a rise or fall of a few milliseconds removes it.
 - `Segments(points)` is an envelope through `(time, level)` points, with straight lines between them. Two points at the same time make a jump to the second one's level.
-- `render` and `listen` reset a unit and play it from its start; within one graph a unit may appear only once.
+- `render`, `take` and `listen` reset a unit and play it from its start; within one graph a unit may appear only once.
 - `ADSR(attack, decay, sustain, release, gate, curve)`: rise to 1 in `attack` s, fall to `sustain` in `decay` s, hold until `gate` s, fall to 0 in `release` s from wherever the level is when the gate ends.
 - `curve` bends each stage by w(p) = (1 − e^(−6 × curve × p)) / (1 − e^(−6 × curve)). 0 is a straight line; positive values approach an exponential, which loses the same number of dB every second, as struck and plucked objects do.
 - Percussive instruments have a sustain of 0: they die away on their own. Sustained instruments hold a level until the gate ends. The envelope is part of an instrument's character, as its spectrum is.
@@ -351,12 +343,10 @@ In the second player the chord drops to 0.45 of its level, about 7 dB, when the 
 4. Build a closed hi-hat from what chapters 3 and 4 taught: four inharmonic partials high up, as in chapter 3's metal bar, under a very short percussive envelope.
 
     ```python
-    from euterpe.view import listen
     from euterpe.sound import ADSR, Additive
-
     partials = [(1, 1.0), (1.47, 0.8), (1.83, 0.7), (2.31, 0.6)]
     env = ADSR(attack=0.001, decay=0.05, sustain=0.0, release=0.0, gate=1.0, curve=0.8)
-    listen(Additive(3000.0, partials) * env * 0.15, 0.5, "A closed hi-hat")
+    display((Additive(3000.0, partials) * env * 0.15).take(0.5, "A closed hi-hat"))
     ```
 
     Then change `decay=0.05` to `decay=0.4`. What does it become?

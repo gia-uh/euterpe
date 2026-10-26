@@ -263,3 +263,16 @@ def test_a_very_long_default_is_capped_and_says_so():
     assert c.seconds == 10.0 and c.defaulted
     fig = default(Pluck(55, damping=0.9999)).figure()
     assert any(t.get_text() == "10 s (default)" for ax in fig.axes for t in ax.texts)
+
+
+def test_default_magnifies_where_the_sound_is():
+    import matplotlib.pyplot as plt
+
+    from euterpe.sound import ADSR, Sine
+    from euterpe.view import default
+
+    drum = (Sine(60.0) * ADSR(attack=0.001, decay=0.08, sustain=0.0, release=0.0, gate=1.0)).take(1.0)
+    fig = default(drum).figure()
+    zoom = fig.axes[1].lines[0].get_ydata()
+    plt.close(fig)
+    assert np.abs(zoom).max() > 0.1
