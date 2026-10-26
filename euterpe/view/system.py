@@ -8,6 +8,7 @@ import numpy as np
 
 from euterpe.sound.core import RATE, Unit, render
 from euterpe.view.base import View
+from euterpe.view.signal import _name_lines
 from euterpe.view.style import MADDER, SERIES, label_axis, note_name, octave_ruler
 
 
@@ -100,7 +101,7 @@ class Curve(View):
     def draw(self):
         import matplotlib.pyplot as plt
 
-        fig, ax = plt.subplots(figsize=(3.6, 3.2))
+        fig, ax = plt.subplots(figsize=(self.width, 3.0))
         ramp = np.linspace(-1, 1, RATE // 2)
         ax.plot([-1, 1], [-1, 1], color="#9aa0a8", lw=0.5, ls=(0, (1, 2)))
         lines = []
@@ -108,10 +109,9 @@ class Curve(View):
             y = _probe(s, ramp, len(ramp) / RATE)
             (line,) = ax.plot(ramp, y[: len(ramp)], color=SERIES[i % len(SERIES)])
             lines.append(line)
-        _name_where_distinct(ax, lines, self.labels)
+        _name_lines(ax, lines, self.labels)
         ax.set_xlim(-1, 1)
         ax.set_ylim(-1, 1)
-        ax.set_aspect("equal", adjustable="box")
         label_axis(ax, "input sample", "output sample")
         return fig
 

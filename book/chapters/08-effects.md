@@ -23,22 +23,12 @@ You hear the note, then the same note again every 0.3 s, quieter each time. Each
 The plot shows the same delay fed a single sample of 1, a click. The click itself comes out at 1 − mix = 0.5. Echo 1 also comes out at 0.5, since it is the copy at mix = 0.5, and echo k at 0.5 × 0.45ᵏ⁻¹:
 
 ```python {run echo=false}
-import matplotlib.pyplot as plt
-import numpy as np
-
-from euterpe.book import show
-from euterpe.sound import Const, Delay, Segments, render
+from euterpe.sound import Delay, Segments
 
 click = Segments([(0.0, 1.0), (1 / 48000, 0.0)])
-x = render(Delay(click, time=0.3, feedback=0.45, mix=0.5), 1.6)
-t = np.arange(len(x)) / 48000
-fig, ax = plt.subplots(figsize=(7, 2.4))
-ax.vlines(t[x > 1e-4], 0, x[x > 1e-4], linewidth=2)
-ax.set_xlabel("time (s)")
-ax.set_ylabel("level")
-ax.set_ylim(0, 0.6)
-fig.tight_layout()
-show(fig, "A click through Delay(time=0.3, feedback=0.45, mix=0.5): the click, then echoes every 0.3 s")
+Delay(click, time=0.3, feedback=0.45, mix=0.5).take(1.6).waveform(
+    caption="A click through Delay(time=0.3, feedback=0.45, mix=0.5): the click, then echoes every 0.3 s",
+)
 ```
 
 ### Short delays colour the sound
@@ -112,23 +102,13 @@ noise = WhiteNoise(seed=3) * ADSR(attack=0.5, gate=7.2, release=0.6) * 0.15
 listen(Flanger(noise, rate=0.25, depth=0.004, feedback=0.7, mix=0.5), 8.0, "White noise through a flanger, rate 0.25 Hz, feedback 0.7")
 ```
 
-The noise sounds like a jet passing overhead. The picture shows why: in this *spectrogram* time runs to the right, frequency goes up, and brighter means louder. The bright bands are the peaks of the comb, evenly spaced, rising and falling together.
+The noise sounds like a jet passing overhead. The picture shows why: in this *spectrogram* time runs to the right, frequency goes up, and darker means louder. The dark bands are the peaks of the comb, evenly spaced in hertz (so on this axis, where each octave takes the same height, they crowd together higher up), rising and falling together.
 
 ```python {run echo=false}
-import matplotlib.pyplot as plt
-import numpy as np
+from euterpe.sound import Flanger, WhiteNoise
 
-from euterpe.book import show
-from euterpe.sound import Flanger, WhiteNoise, render
-
-x = render(Flanger(WhiteNoise(seed=3) * 0.15, rate=0.25, depth=0.004, feedback=0.7, mix=0.5), 8.0)
-fig, ax = plt.subplots(figsize=(7, 3))
-ax.specgram(x, NFFT=2048, Fs=48000, noverlap=1024, cmap="magma", vmin=-110)
-ax.set_ylim(0, 8000)
-ax.set_xlabel("time (s)")
-ax.set_ylabel("frequency (Hz)")
-fig.tight_layout()
-show(fig, "Spectrogram of white noise through the flanger: the comb's peaks sweep together")
+flanged = Flanger(WhiteNoise(seed=3) * 0.15, rate=0.25, depth=0.004, feedback=0.7, mix=0.5)
+flanged.take(8.0).spectrogram(lo=100, hi=8000, caption="Spectrogram of white noise through the flanger: the comb's peaks sweep together")
 ```
 
 ### Phaser
@@ -160,26 +140,14 @@ The effects so far add copies of the sound, and a delay that does not move adds 
 The output is scaled so a full-scale input comes out at −1 dBFS, so turning up `drive` changes the shape and not the peak. The curves are drawn here at drive 4:
 
 ```python {run echo=false}
-import matplotlib.pyplot as plt
-import numpy as np
+from euterpe.sound import Shaper, Sine
+from euterpe.view import curve
 
-from euterpe.book import show
-
-u = np.linspace(-1, 1, 400) * 2
-curves = {
-    "tanh": np.tanh(u) / np.tanh(2),
-    "soft": (np.clip(u, -1, 1) - np.clip(u, -1, 1) ** 3 / 3) / (2 / 3),
-    "hard": np.clip(u, -1, 1),
-}
-fig, ax = plt.subplots(figsize=(4.5, 3.2))
-ax.plot(u / 2, u / 2, color="0.75", linestyle="--", label="no shaper")
-for name, y in curves.items():
-    ax.plot(u / 2, 0.891 * y, label=name)
-ax.set_xlabel("input sample")
-ax.set_ylabel("output sample")
-ax.legend(fontsize=8)
-fig.tight_layout()
-show(fig, "The three curves of Shaper at drive 4: each input sample maps to one output sample")
+kinds = ("tanh", "soft", "hard")
+curve(
+    *[Shaper(Sine(1.0), kind, drive=4.0) for kind in kinds], labels=list(kinds),
+    caption="The three curves of Shaper at drive 4: each input sample maps to one output sample",
+)
 ```
 
 A sine pushed through a curve stays periodic with the same period, so whatever the curve adds must be harmonics, multiples of the sine's frequency. The block measures the first seven harmonics of a sine at 220 Hz through each curve, in dB:
@@ -224,14 +192,11 @@ amp = np.abs(np.fft.rfft(x)) * 2 / len(x)
 print("  ".join(f"{20 * np.log10(amp[220 * k] + 1e-12):6.1f}" for k in range(1, 8)))
 ```
 
-The 2nd harmonic is now at −17.7 dB, as loud as the 3rd, and the 4th and 6th are there too. The plot puts the four spectra side by side, the first ten harmonics of 220 Hz marked, odd ones in blue and even ones in orange:
+The 2nd harmonic is now at −17.7 dB, as loud as the 3rd, and the 4th and 6th are there too. The plot puts the four spectra one above the other, the first ten harmonics of 220 Hz marked, the first five numbered:
 
 ```python {run echo=false}
-import matplotlib.pyplot as plt
-import numpy as np
-
-from euterpe.book import show
-from euterpe.sound import Saturator, Shaper, Sine, render
+from euterpe.sound import Saturator, Shaper, Sine
+from euterpe.view import spectrum
 
 units = {
     "Shaper tanh, drive 4": Shaper(Sine(220.0), "tanh", drive=4.0),
@@ -239,19 +204,10 @@ units = {
     "Shaper hard, drive 4": Shaper(Sine(220.0), "hard", drive=4.0),
     "Saturator, drive 4, bias 0.2": Saturator(Sine(220.0), drive=4.0, bias=0.2),
 }
-fig, axes = plt.subplots(4, 1, figsize=(7, 5.6), sharex=True)
-k = np.arange(1, 11)
-for ax, (name, unit) in zip(axes, units.items()):
-    amp = np.abs(np.fft.rfft(render(unit, 1.0))) * 2 / 48000
-    level = np.maximum(20 * np.log10(amp[220 * k] + 1e-12), -80)
-    ax.vlines(220 * k, -80, level, linewidth=3, colors=["C0" if i % 2 else "C1" for i in k])
-    ax.set_ylim(-80, 5)
-    ax.set_ylabel("dB")
-    ax.set_title(name, fontsize=9, loc="left")
-axes[-1].set_xticks(220 * k)
-axes[-1].set_xlabel("frequency (Hz)")
-fig.tight_layout()
-show(fig, "Spectra of a 220 Hz sine through the three curves and the saturator: harmonics 1 to 10")
+spectrum(
+    *[u.take(1.0) for u in units.values()], f0=220.0, harmonics=10, upto=2300, labels=list(units),
+    caption="Spectra of a 220 Hz sine through the three curves and the saturator: harmonics 1 to 10",
+)
 ```
 
 Listen to the two side by side, a shaper and a saturator at the same drive on a bass note at 110 Hz:
@@ -335,11 +291,10 @@ The first second, at −30.8 dB, is under the threshold and comes through untouc
 `attack` and `release` set how fast the gain follows the level: how quickly it comes down when the level rises and how quickly it goes back up when the level falls. Each is a *time constant*, chapter 4's time scale: the time the gain takes to cover 63 % of the way to its new value. The plot shows the level every 10 ms, before and after, with the defaults, attack 10 ms and release 100 ms:
 
 ```python {run echo=false}
-import matplotlib.pyplot as plt
 import numpy as np
 
-from euterpe.book import show
-from euterpe.sound import Compressor, Saw, Segments, render
+from euterpe import view
+from euterpe.sound import Clip, Compressor, Saw, Segments, render
 
 steps = [(0, 0.05), (1, 0.05), (1, 0.6), (2, 0.6), (2, 0.15), (3, 0.15)]
 before = render(Saw(110.0) * Segments(steps), 3.0)
@@ -351,19 +306,14 @@ def level(x, size=480):
     return 10 * np.log10((frames ** 2).mean(axis=1) + 1e-12)
 
 
-t = np.arange(len(before) // 480) * 0.01
-fig, ax = plt.subplots(figsize=(7, 2.8))
-ax.plot(t, level(before), label="before")
-ax.plot(t, level(after), label="after the compressor")
-ax.axhline(-30, color="0.6", linestyle="--", linewidth=1, label="threshold")
-ax.set_xlabel("time (s)")
-ax.set_ylabel("level (dB, 10 ms)")
-ax.legend(fontsize=8, loc="lower right")
-fig.tight_layout()
-show(fig, "Level of the stepped saw before and after Compressor(threshold=-30, ratio=4), every 10 ms")
+view.level(
+    Clip(before), Clip(after),
+    labels=["before", "after the compressor"],
+    caption="Level of the stepped saw before and after Compressor(threshold=-30, ratio=4), every 10 ms",
+)
 ```
 
-The block reads the numbers off the plot's orange line: its 10 ms levels from 1.00 s, the lowest level after 2 s, and when it gets back to within 1 dB of where it settles:
+The block reads the numbers off the plot's red line: its 10 ms levels from 1.00 s, the lowest level after 2 s, and when it gets back to within 1 dB of where it settles:
 
 ```python {run continue output=code}
 out = level(after)                       # one level every 10 ms, from the plot
@@ -433,31 +383,35 @@ The peak sits at the ceiling, and the output starts 240 samples, 5 ms, late. The
 import matplotlib.pyplot as plt
 import numpy as np
 
-from euterpe.book import show
 from euterpe.sound import Limiter, Segments, Sine, render
+from euterpe.view import figure
 
-level = lambda: Segments([(0.0, 0.3), (0.04, 0.3), (0.04, 3.0), (0.1, 3.0)])
-dry = render(Sine(220.0) * level(), 0.1)
-out = render(Limiter(Sine(220.0) * level(), ceiling=-1.0, release=0.05), 0.1)
-late = np.concatenate([np.zeros(240), dry[:-240]])        # the input, 5 ms later
-t = np.arange(len(out)) / 48 + 0.0                          # milliseconds
-gain = np.where(np.abs(late) > 0.05, out / np.where(late == 0, 1, late), np.nan)
-fig, (top, bottom) = plt.subplots(2, 1, figsize=(7, 4.4), sharex=True)
-top.plot(t, late, color="0.75", linewidth=0.8, label="input, 5 ms later")
-top.plot(t, out, linewidth=0.9, label="output")
-for c in (0.891, -0.891):
-    top.axhline(c, color="C3", linestyle="--", linewidth=1)
-top.set_ylim(-3.2, 3.2)
-top.legend(fontsize=8, loc="upper left")
-bottom.plot(t, gain, linewidth=1)
-bottom.axvline(45, color="0.6", linestyle=":", linewidth=1)
-bottom.axvline(40, color="0.6", linestyle=":", linewidth=1)
-bottom.set_ylabel("gain")
-bottom.set_ylim(0, 1.1)
-bottom.set_xlim(20, 100)
-bottom.set_xlabel("time at the output (ms)")
-fig.tight_layout()
-show(fig, "A sine jumping from 0.3 to 3.0 through Limiter(ceiling=-1): the gain ramps down over the 5 ms before the jump")
+
+def draw():
+    level = lambda: Segments([(0.0, 0.3), (0.04, 0.3), (0.04, 3.0), (0.1, 3.0)])
+    dry = render(Sine(220.0) * level(), 0.1)
+    out = render(Limiter(Sine(220.0) * level(), ceiling=-1.0, release=0.05), 0.1)
+    late = np.concatenate([np.zeros(240), dry[:-240]])        # the input, 5 ms later
+    t = np.arange(len(out)) / 48 + 0.0                          # milliseconds
+    gain = np.where(np.abs(late) > 0.05, out / np.where(late == 0, 1, late), np.nan)
+    fig, (top, bottom) = plt.subplots(2, 1, figsize=(7, 4.4), sharex=True)
+    top.plot(t, late, color="#9aa0a8", linewidth=0.8, label="input, 5 ms later")
+    top.plot(t, out, linewidth=0.9, label="output")
+    for c in (0.891, -0.891):
+        top.axhline(c, color="#b0361f", linestyle="--", linewidth=0.8)
+    top.set_ylim(-3.2, 3.2)
+    top.legend(fontsize=8, loc="upper left", frameon=False)
+    bottom.plot(t, gain, linewidth=1)
+    bottom.axvline(45, color="#9aa0a8", linestyle=":", linewidth=1)
+    bottom.axvline(40, color="#9aa0a8", linestyle=":", linewidth=1)
+    bottom.set_ylabel("gain", fontstyle="italic")
+    bottom.set_ylim(0, 1.1)
+    bottom.set_xlim(20, 100)
+    bottom.set_xlabel("time at the output (ms)", fontstyle="italic")
+    return fig
+
+
+figure(draw, caption="A sine jumping from 0.3 to 3.0 through Limiter(ceiling=-1): the gain ramps down over the 5 ms before the jump")
 ```
 
 A limiter that works this hard flattens the top of every cycle, which is distortion: on a steady loud sine it is a shaper. Its job is to catch rare peaks, not to make a quiet sound loud.
@@ -491,40 +445,27 @@ A delay with feedback makes one train of echoes, evenly spaced, which sounds met
 
 Each line has a gain below 1, chosen from its length so that the tail falls 60 dB in `decay` seconds. A line of L samples is passed 48 000 / L times a second, so its gain is 10^(−3 × L / (48 000 × decay)): in decay seconds that compounds to 10^(−3) in level, −60 dB. `damping` puts a low-pass inside each line, so the high frequencies die faster than the low ones, as they do in a room with soft surfaces. `mix` sets how much reverb is heard against the dry sound.
 
-The plot shows a single click through two reverbs, both with decay 1.5 s: the network, with its defaults size 0.7 and damping 0.3, and the convolution reverb of the next section. The top half shows the first 80 ms, where the network's echoes are still separate spikes; the bottom half shows the level of both over 2.5 s, falling in a straight line in dB, which is what an exponential decay looks like:
+The plot shows a single click through two reverbs, both with decay 1.5 s: the network, with its defaults size 0.7 and damping 0.3, and the convolution reverb of the next section. The left panel shows the first 80 ms, where the network's echoes are still separate spikes; the right panel shows the level of both over 2.5 s, falling in a straight line in dB, which is what an exponential decay looks like:
 
 ```python {run echo=false}
-import matplotlib.pyplot as plt
 import numpy as np
 
-from euterpe.book import show
-from euterpe.sound import ConvolutionReverb, FDNReverb, Segments, render
+from euterpe.sound import ConvolutionReverb, FDNReverb, Segments
+from euterpe.view import level, row, waveform
 
 click = lambda: Segments([(0.0, 1.0), (1 / 48000, 0.0)])
-fdn = render(FDNReverb(click(), decay=1.5, mix=1.0), 2.5)[:, 0]
-conv = render(ConvolutionReverb(click(), decay=1.5, mix=1.0), 2.5)[:, 0]
-fig, (top, bottom) = plt.subplots(2, 1, figsize=(7, 4.6))
-t = np.arange(len(fdn)) / 48000
-n = int(0.08 * 48000)
-top.plot(t[:n] * 1000, fdn[:n], linewidth=0.7, label="FDN")
-top.plot(t[:n] * 1000, conv[:n] - 0.3, linewidth=0.7, label="convolution (shifted down)")
-first = np.argmax(np.abs(fdn) > 1e-6) / 48
-top.annotate(f"first echo {first:.1f} ms", (first, 0.02), (first + 4, 0.18), fontsize=8, arrowprops={"arrowstyle": "->"})
-top.set_xlabel("time (ms)")
-top.legend(fontsize=8, loc="upper right")
-size = 480
-for name, x in (("FDN", fdn), ("convolution", conv)):
-    frames = x[: len(x) // size * size].reshape(-1, size)
-    bottom.plot(np.arange(len(frames)) * 0.01, 10 * np.log10((frames ** 2).mean(axis=1) + 1e-14), label=name, linewidth=1)
-bottom.axvline(1.5, color="0.6", linestyle="--", linewidth=1)
-bottom.set_xlabel("time (s)")
-bottom.set_ylabel("level (dB, 10 ms)")
-bottom.legend(fontsize=8)
-fig.tight_layout()
-show(fig, "A click through FDNReverb and ConvolutionReverb, both decay 1.5 s: the first 80 ms, and the level over 2.5 s")
+fdn = FDNReverb(click(), decay=1.5, mix=1.0).take(2.5)
+conv = ConvolutionReverb(click(), decay=1.5, mix=1.0).take(2.5)
+names = ["FDN", "convolution"]
+first = int(np.argmax(np.abs(fdn.samples[:, 0]) > 1e-6)) / 48000  # the network's first echo
+row(
+    waveform(fdn, conv, span=(0, 0.08), separate=True, labels=names, marks=[(first, f"first echo {first * 1000:.1f} ms")]),
+    level(fdn, conv, labels=names, marks=[(1.5, "1.5 s")]),
+    caption="A click through FDNReverb and ConvolutionReverb, both decay 1.5 s: the first 80 ms, and the level over 2.5 s",
+)
 ```
 
-The convolution reverb's line falls 60 dB from its start to the dashed line at 1.5 s. The network's falls a little faster: its damping removes the high frequencies sooner, and `decay` holds for the low ones. Its first echo arrives after 21.6 ms, marked on the plot: the shortest line, 30 ms × 0.7 = 21 ms, moved a little by the seed. Here is a short pluck, dry, in a small room and in a large hall:
+The convolution reverb's line falls 60 dB from its start to the dotted line at 1.5 s. The network's falls a little faster: its damping removes the high frequencies sooner, and `decay` holds for the low ones. Its first echo arrives after 21.6 ms, marked on the plot: the shortest line, 30 ms × 0.7 = 21 ms, moved a little by the seed. Here is a short pluck, dry, in a small room and in a large hall:
 
 ```python {run}
 from euterpe.view import listen

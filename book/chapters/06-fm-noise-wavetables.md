@@ -40,24 +40,15 @@ for k in range(1, 5):
 The measured levels match the formula: 0.224 for the carrier, 0.577 for the first pair, 0.353 for the second, and they keep falling. The block prints `abs(jv(...))` because a spectrum's level has no sign, but J_k can be negative, and the lower sideband of an odd k has the opposite sign of the upper one. The sign matters when two partials land on the same frequency, as the next section shows. At index 2 the first sidebands are louder than the carrier. A rule of thumb (Carson's rule) says that about index + 1 pairs are loud, so a higher index spreads the energy wider and the tone gets brighter. The plot shows the spectrum at four indexes, with the modulator at the carrier's frequency, ratio 1.
 
 ```python {run echo=false}
-import matplotlib.pyplot as plt
-import numpy as np
+from euterpe.sound import FM
+from euterpe.view import spectrum
 
-from euterpe.book import show
-from euterpe.sound import FM, render
-
-fig, axes = plt.subplots(4, 1, figsize=(7, 5), sharex=True)
-for ax, index in zip(axes, (0.0, 1.0, 3.0, 8.0)):
-    x = render(FM(220.0, ratio=1.0, index=index), 1.0)
-    amp = np.abs(np.fft.rfft(x)) * 2 / len(x)
-    k = np.arange(1, 21) * 220
-    ax.vlines(k, -80, np.maximum(20 * np.log10(amp[k] + 1e-9), -80), linewidth=2)
-    ax.set_ylim(-80, 0)
-    ax.set_ylabel("dB")
-    ax.set_title(f"index {index:g}", fontsize=9, loc="left")
-axes[-1].set_xlabel("frequency (Hz)")
-fig.tight_layout()
-show(fig, "The spectrum of FM at 220 Hz, ratio 1, at index 0, 1, 3 and 8")
+indexes = (0.0, 1.0, 3.0, 8.0)
+spectrum(
+    *[FM(220.0, ratio=1.0, index=i).take(1.0) for i in indexes],
+    f0=220.0, harmonics=20, upto=4400, labels=[f"index {i:g}" for i in indexes],
+    caption="The spectrum of FM at 220 Hz, ratio 1, at index 0, 1, 3 and 8",
+)
 ```
 
 With ratio 1, every sideband falls on a multiple of 220 Hz, because freq ± k × freq is always a whole number times freq. So the result is harmonic, with the pitch of the carrier. Index 0 is a plain sine; index 8 has strong harmonics up to about the 9th.
@@ -178,24 +169,14 @@ listen(brown * ADSR(gate=1.7, release=0.3) * 1.0, 2.2, "Brown noise")
 White noise hisses like a detuned radio. Pink sounds even from bottom to top, like steady rain; it is the noise engineers play through speakers to check them, because a meter that reads in octaves shows it flat. Brown is a deep roar, like surf heard from a distance. Brown noise has so much of its energy at the lowest frequencies that two seconds of it do not average 0, so a `OnePole` high-pass at 20 Hz (chapter 5) takes away what lies below hearing. White noise drawn evenly between −1 and 1 has an RMS level of 1 / √3 = 0.58. `PinkNoise` and `BrownNoise` are scaled to an RMS of 0.18, a level chosen so that their peaks stay below 1, which is why they need a gain of 1.0 where white noise needs 0.25.
 
 ```python {run echo=false}
-import matplotlib.pyplot as plt
-import numpy as np
+from euterpe.sound import BrownNoise, PinkNoise, WhiteNoise
+from euterpe.view import spectrum
 
-from euterpe.book import show
-from euterpe.sound import BrownNoise, PinkNoise, WhiteNoise, render
-
-fig, ax = plt.subplots(figsize=(7, 2.8))
-for unit in (WhiteNoise(seed=1), PinkNoise(seed=1), BrownNoise(seed=1)):
-    x = render(unit, 4.0)
-    power = np.abs(np.fft.rfft(x)) ** 2 / len(x)
-    edges = np.geomspace(30, 20_000, 40)
-    f = np.fft.rfftfreq(len(x), 1 / 48_000)
-    db = [10 * np.log10(power[(f >= a) & (f < b)].mean()) for a, b in zip(edges[:-1], edges[1:])]
-    ax.semilogx(np.sqrt(edges[:-1] * edges[1:]), db, linewidth=1, label=type(unit).__name__)
-ax.set_xlabel("frequency (Hz)")
-ax.set_ylabel("dB per Hz")
-ax.legend(fontsize=8)
-show(fig, "The spectra of white, pink and brown noise: flat, 3 dB and 6 dB per octave down")
+noises = (WhiteNoise(seed=1), PinkNoise(seed=1), BrownNoise(seed=1))
+spectrum(
+    *[n.take(4.0) for n in noises], upto=20_000, labels=[type(n).__name__ for n in noises],
+    caption="The spectra of white, pink and brown noise: flat, 3 dB and 6 dB per octave down",
+)
 ```
 
 ### Noise from a shift register

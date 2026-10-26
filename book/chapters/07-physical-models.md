@@ -65,25 +65,15 @@ listen(note * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4) * 0.6, 3.0, "
 The line that makes `note` is the whole instrument. The `ADSR` is the same hand on the string as in step 1: left alone, at damping 0.996 the first harmonic loses 7.9 dB a second, so it takes 60 / 7.9 = 7.6 s to fall 60 dB. The spectrogram shows the difference from step 1: in the comb, every harmonic fades at the same rate; in the pluck, the high ones vanish first.
 
 ```python {run echo=false}
-import matplotlib.pyplot as plt
-import numpy as np
-from scipy.signal import spectrogram
-
-from euterpe.book import show
-from euterpe.sound import Comb, Pluck, Segments, WhiteNoise, render
+from euterpe.sound import Comb, Pluck, Segments, WhiteNoise
+from euterpe.view import spectrogram
 
 burst = WhiteNoise(seed=1) * Segments([(0.0, 1.0), (1 / 220, 1.0), (1 / 220, 0.0)])
-fig, axes = plt.subplots(1, 2, figsize=(8, 2.8), sharey=True)
-for ax, unit, title in ((axes[0], Comb(burst, delay=1 / 220, feedback=0.996), "comb (step 1)"), (axes[1], Pluck(220.0, damping=0.996, seed=1), "Pluck")):
-    x = render(unit, 2.0)
-    f, t, s = spectrogram(x, fs=48_000, nperseg=2048, noverlap=1536)
-    db = 10 * np.log10(s + 1e-14)
-    ax.pcolormesh(t, f, db, shading="auto", vmin=db.max() - 70, vmax=db.max(), cmap="magma", rasterized=True)
-    ax.set_ylim(0, 6000)
-    ax.set_title(title, fontsize=9)
-    ax.set_xlabel("time (s)")
-axes[0].set_ylabel("frequency (Hz)")
-show(fig, "A burst circulating in a comb, and the same idea as Pluck: in the pluck the high harmonics die first")
+spectrogram(
+    Comb(burst, delay=1 / 220, feedback=0.996).take(2.0), Pluck(220.0, damping=0.996, seed=1).take(2.0),
+    labels=["comb (step 1)", "Pluck"], lo=110, hi=6000,
+    caption="A burst circulating in a comb, and the same idea as Pluck: in the pluck the high harmonics die first",
+)
 ```
 
 `Pluck`'s burst is not raw noise. One period of raw noise gives each harmonic a random level, so with some seeds the octave above the note is louder than the note itself, and the same note played with two seeds differs in loudness and tone. `Pluck` sets the level of each harmonic and draws only their phases from the seed. The k-th harmonic starts at 1 / (1 + (k × freq / cutoff)²), with cutoff = freq × 2^(8 × brightness): This curve is the gain of two of chapter 5's one-pole low-passes in a row, each with gain 1 / √(1 + (f / cutoff)²). `brightness=0` puts the cutoff at the note itself, so the harmonics start at about 1/k². That is the spectrum of a string a finger has pulled aside at one point, so that it starts in the shape of a triangle; the triangle is the string's shape, not chapter 3's triangle wave, which falls as 1/k² too. `brightness=1` puts the cutoff at the 256th harmonic, as bright as raw noise.
@@ -158,22 +148,10 @@ print(round(float(20 * np.log10(at_decay / start)), 1), "dB after 1.2 s")
 It has fallen 59.5 dB, close to the 60 its decay time promises: the second peak comes from up to 10 ms before 1.2 s, when the mode had not quite finished its fall. The spectrogram shows the four modes as four lines, the higher ones shorter:
 
 ```python {run continue echo=false}
-import matplotlib.pyplot as plt
-import numpy as np
-from scipy.signal import spectrogram
+from euterpe.sound import Modal
 
-from euterpe.book import show
-from euterpe.sound import Modal, render
-
-x = render(Modal([440 * r for r in ratios], decays=[1.2, 0.5, 0.25, 0.12], amps=[1.0, 0.5, 0.3, 0.2]), 2.0)
-f, t, s = spectrogram(x, fs=48_000, nperseg=2048, noverlap=1536)
-db = 10 * np.log10(s + 1e-14)
-fig, ax = plt.subplots(figsize=(7, 2.8))
-ax.pcolormesh(t, f, db, shading="auto", vmin=db.max() - 70, vmax=db.max(), cmap="magma", rasterized=True)
-ax.set_ylim(0, 5000)
-ax.set_xlabel("time (s)")
-ax.set_ylabel("frequency (Hz)")
-show(fig, "The struck bar over time: each line is a mode, and the higher ones die sooner")
+bar = Modal([440 * r for r in ratios], decays=[1.2, 0.5, 0.25, 0.12], amps=[1.0, 0.5, 0.3, 0.2])
+bar.take(2.0).spectrogram(lo=220, hi=6000, caption="The struck bar over time: each line is a mode, and the higher ones die sooner")
 ```
 
 ### What strikes it

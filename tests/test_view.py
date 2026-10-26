@@ -224,3 +224,8 @@ def test_end_labels_do_not_overlap():
     fig.canvas.draw()
     boxes = [t.get_window_extent() for t in fig.axes[0].texts if t.get_text() in "abc"]
     assert not any(a.overlaps(b) for i, a in enumerate(boxes) for b in boxes[i + 1:])
+
+
+def test_level_marks_name_moments_in_time():
+    fig = level(Pluck(220).take(0.5), marks=[(0.3, "here")]).figure()
+    assert any(t.get_text() == "here" for t in fig.axes[0].texts)

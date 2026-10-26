@@ -46,6 +46,15 @@ def _mark_default(clips, ax) -> None:
         default_mark(ax)
 
 
+def _draw_marks(ax, marks, scale=1.0, labels=True) -> None:
+    """(time, label) pairs as dotted rules, with their label at the top when labels is true."""
+    for t, label in marks:
+        ax.axvline(t * scale, color=RULE, lw=0.6, ls=(0, (1, 2)))
+        if labels:
+            ax.annotate(label, (t * scale, 1), xycoords=("data", "axes fraction"), xytext=(3, -2),
+                        textcoords="offset points", va="top", fontsize=8.5, fontstyle="italic", color=MADDER)
+
+
 def _name_lines(ax, lines, labels) -> None:
     """Each series named in its own ink at the right end of its line, instead of a legend; labels
     that would touch are pushed apart vertically."""
@@ -129,12 +138,9 @@ class Waveform(_Many):
             if self.reference is not None and (self.separate or i == 0):
                 self._plot(ax, self.reference, RULE, lo, hi, scale, lw=0.8)
             lines.append((ax, self._plot(ax, c, SERIES[i % len(SERIES)], lo, hi, scale, dots=self.samples)))
-        for ax in axes:
+        for k, ax in enumerate(axes):
             ax.axhline(0, color=RULE, lw=0.4, zorder=0)
-            for t, label in self.marks:
-                ax.axvline(t * scale, color=RULE, lw=0.6, ls=(0, (1, 2)))
-                ax.annotate(label, (t * scale, 1), xycoords=("data", "axes fraction"), xytext=(3, -2),
-                            textcoords="offset points", va="top", fontsize=8.5, fontstyle="italic", color=MADDER)
+            _draw_marks(ax, self.marks, scale, labels=k == 0)
             ax.spines["left"].set_position(("outward", 4))
         ax0 = axes[0]
         ax0.set_xlim(lo * scale, hi * scale)
@@ -250,7 +256,7 @@ class Spectrum(_Many):
                 if self.labels:
                     ax.text(1.0, 0.55, self.labels[i], transform=ax.transAxes, ha="right", fontstyle="italic",
                             color=color, fontsize=10)
-                octave_ruler(ax, max(self.f0 * 0.9, 20), self.upto, names=i == 0)
+                octave_ruler(ax, max(self.f0 * 1.5, 20), self.upto, names=i == 0)
                 ax.spines["left"].set_position(("outward", 4))
             axes[-1].set_xlim(0, self.upto)
             label_axis(axes[-1], "frequency (Hz)")
@@ -318,11 +324,11 @@ class Spectrogram(_Many):
 
 
 class Level(_Many):
-    """Level in dBFS over time, one step every `every` seconds."""
+    """Level in dBFS over time, one step every `every` seconds; marks as in Waveform."""
 
-    def __init__(self, *xs, every: float = 0.01, **kw):
+    def __init__(self, *xs, every: float = 0.01, marks: list[tuple[float, str]] | None = None, **kw):
         super().__init__(*xs, **kw)
-        self.every = every
+        self.every, self.marks = every, marks or []
 
     def draw(self):
         import matplotlib.pyplot as plt
@@ -340,6 +346,7 @@ class Level(_Many):
         ax.set_xlim(0, max(c.seconds for c in self.clips))
         top = max(float(np.nanmax(line.get_ydata())) for line in lines)
         ax.set_ylim(max(ax.get_ylim()[0], top - 80), top + 3)
+        _draw_marks(ax, self.marks)
         _name_lines(ax, lines, self.labels)
         label_axis(ax, "time (s)", "level (dBFS)")
         _mark_default(self.clips, ax)

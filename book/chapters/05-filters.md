@@ -23,29 +23,14 @@ The first is a hiss, like air escaping. The second is a dull rumble, like wind h
 The plot shows the spectrum of both sounds, in dB, on a logarithmic frequency axis, so each octave takes the same width.
 
 ```python {run continue echo=false}
-import matplotlib.pyplot as plt
-import numpy as np
+from euterpe.sound import Biquad, WhiteNoise
+from euterpe.view import spectrum
 
-from euterpe.book import show
-from euterpe.sound import Biquad, WhiteNoise, render
-
-
-def smooth_db(x, width=40):
-    power = np.abs(np.fft.rfft(x)) ** 2 / len(x)
-    power = np.convolve(power, np.ones(width) / width, mode="same")
-    return np.fft.rfftfreq(len(x), 1 / 48_000), 10 * np.log10(power + 1e-12)
-
-
-fig, ax = plt.subplots(figsize=(7, 2.8))
-for unit, name in ((WhiteNoise(seed=1), "white noise"), (Biquad(WhiteNoise(seed=1), "lowpass", cutoff=500.0), "low-pass at 500 Hz")):
-    f, db = smooth_db(render(unit, 1.0))
-    ax.semilogx(f[20:], db[20:], linewidth=0.9, label=name)
-ax.axvline(500, color="grey", linestyle="--", linewidth=0.8)
-ax.set_xlim(20, 24_000)
-ax.set_xlabel("frequency (Hz)")
-ax.set_ylabel("dB")
-ax.legend(fontsize=8)
-show(fig, "The spectrum of white noise, and of the same noise through a low-pass at 500 Hz, before the gains")
+spectrum(
+    WhiteNoise(seed=1).take(1.0), Biquad(WhiteNoise(seed=1), "lowpass", cutoff=500.0).take(1.0),
+    labels=["white noise", "low-pass at 500 Hz"], upto=24_000,
+    caption="The spectrum of white noise, and of the same noise through a low-pass at 500 Hz, before the gains",
+)
 ```
 
 The noise is flat. The filtered noise keeps the same level up to about 500 Hz, then falls along a straight line: on a logarithmic axis, a fall of the same number of dB per octave.
@@ -117,29 +102,18 @@ for n in (1, 2, 3, 4):
 Relative to the first, the second harmonic ends up about 10 dB down and the third about 18 dB down, where in the unfiltered saw they are 6 dB (1/2) and 9.5 dB (1/3) down. The plot shows each harmonic's level, measured.
 
 ```python {run echo=false}
-import matplotlib.pyplot as plt
-import numpy as np
+from euterpe.sound import Biquad, Saw
+from euterpe.view import spectrum
 
-from euterpe.book import show
-from euterpe.sound import Biquad, Saw, render
-
-fig, ax = plt.subplots(figsize=(7, 2.8))
-for cutoff in (None, 2000.0, 600.0, 200.0):
-    unit = Saw(110.0) if cutoff is None else Biquad(Saw(110.0), "lowpass", cutoff=cutoff)
-    x = render(unit, 1.0)
-    amp = np.abs(np.fft.rfft(x)) * 2 / len(x)
-    k = np.arange(1, 51) * 110
-    ax.plot(k, 20 * np.log10(amp[k]), marker="o", markersize=2.5, linewidth=0.8,
-            label="no filter" if cutoff is None else f"low-pass {cutoff:.0f} Hz")
-ax.set_xscale("log")
-ax.set_ylim(-90, 0)
-ax.set_xlabel("frequency (Hz)")
-ax.set_ylabel("dB")
-ax.legend(fontsize=8)
-show(fig, "The first 50 harmonics of a saw at 110 Hz, up to 5500 Hz, unfiltered and through three low-passes")
+cutoffs = (2000.0, 600.0, 200.0)
+spectrum(
+    Saw(110.0).take(1.0), *[Biquad(Saw(110.0), "lowpass", cutoff=c).take(1.0) for c in cutoffs],
+    f0=110.0, harmonics=50, upto=5500, labels=["no filter"] + [f"low-pass {c:.0f} Hz" for c in cutoffs],
+    caption="The first 50 harmonics of a saw at 110 Hz, up to 5500 Hz, unfiltered and through three low-passes",
+)
 ```
 
-Each dot is one harmonic; the first 50, up to 5 500 Hz, are enough to show where each low-pass bends. Without a filter the dots fall by 6 dB per octave, the 1/n of the saw. Below each cutoff the filtered dots follow that line; above it they fall 12 dB per octave faster.
+Each stem is one harmonic; the first 50, up to 5 500 Hz, are enough to show where each low-pass bends. Without a filter the harmonics fall by 6 dB per octave, the 1/n of the saw. Below each cutoff the filtered harmonics keep those levels; above it they fall 12 dB per octave faster.
 
 ## Resonance
 
@@ -181,26 +155,14 @@ for q, tone in tones.items():
 The three are within half a decibel of each other. At q = 12 the whistle is near 770 Hz, the seventh harmonic of 110 Hz, the one closest to the cutoff.
 
 ```python {run echo=false}
-import matplotlib.pyplot as plt
-import numpy as np
+from euterpe.sound import Biquad, Sine
+from euterpe.view import response
 
-from euterpe.book import show
-from euterpe.sound import Biquad, Sine, render
-
-freqs = np.geomspace(50, 20_000, 90)
-fig, ax = plt.subplots(figsize=(7, 2.6))
-for q in (0.707, 4.0, 12.0):
-    gains = [
-        np.abs(render(Biquad(Sine(f), "lowpass", cutoff=800.0, q=q), 0.3)[4800:]).max()
-        / np.abs(render(Sine(f), 0.3)[4800:]).max()
-        for f in freqs
-    ]
-    ax.semilogx(freqs, 20 * np.log10(gains), linewidth=1, label=f"q {q}")
-ax.set_ylim(-48, 24)
-ax.set_xlabel("frequency (Hz)")
-ax.set_ylabel("gain (dB)")
-ax.legend(fontsize=8)
-show(fig, "The response of a low-pass at 800 Hz with three values of q")
+qs = (0.707, 4.0, 12.0)
+response(
+    *[Biquad(Sine(1.0), "lowpass", cutoff=800.0, q=q) for q in qs], labels=[f"q {q}" for q in qs],
+    caption="The response of a low-pass at 800 Hz with three values of q",
+)
 ```
 
 ## The other kinds
@@ -290,24 +252,13 @@ listen(tone, 3.0, "A wah: the cutoff swings between 300 and 1700 Hz")
 A slow oscillator used to move a parameter is called an *LFO*, a low-frequency oscillator: low here means below about 20 Hz, too slow to hear as a pitch, so it is heard as movement.
 
 ```python {run continue echo=false}
-import matplotlib.pyplot as plt
-import numpy as np
-from scipy.signal import spectrogram
-
-from euterpe.book import show
-from euterpe.sound import render
-
-x = render(tone, 3.0)
-f, t, s = spectrogram(x, fs=48_000, nperseg=2048, noverlap=1536)
-fig, ax = plt.subplots(figsize=(7, 2.8))
-ax.pcolormesh(t, f, 10 * np.log10(s + 1e-12), shading="auto", vmin=-110, vmax=-30, cmap="magma", rasterized=True)
-ax.set_ylim(0, 3000)
-ax.set_xlabel("time (s)")
-ax.set_ylabel("frequency (Hz)")
-show(fig, "The wah over time: each horizontal line is a harmonic; the bright band is the moving peak")
+tone.take(3.0).spectrogram(
+    lo=55, hi=4000,
+    caption="The wah over time: each horizontal line is a harmonic; the dark band is the moving peak",
+)
 ```
 
-The picture is a *spectrogram*: time runs left to right, frequency bottom to top, and brightness is level. Each horizontal line is one harmonic of 110 Hz. The bright band that rises and falls is the resonant peak, lighting up the harmonics it passes.
+The picture is a *spectrogram*: time runs left to right, frequency bottom to top, and darker ink is a higher level. Each horizontal line is one harmonic of 110 Hz. The dark band that rises and falls is the resonant peak, inking the harmonics it passes.
 
 ## Filters made of delays
 
@@ -395,23 +346,14 @@ for vowel in "aeiou":
 Listen to them in a row: a buzzing voice says "ah, eh, ee, aw, oo". The pitch is the same in all five; only the bands changed. "ee" has its first formant very low, at 270 Hz, and its second high, at 2 290 Hz; "oo" has both low, at 300 and 870 Hz, so it is the darkest.
 
 ```python {run echo=false}
-import matplotlib.pyplot as plt
-import numpy as np
+from euterpe.sound import Formant, Saw
+from euterpe.view import spectrum
 
-from euterpe.book import show
-from euterpe.sound import Formant, Saw, render
-
-fig, axes = plt.subplots(1, 2, figsize=(8, 2.6), sharey=True)
-for ax, vowel in zip(axes, "iu"):
-    x = render(Formant(Saw(110.0), vowel), 1.0)
-    amp = np.abs(np.fft.rfft(x)) * 2 / len(x)
-    k = np.arange(1, 40) * 110
-    ax.vlines(k, -80, 20 * np.log10(amp[k]), linewidth=1.5)
-    ax.set_title(f"vowel {vowel}")
-    ax.set_xlabel("frequency (Hz)")
-    ax.set_ylim(-80, 0)
-axes[0].set_ylabel("dB")
-show(fig, "The harmonics of a saw at 110 Hz through the formants of i and of u")
+spectrum(
+    Formant(Saw(110.0), "i").take(1.0), Formant(Saw(110.0), "u").take(1.0),
+    f0=110.0, harmonics=39, upto=4400, labels=["vowel i", "vowel u"],
+    caption="The harmonics of a saw at 110 Hz through the formants of i and of u",
+)
 ```
 
 Each line is one harmonic of 110 Hz. The harmonics are the same in both pictures; the formants decide which of them are loud.

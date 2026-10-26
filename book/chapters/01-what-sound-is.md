@@ -195,7 +195,7 @@ listen(Saw(sweep, antialias=False) * 0.5, 4.0, "The same sweep without the corre
 
 Listen to the first sweep: one tone rises until it is too high to hear. Most adults stop hearing somewhere between 15 000 and 20 000 Hz, so the end of it may sound like silence. In the second sweep, other tones move down while the note moves up, and they stay audible after the note itself is gone. Those are folded harmonics.
 
-A *spectrogram* shows the same thing as a picture. It cuts the sound into slices of 1 024 samples, about 21 ms each, measures how strong each frequency is in each slice, and draws one column per slice. Time runs left to right, frequency bottom to top, and brightness is the strength:
+A *spectrogram* shows the same thing as a picture. It cuts the sound into short overlapping slices, measures how strong each frequency is in each slice, and draws one column per slice. Time runs left to right, frequency bottom to top, with a keyboard along the edge so that each octave takes the same height, and darker ink is more strength:
 
 ```python {run echo=false}
 from euterpe.sound import Saw, Sine
@@ -214,7 +214,7 @@ spectrogram(
 )
 ```
 
-In the right panel each harmonic reaches the top edge, 24 000 Hz, and comes back down as a falling line. Those falling lines are the extra tones you heard. The left panel has them too, darker: polyBLEP reduces aliasing, it does not remove it. For most notes of real music that is enough: they sit far below 23 000 Hz, and the lower the note, the higher the number k of the first harmonic that folds, so its amplitude 1/k is smaller.
+In the right panel each harmonic reaches the top edge, 24 000 Hz, and comes back down as a falling line. Those falling lines are the extra tones you heard. The left panel has them too, fainter: polyBLEP reduces aliasing, it does not remove it. For most notes of real music that is enough: they sit far below 23 000 Hz, and the lower the note, the higher the number k of the first harmonic that folds, so its amplitude 1/k is smaller.
 
 ## How fine each sample is
 
