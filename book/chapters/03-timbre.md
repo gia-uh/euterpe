@@ -150,7 +150,7 @@ hz = 220 * np.array([1, 2.76, 5.40, 8.93])
 print(hz, hz / 2.2, np.gcd.reduce([100, 276, 540, 893]))
 ```
 
-The four frequencies are 2.2 Hz times 100, 276, 540 and 893. Some of those whole numbers share a factor (100, 276 and 540 are all multiples of 4), but all four together share none, as `np.gcd.reduce` shows. So 2.2 Hz is the largest step that fits all four, and the wave repeats every 1/2.2 s, 0.45 s. A repetition rate of 2.2 Hz is far below any pitch the ear hears, so the ear finds no single note, and hears several pitches at once. This is why bells and gongs sound the way they do. Chapter 6 makes such sounds ring and decay.
+The four frequencies are 2.2 Hz times 100, 276, 540 and 893. Some of those whole numbers share a factor (100, 276 and 540 are all multiples of 4), but all four together share none, as `np.gcd.reduce` shows. So 2.2 Hz is the largest step that fits all four, and the wave repeats every 1/2.2 s, 0.45 s. A repetition rate of 2.2 Hz is far below any pitch the ear hears, so the ear finds no single note, and hears several pitches at once. This is why bells and gongs sound the way they do. Chapter 7 makes such sounds ring and decay.
 
 ## A saw, one sine at a time
 

@@ -327,7 +327,7 @@ listen(comb_note(0.5, 0.5), 2.0, "Noise through a comb tuned to 220 Hz, feedback
 listen(comb_note(0.98, 0.08), 2.0, "The same comb, feedback 0.98")
 ```
 
-With feedback 0.5 the noise has a faint pitch in it. With 0.98 the peaks are 1 / 0.02 = 50 times the input, and narrow, and the noise turns into a buzzing note at 220 Hz. That is also why the second note needs a gain of 0.08 instead of 0.5: the comb makes it much louder. The low-pass before the comb removes the harsh high peaks. The delay is a whole number of samples: 48 000 / 220 = 218.2, rounded to 218, so the note is at 48 000 / 218 = 220.2 Hz. Chapter 6 builds a plucked string from this loop, with a filter inside it and a fractional delay that makes the pitch exact.
+With feedback 0.5 the noise has a faint pitch in it. With 0.98 the peaks are 1 / 0.02 = 50 times the input, and narrow, and the noise turns into a buzzing note at 220 Hz. That is also why the second note needs a gain of 0.08 instead of 0.5: the comb makes it much louder. The low-pass before the comb removes the harsh high peaks. The delay is a whole number of samples: 48 000 / 220 = 218.2, rounded to 218, so the note is at 48 000 / 218 = 220.2 Hz. Chapter 7 builds a plucked string from this loop, with a filter inside it and a fractional delay that makes the pitch exact.
 
 `Allpass(src, delay, gain)` is a comb with a second, forward path that cancels its peaks and dips: y[n] = −gain × x[n] + x[n − D] + gain × y[n − D]. Every frequency comes out at the level it went in:
 
@@ -352,7 +352,7 @@ print([round(float(v), 3) for v in y[::144][:6]])
 print("energy out:", round(float((y ** 2).sum()), 3))
 ```
 
-The impulse comes out at once as −0.7 (the −gain × x[n] path), then as an echo of 1 − 0.7² = 0.51 after 3 ms, and each later echo is 0.7 times the one before. The energies add up to 0.49 + 0.51² × (1 + 0.49 + 0.49² + …) = 0.49 + 0.51 = 1, the energy of the impulse that went in; the sum printed is 1.0. The same holds at every frequency, which is what the gains above measured. What an allpass changes is time: the energy comes out spread over a dense ring of echoes, each frequency delayed by its own amount. Chapter 3 called this the phase of each component: the allpass changes only phases. On a steady tone the ear does not hear phase, so an allpass is almost inaudible; on a click it smears the attack into a short ring. The example below is four clicks a quarter second apart. Each is made with `Segments` from `(time, level)` points joined by straight lines, where two points at the same time make a jump: 3 ms at +0.5, then 3 ms at −0.5, so that its average is 0 and it has no DC offset. Chapter 7 chains allpasses to make reverb.
+The impulse comes out at once as −0.7 (the −gain × x[n] path), then as an echo of 1 − 0.7² = 0.51 after 3 ms, and each later echo is 0.7 times the one before. The energies add up to 0.49 + 0.51² × (1 + 0.49 + 0.49² + …) = 0.49 + 0.51 = 1, the energy of the impulse that went in; the sum printed is 1.0. The same holds at every frequency, which is what the gains above measured. What an allpass changes is time: the energy comes out spread over a dense ring of echoes, each frequency delayed by its own amount. Chapter 3 called this the phase of each component: the allpass changes only phases. On a steady tone the ear does not hear phase, so an allpass is almost inaudible; on a click it smears the attack into a short ring. The example below is four clicks a quarter second apart. Each is made with `Segments` from `(time, level)` points joined by straight lines, where two points at the same time make a jump: 3 ms at +0.5, then 3 ms at −0.5, so that its average is 0 and it has no DC offset. Chapter 8 chains allpasses to make reverb.
 
 ```python {run}
 from euterpe.book import listen
@@ -459,7 +459,7 @@ Every number in `voice` changes the sound. The filter's `decay` sets how long th
 
 1. The cutoff stays at 3 250 Hz for the whole note, so there is no bright start that settles: the note is bright throughout, as bright as the saws through a low-pass with almost nothing cut. The sweep at the start disappears because the decay now falls from 1 to 1.
 2. The peak sweeps up and down six times a second instead of one and a half. It is too fast to hear as a pedal being rocked: pitch stays put while the brightness of the tone wobbles six times a second, a rapid warble rather than a wah.
-3. A note near E4, 330 Hz. The delay rounds to 145 samples, so the note is at 48 000 / 145 = 331.0 Hz, 1.0 Hz sharp, 1200 × log₂(331.0 / 330) = 5 cents (a twentieth of a semitone): close, but not exact, which is why chapter 6 adds a fractional delay.
+3. A note near E4, 330 Hz. The delay rounds to 145 samples, so the note is at 48 000 / 145 = 331.0 Hz, 1.0 Hz sharp, 1200 × log₂(331.0 / 330) = 5 cents (a twentieth of a semitone): close, but not exact, which is why chapter 7 adds a fractional delay.
 
 ```python {run echo=false}
 # Level check: lint every sound in build/audio, this chapter's and any written before it.
