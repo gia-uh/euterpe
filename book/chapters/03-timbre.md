@@ -101,7 +101,7 @@ for wave in (Sine, Triangle, Square, Saw):
     print(f"{wave.__name__:8}  low {shares[0]:5.1f} %   mid {shares[1]:5.1f} %   high {shares[2]:4.1f} %")
 ```
 
-At 220 Hz only the fundamental is below 250 Hz, so the low band is the fundamental's share. The sine has all of its energy there. The triangle keeps 98.6 % there, the square 81.7 % and the saw 61.6 %. The saw puts the most energy above 4 000 Hz, 2.2 %, against 1.5 % for the square and 0.0 % for the triangle; that is what makes it the brightest. A mix whose high band holds almost nothing sounds muffled; one whose high band holds a large share sounds harsh. Later chapters use these numbers to balance a mix.
+At 220 Hz only the fundamental is below 250 Hz, so the low band is the fundamental's share. The sine has all of its energy there. The triangle keeps 98.6 % there, the square 81.7 % and the saw 61.6 %. The saw puts the most energy above 4 000 Hz, 2.2 %, against 1.5 % for the square and 0.0 % for the triangle; that is what makes it the brightest. Later chapters use these numbers to balance a mix.
 
 ## Building sounds from sines
 
@@ -130,7 +130,7 @@ listen(Additive(220.0, list(zip([1, 3, 5, 9], amps))) * 0.3, 2.0, "Harmonics 1, 
 listen(Additive(220.0, list(zip([1, 2.76, 5.40, 8.93], amps))) * 0.3, 2.0, "Partials at 1, 2.76, 5.40 and 8.93: a metal bar")
 ```
 
-The first tone is one note, hollow like the square, which also has only odd harmonics. The second sounds metallic, and it is hard to say what note it is: the partials do not fit a common period, so the sum never repeats, and the ear hears several pitches at once. This is why bells and gongs sound the way they do. Chapter 6 makes such sounds ring and decay.
+The first tone is one note. It has only odd harmonics, and strong ones, as the square does, so it sounds hollow like the square. The second sounds metallic, and it is hard to say what note it is. Its ratios are 100, 276, 540 and 893 hundredths, which share no common factor, so their common period is 100 cycles of 220 Hz: 0.45 s, a repetition rate of 2.2 Hz. That is far below any pitch the ear hears, so the ear finds no single note, and hears several pitches at once. This is why bells and gongs sound the way they do. Chapter 6 makes such sounds ring and decay.
 
 ## A saw, one sine at a time
 
@@ -181,12 +181,12 @@ import numpy as np
 
 from euterpe.sound import Additive, render
 
-for n in (4, 16, 109):
+for n in (4, 8, 16, 109):
     partials = [(k, -2 / (np.pi * k)) for k in range(1, n + 1)]
     print(f"{n:3} harmonics: highest sample {render(Additive(220.0, partials), 1.0).max():.3f}")
 ```
 
-With 4 harmonics the sum stays below 1, but from 16 on it overshoots, and with 109 it reaches 1.17. The overshoot moves closer to the drop as harmonics are added, but it does not get smaller: it approaches about 9 % of the jump, which is 2, so the peak approaches 1.18. It is called the *Gibbs phenomenon*, and it is the price of stopping at a finite number of harmonics, as a sampled wave must.
+With 4 harmonics the sum stays below 1 (0.972); with 8 it already passes 1, and with 16 and 109 it reaches 1.12 and 1.17. The overshoot moves closer to the drop as harmonics are added, but it does not get smaller: it approaches about 9 % of the jump, which is 2, so the peak approaches 1.18. It is called the *Gibbs phenomenon*, and it is the price of stopping at a finite number of harmonics, as a sampled wave must.
 
 So which is the better saw? The 109-harmonic sum is exactly the saw with every harmonic below 24 000 Hz and nothing above, so nothing can fold back. `Saw` is cheaper to compute, one formula per sample instead of 109 sines, and its polyBLEP correction is only an approximation. This block compares their harmonics 1, 10, 50 and 100, each multiplied by k so that the ideal value is 2/π = 0.637 for every one:
 
@@ -196,12 +196,14 @@ import numpy as np
 from euterpe.sound import Additive, Saw, render
 
 built = render(Additive(220.0, [(k, -2 / (np.pi * k)) for k in range(1, 110)]), 1.0)
-for name, x in (("Additive", built), ("Saw", render(Saw(220.0), 1.0))):
+saw = render(Saw(220.0), 1.0)
+for name, x in (("Additive", built), ("Saw", saw)):
     amp = np.abs(np.fft.rfft(x)) * 2 / len(x)
     print(f"{name:8}", "  ".join(f"k={k}: {k * amp[220 * k]:.3f}" for k in (1, 10, 50, 100)))
+print(f"energy of Saw against Additive: {100 * np.mean(saw ** 2) / np.mean(built ** 2):.1f} %")
 ```
 
-The two agree up to the tenth harmonic, 2 200 Hz. Above it, `Saw` falls behind: harmonic 50, at 11 000 Hz, is at 84 % of the ideal, and harmonic 100, at 22 000 Hz, at 47 %. polyBLEP smooths the drop over two samples, which is a little smoother than the ideal saw, and smoothing takes away high harmonics. Most of what it loses is above the range most adults can hear, which is why the two players sound alike.
+The two agree up to the tenth harmonic, 2 200 Hz. Above it, `Saw` falls behind: harmonic 50, at 11 000 Hz, is at 84 % of the ideal, and harmonic 100, at 22 000 Hz, at 47 %. polyBLEP smooths the drop over two samples, which is a little smoother than the ideal saw, and smoothing takes away high harmonics. Yet the last line shows that `Saw` keeps 99.3 % of the ideal's energy: it loses 0.7 %, about 0.03 dB, far below the 1 dB step of chapter 2, and the loss falls on harmonics that are already weak. That is why the two players sound alike.
 
 `Additive` drops a partial on its own when its frequency reaches 24 000 Hz. Asking for 200 harmonics of 220 Hz gives the same samples as asking for 109:
 
@@ -218,9 +220,9 @@ print(np.array_equal(render(Additive(220.0, saw_partials(200)), 1.0), render(Add
 
 ## Why the square has only odd harmonics
 
-A square spends the first half of each cycle at +1 and the second half at −1. So its second half is its first half turned upside down: if T is the period, the value at time t + T/2 is minus the value at t. The triangle has the same property: it rises in the first half and falls by the same path in the second.
+A square spends the first half of each cycle at +1 and the second half at −1. So its second half is its first half turned upside down: if T is the period, the value at time t + T/2 is minus the value at t. The triangle has the same property: its second half, a fall from 1 to −1, is its first half, a rise from −1 to 1, turned upside down.
 
-Now look at one harmonic. Harmonic k does k cycles per period, so in half a period it does k/2 cycles. When k is even, k/2 is a whole number, and half a period later the harmonic is back at the same value. When k is odd, it is half a cycle further on, which is the same sine upside down. Shift the whole wave by half a period, then: the even harmonics stay the same and the odd ones flip. For a square that shift must flip the whole wave. A wave has only one spectrum, so each harmonic of the shifted wave must equal minus the same harmonic of the wave. An even harmonic h is unchanged by the shift, so h = −h, and that holds only when h is zero. So a square, and any wave whose second half mirrors its first, has no even harmonics.
+Now look at one harmonic. Harmonic k does k cycles per period, so in half a period it does k/2 cycles. When k is even, k/2 is a whole number, and half a period later the harmonic is back at the same value. When k is odd, it is half a cycle further on, which is the same sine upside down. Shift the whole wave by half a period, then: the even harmonics stay the same and the odd ones flip. For a square that shift must flip the whole wave. A wave has only one spectrum, so each harmonic of the shifted wave must equal minus the same harmonic of the wave. Call an even harmonic h(t): the shift leaves it h(t), and the flip requires −h(t), so h(t) = −h(t) for every t, which only zero satisfies. So a square, and any wave whose second half mirrors its first, has no even harmonics.
 
 The saw does not have this property: its second half continues the same rising ramp. This block checks it on the samples. At 200 Hz a cycle is exactly 240 samples, so half a cycle is 120 samples, and `x[120:240] + x[:120]` is zero wherever the second half mirrors the first:
 
@@ -236,7 +238,7 @@ for wave in (Square, Triangle, Saw):
 
 The square and the triangle mirror exactly, and their spectra have no even harmonic. The saw does not, and has every harmonic.
 
-The argument also runs the other way: a sum of odd harmonics alone always mirrors itself, so it sounds hollow like the square. Here is the square built from its odd harmonics, at 4/π × 1/k as the table measured, next to `Square`:
+The argument also runs the other way: a sum of odd harmonics alone always mirrors itself. When those odd harmonics are strong, at 1/k as in the square, it sounds hollow; at 1/k², as in the triangle, they fade too fast to be heard much, and it sounds soft. Here is the square built from its odd harmonics, at 4/π × 1/k as the table measured, next to `Square`:
 
 ```python {run}
 import numpy as np
