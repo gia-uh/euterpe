@@ -365,7 +365,7 @@ lowest = render(duck, 2.0).min()
 print(round(float(lowest), 3), round(float(20 * np.log10(lowest)), 1), "dB")
 ```
 
-In the second player the chord drops to 0.45 of its level, about 7 dB, when the drum strikes, and comes back as the drum fades, so the drum is heard more clearly at the same level. Chapter 7's compressor measures level the same way, with an RMS detector instead of peaks.
+In the second player the chord drops to 0.45 of its level, about 7 dB, when the drum strikes, and comes back as the drum fades, so the drum is heard more clearly at the same level. Chapter 8's compressor measures level the same way, with an RMS detector instead of peaks.
 
 ## Summary
 

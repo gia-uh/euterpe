@@ -1,6 +1,6 @@
 # Effects
 
-The chapters so far made sounds: oscillators, envelopes, filters, FM, noise and models. An *effect* takes a sound that already exists and changes it. A guitar amplifier, an echo pedal, the reverb of a concert hall and the compressor on a radio station's output are all effects. Each one is a unit that takes another unit as its source, as a filter does, so they chain: a source, then a distortion, then a delay, then a reverb.
+The chapters so far made sounds: oscillators, envelopes, filters, FM, noise, wavetables and physical models. An *effect* takes a sound that already exists and changes it. A guitar amplifier, an echo pedal, the reverb of a concert hall and the compressor on a radio station's output are all effects. Each one is a unit that takes another unit as its source, as a filter does, so they chain: a source, then a distortion, then a delay, then a reverb.
 
 This chapter covers five families. Delays add copies of the sound later in time. Moving delays (chorus, flanger) and the phaser make the copy's timing change as the sound plays. Distortion bends the wave and adds harmonics. Dynamics (compressor, limiter, gate) turn the volume up and down by themselves, following the level of the sound. Reverb adds the thousands of echoes a room makes. The chapter ends with stereo: placing a sound between two speakers.
 
