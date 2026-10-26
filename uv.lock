@@ -202,6 +202,7 @@ book = [
     { name = "scriptorium" },
 ]
 dev = [
+    { name = "matplotlib" },
     { name = "pytest" },
 ]
 
@@ -218,7 +219,10 @@ book = [
     { name = "matplotlib", specifier = ">=3.9" },
     { name = "scriptorium", git = "https://github.com/apiad/scriptorium" },
 ]
-dev = [{ name = "pytest", specifier = ">=8" }]
+dev = [
+    { name = "matplotlib", specifier = ">=3.9" },
+    { name = "pytest", specifier = ">=8" },
+]
 
 [[package]]
 name = "fonttools"
