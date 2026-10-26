@@ -1,21 +1,34 @@
+import re
+
 from euterpe.book import listen
-from euterpe.sound import Sine
+from euterpe.sound import Saw, Sine
+
+AUDIO_LINE = re.compile(r"^!\[A tone\]\(build/audio/a-tone-[0-9a-f]{8}\.mp3\)\n$")
 
 
-def test_listen_renders_and_prints_the_audio_line(tmp_path, monkeypatch, capsys):
+def test_listen_takes_a_caption_and_names_the_file_after_it(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
-    listen(Sine(440.0), 0.1, "a", "A tone", id="tone")
-    assert capsys.readouterr().out == "![A tone](build/audio/a.mp3){#aud-tone}\n"
-    assert (tmp_path / "build/audio/a.mp3").is_file()
+    listen(Sine(440.0), 0.1, "A tone")
+    out = capsys.readouterr().out
+    assert AUDIO_LINE.match(out)
+    assert (tmp_path / out[out.index("(") + 1:out.index(")")]).is_file()
 
 
-def test_listen_without_id_has_no_attribute_block(tmp_path, monkeypatch, capsys):
+def test_the_same_caption_on_different_sounds_gives_different_files(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
-    listen(Sine(440.0), 0.1, "b", "Another tone")
-    assert capsys.readouterr().out == "![Another tone](build/audio/b.mp3)\n"
+    listen(Sine(440.0), 0.1, "A tone")
+    listen(Saw(440.0), 0.1, "A tone")
+    first, second = capsys.readouterr().out.splitlines()
+    assert first != second
 
 
-def test_show_saves_an_svg_and_prints_the_image_line(tmp_path, monkeypatch, capsys):
+def test_listen_with_an_id_adds_the_reference_target(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    listen(Sine(440.0), 0.1, "A tone", id="tone")
+    assert capsys.readouterr().out.rstrip().endswith("{#aud-tone}")
+
+
+def test_show_takes_a_caption_and_saves_an_svg(tmp_path, monkeypatch, capsys):
     import matplotlib
 
     matplotlib.use("Agg")
@@ -26,6 +39,7 @@ def test_show_saves_an_svg_and_prints_the_image_line(tmp_path, monkeypatch, caps
     monkeypatch.chdir(tmp_path)
     fig, ax = plt.subplots()
     ax.plot([0, 1], [0, 1])
-    show(fig, "line", "A line")
-    assert capsys.readouterr().out == "![A line](build/img/line.svg)\n"
-    assert (tmp_path / "build/img/line.svg").read_text().lstrip().startswith("<?xml")
+    show(fig, "A line")
+    out = capsys.readouterr().out
+    assert re.match(r"^!\[A line\]\(build/img/a-line-[0-9a-f]{8}\.svg\)\n$", out)
+    assert (tmp_path / out[out.index("(") + 1:out.index(")")]).read_text().lstrip().startswith("<?xml")

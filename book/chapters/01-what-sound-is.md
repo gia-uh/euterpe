@@ -15,14 +15,14 @@ from euterpe.book import listen
 from euterpe.sound import Sine
 
 tone = Sine(440.0) * 0.5
-listen(tone, 2.0, "01-sine-440", "A sine wave at 440 Hz", id="sine-440")
+listen(tone, 2.0, "A sine wave at 440 Hz")
 ```
 
 This is the note musicians call A, the one orchestras tune to (chapter 2 explains note names). A sine is the plainest tone there is: it sounds like a tuning fork or a soft whistle. Every other sound in this book is built from sines, or analysed as a sum of them, so it is worth knowing well.
 
 One cycle at 440 Hz lasts 1/440 of a second, about 2.27 milliseconds. In that time the sound travels 343 / 440 = 0.78 metres, which is the length of one wave in the air. Here are the first 5 milliseconds as a plot:
 
-```python {run}
+```python {run echo=false}
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -37,7 +37,7 @@ ax.plot(ms, x)
 ax.set_xlabel("time (ms)")
 ax.set_ylabel("pressure (full scale = 1)")
 ax.axhline(0, color="grey", linewidth=0.5)
-show(fig, "01-sine-plot", "The first 5 ms of the 440 Hz sine: a little over two cycles")
+show(fig, "The first 5 ms of the 440 Hz sine: a little over two cycles")
 ```
 
 The vertical axis is not in pascals. Inside a computer a sound is a number between −1 and 1, and the loudspeaker and its volume knob decide how many pascals that becomes. That is why a value of 1 is called *full scale*: it means the most the file can hold, not a pressure. The sine above reaches 0.5, half of full scale.
@@ -46,21 +46,17 @@ The vertical axis is not in pascals. Inside a computer a sound is a number betwe
 
 A computer cannot store a smooth curve. It stores the value of the curve at regular moments, and each stored value is a *sample*. Euterpe takes 48 000 samples every second; this number is the *sample rate*. Audio CDs use 44 100 and video uses 48 000. `render` returns the samples as a numpy array:
 
-```python {run}
-from euterpe.sound import RATE, Sine, render
+```python {run output=code}
+from euterpe.sound import Sine, render
 
 x = render(Sine(440.0) * 0.5, 2.0)
-print(f"{RATE} samples per second, {len(x)} samples in 2 seconds, {x.nbytes} bytes")
-print()
-print("The first eight samples:")
-print()
-for i, v in enumerate(x[:8]):
-    print(f"- sample {i}, at {i / RATE * 1000:.4f} ms: {v:+.5f}")
+print(len(x), "samples,", x.nbytes, "bytes")
+print(x[:8])
 ```
 
 Each sample is a 32-bit float, so two seconds take 384 kilobytes. Between two samples there is nothing: the file does not say what the pressure was in between. Zoomed in to the first millisecond, the dots are all that is stored.
 
-```python {run}
+```python {run echo=false}
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -76,7 +72,7 @@ ax.plot(fine, 0.5 * np.sin(2 * np.pi * 440 * fine / 1000), color="lightgrey", la
 ax.plot(ms, x, "o", markersize=3, label="the samples")
 ax.set_xlabel("time (ms)")
 ax.legend(loc="lower right")
-show(fig, "01-samples", "The first millisecond: 48 samples of the 440 Hz sine")
+show(fig, "The first millisecond: 48 samples of the 440 Hz sine")
 ```
 
 At 440 Hz there are 48 000 / 440, about 109 samples per cycle, which is plenty. The question is what happens when a wave moves faster, so that only a few samples land in each cycle.
@@ -85,9 +81,9 @@ At 440 Hz there are 48 000 / 440, about 109 samples per cycle, which is plenty. 
 
 Sampling at 48 000 Hz can represent frequencies up to half of that, 24 000 Hz. This half of the sample rate is the *Nyquist frequency*. A wave above it does not disappear. Its samples are exactly the samples of some wave below it, so after sampling the two cannot be told apart. The higher wave *folds back* to a lower one, and this is called *aliasing*.
 
-Here is the arithmetic. A sine at 44 000 Hz is 4 000 Hz short of 48 000. At each sample it has advanced almost one full cycle, 44/48 of one; the shortfall, 4/48 of a cycle, is what a 4 000 Hz sine advances per sample, in the opposite direction. The code compares the samples of the two:
+Here is the arithmetic. A sine at 44 000 Hz is 4 000 Hz short of 48 000. At each sample it has advanced almost one full cycle, 44/48 of one; the shortfall, 4/48 of a cycle, is what a 4 000 Hz sine advances per sample, in the opposite direction. Comparing the samples of the two, one by one:
 
-```python {run}
+```python {run echo=false}
 import numpy as np
 
 n = np.arange(48)                        # one millisecond of sample numbers
@@ -98,7 +94,7 @@ print(f"largest difference between the 44 000 Hz samples and the upside-down 4 0
 
 The difference is rounding error: the samples are the same, with the sign flipped. A sound system playing these samples produces 4 000 Hz. In the plot, the thin line is the 44 000 Hz wave and the thick one is the 4 000 Hz wave turned upside down; the samples, the dots, lie on both.
 
-```python {run}
+```python {run echo=false}
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -113,7 +109,7 @@ ax.plot(ms, -np.sin(2 * np.pi * 4_000 * ms / 1000), linewidth=2, label="4 000 Hz
 ax.plot(n / 48, np.sin(2 * np.pi * 44_000 * n / 48_000), "o", markersize=4, label="the samples")
 ax.set_xlabel("time (ms)")
 ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.25), ncol=3, fontsize=8)
-show(fig, "01-aliasing", "Half a millisecond: a 44 000 Hz sine and a 4 000 Hz sine share their samples")
+show(fig, "Half a millisecond: a 44 000 Hz sine and a 4 000 Hz sine share their samples")
 ```
 
 In general, a frequency f above the Nyquist frequency lands at the distance from f to the nearest multiple of 48 000. Euterpe's oscillators avoid the problem at the source: asked for a frequency at or above 24 000 Hz, they output silence.
@@ -122,7 +118,7 @@ In general, a frequency f above the Nyquist frequency lands at the distance from
 
 A sine has one frequency, so it is easy to keep below the limit. Most sounds are not sines. A *saw wave* rises steadily from −1 to 1 and then drops back at once, once per cycle. Chapter 3 shows that such a wave is a sum of sines at every whole multiple of its frequency, called its *harmonics*: a 10 000 Hz saw contains 10 000, 20 000, 30 000 Hz and so on, each one quieter. Every harmonic above 24 000 Hz folds back:
 
-```python {run}
+```python {run echo=false}
 def fold(f, rate=48_000):
     """Where a frequency lands after sampling at rate."""
     return abs((f + rate / 2) % rate - rate / 2)
@@ -135,73 +131,46 @@ for k in range(1, 8):
 
 The 5th harmonic, 50 000 Hz, is heard at 2 000 Hz, far below the note itself. Folded harmonics do not sit at multiples of the note, so they sound like separate, out-of-tune whistles.
 
-To hear it, here is a saw computed the direct way: take the position in the cycle, from 0 to 1, and scale it to run from −1 to 1. This is a new unit written in a few lines. A unit's `block(n)` returns its next `n` samples, and `_param("freq", n)` gives the frequency for each of them.
+To hear it, Euterpe's `Saw` can be told to skip its correction. With `antialias=False` it computes the wave the direct way: take the position in the cycle, from 0 to 1, and scale it to run from −1 to 1. Both saws below sweep from 1 000 Hz up to 23 000 Hz in four seconds. The frequency is itself a unit: half a cycle of a slow sine, scaled to that range. The first sweep is the normal `Saw`, which smooths each drop over two samples with a correction called polyBLEP, so that much less is left above 24 000 Hz to fold. The second is the direct one.
 
 ```python {run}
-import numpy as np
-
-from euterpe.sound import RATE, Param, Unit
-
-
-class NaiveSaw(Unit):
-    """A saw computed sample by sample, with nothing done about aliasing."""
-
-    params = (Param("freq", "Hz", 0.01, 24_000.0, "log", 440.0),)
-
-    def __init__(self, freq):
-        self._set_params(freq=freq)
-        self.reset()
-
-    def reset(self):
-        super().reset()
-        self.position = 0.0
-
-    def block(self, n):
-        steps = self._param("freq", n).astype(np.float64) / RATE
-        position = (self.position + np.cumsum(steps)) % 1.0
-        self.position = position[-1]
-        return (2 * position - 1).astype(np.float32)
-```
-
-This block and the next three use `NaiveSaw`, so they continue from it: to run one yourself, put it after this block in the same file. Both saws now sweep from 1 000 Hz up to 23 000 Hz in four seconds. The frequency is itself a unit: half a cycle of a slow sine, scaled to the range. The first sweep is Euterpe's `Saw`, which smooths each drop over two samples with a correction called polyBLEP, so that much less is left above 24 000 Hz to fold. The second is the naive saw.
-
-```python {run continue}
 from euterpe.book import listen
 from euterpe.sound import Saw, Sine
 
-def sweep():
-    """1 000 Hz at the start, 23 000 Hz after four seconds."""
-    return Sine(0.125, phase=0.75) * 11_000 + 12_000
+sweep = Sine(0.125, phase=0.75) * 11_000 + 12_000      # 1 000 Hz to 23 000 Hz in 4 s
 
-listen(Saw(sweep()) * 0.5, 4.0, "01-sweep-polyblep", "A saw sweeping from 1 to 23 kHz, band-limited", id="sweep-polyblep")
-listen(NaiveSaw(sweep()) * 0.5, 4.0, "01-sweep-naive", "The same sweep with the naive saw: aliasing", id="sweep-naive")
+listen(Saw(sweep) * 0.5, 4.0, "A saw sweeping from 1 to 23 kHz, band-limited")
+listen(Saw(sweep, antialias=False) * 0.5, 4.0, "The same sweep without the correction: aliasing")
 ```
 
 Listen to the first sweep: one tone rises until it is too high to hear. Most adults stop hearing somewhere between 15 000 and 20 000 Hz, so the end of it may sound like silence. (The MP3 files on this page also drop everything above about 20 500 Hz.) In the second sweep, other tones move down while the note moves up, and they stay audible after the note itself is gone. Those are folded harmonics. Both sweeps also start with a click: the wave jumps from silence to −0.5 in one sample. Chapter 4 is about starting a sound smoothly.
 
 A spectrogram shows the same thing. Time runs left to right, frequency bottom to top, and brightness is how much of each frequency is present at each moment:
 
-```python {run continue}
+```python {run echo=false}
 import matplotlib.pyplot as plt
 
 from euterpe.book import show
-from euterpe.sound import RATE, render
+from euterpe.sound import RATE, Saw, Sine, render
+
+def sweep():
+    return Sine(0.125, phase=0.75) * 11_000 + 12_000
 
 fig, axes = plt.subplots(1, 2, figsize=(8, 3), sharey=True, dpi=60)
-for ax, (title, unit) in zip(axes, [("Saw (polyBLEP)", Saw(sweep())), ("naive saw", NaiveSaw(sweep()))]):
+for ax, (title, unit) in zip(axes, [("Saw", Saw(sweep())), ("Saw, antialias=False", Saw(sweep(), antialias=False))]):
     ax.specgram(render(unit * 0.5, 4.0), NFFT=1024, Fs=RATE, noverlap=0, vmin=-90, cmap="magma")
     ax.set_title(title)
     ax.set_xlabel("time (s)")
 axes[0].set_ylabel("frequency (Hz)")
-show(fig, "01-sweep-spectrogram", "The two sweeps: harmonics fold back from 24 kHz in the naive saw")
+show(fig, "The two sweeps: harmonics fold back from 24 kHz without the correction")
 ```
 
 In the right panel each harmonic reaches the top edge, 24 000 Hz, and comes back down as a falling line. Those falling lines are the extra tones you heard. The left panel has them too, much fainter: polyBLEP reduces aliasing, it does not remove it. To put numbers on it, the next block takes one second of each saw at a steady 3 300 Hz and measures which share of the energy lies at frequencies that are not harmonics of 3 300 Hz, that is, in folded tones.
 
-```python {run continue}
+```python {run echo=false}
 import numpy as np
 
-from euterpe.sound import RATE, render
+from euterpe.sound import RATE, Saw, render
 
 def folded_share(x, f, below, above):
     """The share of x's energy between below and above Hz that is not at a harmonic of f."""
@@ -212,15 +181,15 @@ def folded_share(x, f, below, above):
     return power[band & ~harmonic].sum() / power.sum()
 
 shares = {}
-for name, unit in [("Saw (polyBLEP)", Saw(3_300.0)), ("naive saw", NaiveSaw(3_300.0))]:
+for name, unit in [("Saw", Saw(3_300.0)), ("Saw, antialias=False", Saw(3_300.0, antialias=False))]:
     x = render(unit, 1.0)
     shares[name] = folded_share(x, 3_300.0, 0, 12_000), folded_share(x, 3_300.0, 12_000, 24_000)
     print(f"- {name}: {100 * shares[name][0]:.4f} % folded below 12 000 Hz, {100 * shares[name][1]:.3f} % above")
-low, high = (shares["naive saw"][i] / shares["Saw (polyBLEP)"][i] for i in (0, 1))
+low, high = (shares["Saw, antialias=False"][i] / shares["Saw"][i] for i in (0, 1))
 print(f"- polyBLEP leaves {low:.0f} times less below 12 000 Hz and {high:.0f} times less above")
 ```
 
-Below 12 000 Hz, where hearing is most sensitive, polyBLEP leaves several hundred times less folded energy than the naive saw. Above 12 000 Hz the reduction is far smaller, because a correction two samples wide cannot act sharply near the Nyquist frequency. Better methods exist and cost more computation: computing the wave at several times the sample rate and filtering before dropping the extra samples (oversampling), or longer corrections such as minBLEP. For the notes of real music, polyBLEP is enough.
+Below 12 000 Hz, where hearing is most sensitive, polyBLEP leaves several hundred times less folded energy than the direct saw. Above 12 000 Hz the reduction is far smaller, because a correction two samples wide cannot act sharply near the Nyquist frequency. Better methods exist and cost more computation: computing the wave at several times the sample rate and filtering before dropping the extra samples (oversampling), or longer corrections such as minBLEP. For the notes of real music, polyBLEP is enough.
 
 ## How fine each sample is
 
@@ -233,12 +202,12 @@ from euterpe.book import listen
 from euterpe.sound import BitCrush, Sine
 
 for bits in (16, 6, 4, 2):
-    listen(BitCrush(Sine(440.0), bits=bits) * 0.5, 2.0, f"01-bits-{bits}", f"The 440 Hz sine with {bits} bits: {2 ** bits - 1} levels", id=f"bits-{bits}")
+    listen(BitCrush(Sine(440.0), bits=bits) * 0.5, 2.0, f"The 440 Hz sine with {bits} bits")
 ```
 
 At 16 bits it sounds like the sine at the top of the chapter. At 6 bits a faint hiss and buzz sit under the tone. At 4 bits the tone is harsh, and at 2 bits there are only three levels, −1, 0 and 1: the wave jumps between them and sounds close to a square wave. The plot shows one cycle of each:
 
-```python {run}
+```python {run echo=false}
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -251,7 +220,7 @@ for bits in (16, 4, 2):
     ax.plot(np.arange(len(x)) / RATE * 1000, x, label=f"{bits} bits")
 ax.set_xlabel("time (ms)")
 ax.legend(loc="lower left")
-show(fig, "01-bits-plot", "One cycle of the 440 Hz sine with 16, 4 and 2 bits")
+show(fig, "One cycle of the 440 Hz sine with 16, 4 and 2 bits")
 ```
 
 Rounding is a change in the shape of the wave, so it adds frequencies that were not there: the rough edge you hear is those added frequencies. At 16 bits they are about 96 dB below full scale, too quiet to hear in normal listening, which is why 16 bits was enough for the CD.
@@ -267,7 +236,7 @@ Rounding is a change in the shape of the wave, so it adds frequencies that were 
 ## Exercises
 
 1. In the first example, change `440.0` to `220.0`, then to `880.0`. Each doubling of the frequency sounds like the same note, only higher. Chapter 2 calls a doubling an octave.
-2. In the sweep example, change `11_000 + 12_000` to `4_000 + 5_000`, a sweep from 1 000 to 9 000 Hz. Does the naive saw still produce falling tones? Use the `fold` table to predict which harmonics of a 9 000 Hz saw land below 9 000 Hz.
+2. In the sweep example, change `11_000 + 12_000` to `4_000 + 5_000`, a sweep from 1 000 to 9 000 Hz. Does the saw with `antialias=False` still produce falling tones? Use the table of folded harmonics to predict which harmonics of a 9 000 Hz saw land below 9 000 Hz.
 3. In the `BitCrush` example, add `downsample=8` and listen. Each sample is now held for 8 samples, so the sample rate is in effect 6 000 Hz and its Nyquist frequency 3 000 Hz. Holding adds copies of the tone around each multiple of 6 000 Hz: 5 560 and 6 440 Hz, 11 560 and 12 440 Hz, and so on. Then replace `Sine` with `Saw`, in the import line too: which harmonics of the 440 Hz saw now fold back below 3 000 Hz?
 
 ```python {run echo=false}
@@ -280,9 +249,8 @@ from euterpe.io import read
 
 # Replaced by lint_audio from chapter 2 on. A failure prints on the page as a block error;
 # it stops the build only once scriptorium can refuse block errors.
-expected = ["01-sine-440", "01-sweep-polyblep", "01-sweep-naive", "01-bits-16", "01-bits-6", "01-bits-4", "01-bits-2"]
-failures = [f"{name}.mp3 is missing" for name in expected if not Path(f"build/audio/{name}.mp3").is_file()]
-for path in sorted(Path("build/audio").glob("01-*.mp3")):
+failures = []
+for path in sorted(Path("build/audio").glob("*.mp3")):
     x, rate = read(path)
     peak = float(np.abs(x).max())
     if rate != 48_000 or peak >= 0.999:

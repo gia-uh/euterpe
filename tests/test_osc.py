@@ -57,3 +57,14 @@ def test_a_triangle_has_little_aliasing():
 def test_a_slow_triangle_reaches_full_scale():
     for f in (1.0, 0.1):
         assert abs(render(Triangle(f), 1.5 / f).max() - 1.0) < 0.02, f   # the top of the first ramp
+
+
+def test_a_saw_without_antialias_is_the_direct_ramp_and_aliases():
+    x = render(Saw(1_000.0, antialias=False), 1.0)
+    t = (np.arange(len(x)) * 1_000.0 / 48_000) % 1.0
+    assert np.allclose(np.sin(np.pi * x), np.sin(np.pi * (2 * t - 1)), atol=1e-3)   # -1 and 1 meet at the wrap
+    big = render(Saw(4_000.0, antialias=False), 1.0)
+    spectrum = np.abs(np.fft.rfft(big * np.hanning(len(big)))) ** 2
+    freqs = np.fft.rfftfreq(len(big), 1 / 48_000)
+    harmonic = np.min(np.abs(freqs[:, None] - 4_000.0 * np.arange(1, 7)), axis=1) < 30
+    assert spectrum[~harmonic].sum() / spectrum.sum() > 0.01
