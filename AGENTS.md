@@ -19,7 +19,7 @@ Euterpe is a Python library for composing music by writing code. It has four lay
 - Default block size 1024 frames. Rendering in any block size gives the same samples, to the bit.
 - Every random source takes an explicit seed. The same unit graph and seed render the same samples.
 - Every unit declares its parameters as `Param(name, unit, lo, hi, scale, default)`. A constant outside `[lo, hi]` raises `ValueError` naming the unit, parameter and range. A parameter may be a number or a `Unit`; a modulating signal is clipped to the range.
-- Exceptions, where a parameter fixes the unit's structure when it is built: `Comb` and `Allpass` (delay and gain) and `Pluck` (all four: the loop length and its filters are set when the string is plucked) take numbers only and raise `TypeError` for a `Unit`. `Modal` takes lists (`freqs`, `decays`, `amps`), declares no `Param` and validates them itself.
+- Exceptions, where a parameter fixes the unit's structure when it is built: `Comb` and `Allpass` (delay and gain), `Pluck` (all four: the loop length and its filters are set when the string is plucked), `Phaser.stages`, `Limiter.ceiling`, `FDNReverb` (decay, size, damping) and `ConvolutionReverb.decay` take numbers only and raise `TypeError` for a `Unit`. `Modal` takes lists (`freqs`, `decays`, `amps`), declares no `Param` and validates them itself.
 - Each unit's docstring says what it does to the spectrum.
 - `render(..., to=path)` writes the file and returns its `Path`.
 - Algorithms (polyBLEP, LFSR noise, Karplus-Strong) are written from their published descriptions. Nothing is copied from other projects.
