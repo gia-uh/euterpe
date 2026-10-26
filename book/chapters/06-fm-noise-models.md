@@ -253,7 +253,7 @@ listen(hat(0.05), 0.5, "A closed hi-hat: high-passed noise, 50 ms")
 listen(hat(0.4), 1.0, "An open hi-hat: the same noise, 0.4 s")
 ```
 
-A snare drum has two parts: the skin, struck, gives a short tone near 180 Hz whose pitch drops a little, as the bass drum of chapter 4 did; the wires give a burst of noise, brightest between 1 000 and 8 000 Hz, that lasts longer than the tone. The snare is the sum of the two:
+A snare drum has two parts: the skin, struck, gives a short tone near 180 Hz whose pitch drops a little, as the bass drum of chapter 4 did; the wires give a burst of noise above 1 000 Hz that lasts longer than the tone. The snare is the sum of the two:
 
 ```python {run}
 from euterpe.book import listen
@@ -366,7 +366,7 @@ for damping in (0.99, 0.996, 0.999):
     listen(Pluck(220.0, damping=damping, seed=1) * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4) * 0.8, 3.0, f"A plucked A3, damping {damping}")
 ```
 
-At 0.99 the note is short and muffled, like a string damped by the palm of the hand. At 0.999 it rings like a harp. `brightness` is the softness of what plucks it, from a fingertip (dark) to a hard plectrum (bright). `Pluck` gives every burst the same energy, but a bright burst holds much of it in high harmonics, and step 2 showed that those are gone within a fraction of a second. So over the whole note a bright pluck is quieter. The gains 0.42, 0.5 and 1.0 compensate, so the three differ in tone and not in loudness, and the second block measures them:
+At 0.99 the note is short and muffled, like a string damped by the palm of the hand. At 0.999 it rings like a harp. `brightness` is the softness of what plucks it, from a fingertip (dark) to a hard plectrum (bright). `Pluck` gives every burst the same energy (unless that would put its peak above 0.9), but a bright burst holds much of it in high harmonics, and step 2 showed that those are gone within a fraction of a second. So over the whole note a bright pluck is quieter. The gains 0.42, 0.5 and 1.0 compensate, so the three differ in tone and not in loudness, and the second block measures them:
 
 ```python {run}
 from euterpe.book import listen
@@ -423,7 +423,7 @@ bar = Modal([440 * r for r in ratios], decays=[1.2, 0.5, 0.25, 0.12], amps=[1.0,
 listen(bar * 0.3, 2.0, "A struck bar at 440 Hz: four modes")
 ```
 
-It is a xylophone or a glockenspiel, depending on what you imagine striking it. The 60 dB is a rule of acousticians: it is about how far a sound falls before it is lost in the quiet of an ordinary room. The block measures how far the first mode has fallen at its decay time, 1.2 s, with a band-pass that keeps it alone:
+It is a xylophone or a glockenspiel, depending on what you imagine striking it. The 60 dB is a rule of acousticians: it is about how far a sound falls before it is lost in the quiet of an ordinary room. The block measures how far the first mode has fallen at its decay time, 1.2 s, by rendering the first mode alone:
 
 ```python {run continue output=code}
 import numpy as np
