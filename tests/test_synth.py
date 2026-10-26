@@ -31,7 +31,7 @@ def test_additive_drops_a_modulated_partial_only_while_it_is_above_nyquist():
 def test_additive_matches_the_saw_fourier_series():
     from euterpe.sound.osc import Saw
 
-    partials = [(k, -2 / (np.pi * k)) for k in range(1, 109)]  # every harmonic below 24 kHz
+    partials = [(k, -2 / (np.pi * k)) for k in range(1, 110)]  # every harmonic below 24 kHz
     built, saw = render(Additive(220.0, partials), 0.1), render(Saw(220.0), 0.1)
     assert np.abs(built - saw)[200:-200].mean() < 0.02
 
@@ -41,9 +41,24 @@ def test_additive_is_the_same_in_any_block_size():
     assert np.array_equal(render(unit, 0.5), render(unit, 0.5, block=37))
 
 
+def test_additive_with_a_modulated_freq_is_the_same_in_any_block_size():
+    from euterpe.sound.osc import Sine
+
+    unit = Additive(Sine(3.0) * 300 + 500, [(1, 0.5), (2.01, 0.25), (5.3, 0.1)])
+    whole = render(unit, 0.5)
+    assert np.array_equal(whole, render(unit, 0.5, block=1))
+    assert np.array_equal(whole, render(unit, 0.5, block=37))
+
+
 def test_additive_refuses_a_partial_with_ratio_zero_or_below():
     with pytest.raises(ValueError, match="ratio"):
         Additive(200.0, [(1, 1.0), (0, 0.5)])
+
+
+@pytest.mark.parametrize("ratio", [np.nan, np.inf])
+def test_additive_refuses_a_ratio_that_is_not_finite(ratio):
+    with pytest.raises(ValueError, match="ratio"):
+        Additive(200.0, [(1, 1.0), (ratio, 0.5)])
 
 
 def test_additive_refuses_a_frequency_out_of_range():
