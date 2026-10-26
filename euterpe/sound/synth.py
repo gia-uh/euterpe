@@ -1,4 +1,4 @@
-"""Synthesis from models of a sound: additive, so far."""
+"""Synthesis from models of a sound."""
 
 from __future__ import annotations
 
