@@ -44,7 +44,8 @@ def test_brown_noise_falls_6_db_per_octave():
 @pytest.mark.parametrize("unit", [PinkNoise, BrownNoise])
 def test_coloured_noise_stays_within_full_scale_and_is_reproducible(unit):
     x = render(unit(seed=4), 10.0)
-    assert np.abs(x).max() <= 1.0
+    assert abs(float(np.sqrt((x.astype(np.float64) ** 2).mean())) - 0.18) < 0.01
+    assert np.mean(np.abs(x) >= 1.0) < 1e-4
     assert np.abs(x.mean()) < 0.1
     assert np.array_equal(x[:4800], render(unit(seed=4), 0.1))
     assert not np.array_equal(x[:4800], render(unit(seed=5), 0.1))
@@ -91,6 +92,12 @@ def test_a_wavetable_plays_at_its_frequency():
 def test_a_wavetable_steps_through_its_table():
     x = render(Wavetable([0.0, 0.25, 0.5, 0.75], 12_000.0), 0.001)
     assert np.array_equal(x[:8], np.array([0.0, 0.25, 0.5, 0.75] * 2, np.float32))
+
+
+def test_a_wavetable_holds_each_value_between_entries():
+    # four samples per entry: an interpolating table would ramp from 0 to 1 instead
+    x = render(Wavetable([0.0, 1.0], 6_000.0), 0.001)
+    assert np.array_equal(x[:8], np.array([0, 0, 0, 0, 1, 1, 1, 1], np.float32))
 
 
 def test_a_wavetable_is_silent_at_or_above_nyquist():

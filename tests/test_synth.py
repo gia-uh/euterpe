@@ -125,9 +125,17 @@ def test_plucking_in_the_middle_removes_the_even_harmonics():
     assert band_db(x, 430, 450) < band_db(x, 650, 670) - 15
 
 
-def test_a_pluck_stays_below_full_scale_with_no_offset():
+@pytest.mark.parametrize("brightness", [0.0, 1.0])
+@pytest.mark.parametrize("position", [0.0, 0.1, 0.5])
+@pytest.mark.parametrize("freq", [110.0, 220.0])
+def test_a_pluck_stays_below_full_scale(freq, brightness, position):
+    for seed in range(20):
+        x = render(Pluck(freq, brightness=brightness, position=position, seed=seed), 0.05)
+        assert np.abs(x).max() <= 1.0, seed
+
+
+def test_a_pluck_has_no_offset():
     x = render(Pluck(110.0, brightness=1.0, seed=3), 2.0)
-    assert np.abs(x).max() <= 1.0
     assert abs(float(x.mean())) < 1e-3
 
 
@@ -211,3 +219,28 @@ def test_brightness_and_position_do_not_change_the_energy_of_the_burst():
 
     levels = [energy(brightness=b) for b in (0.0, 0.5, 1.0)] + [energy(position=p) for p in (0.1, 0.5)]
     assert max(levels) - min(levels) < 1.5
+
+
+def test_fm_sidebands_have_the_bessel_levels_of_the_index():
+    from scipy.special import jv
+
+    x = render(FM(1_000.0, ratio=0.15, index=2.0), 1.0)
+    amp = np.abs(np.fft.rfft(x)) * 2 / len(x)
+    assert abs(amp[1_000] - jv(0, 2.0)) < 0.01
+    assert abs(amp[1_150] - jv(1, 2.0)) < 0.01
+
+
+def test_fm_with_its_modulator_at_or_above_nyquist_is_the_plain_carrier():
+    from euterpe.sound.osc import Sine
+
+    for feedback in (0.0, 1.0):
+        assert np.array_equal(render(FM(1_000.0, ratio=30.0, index=3.0, feedback=feedback), 0.1), render(Sine(1_000.0), 0.1))
+
+
+def test_a_mode_starts_at_its_amplitude():
+    assert abs(np.abs(render(Modal([500.0], [1.0], [0.5]), 0.1)).max() - 0.5) < 0.01
+
+
+def test_two_modes_keep_the_ratio_of_their_amplitudes():
+    x = render(Modal([500.0, 1_300.0], [1.0, 1.0], [1.0, 0.25]), 1.0)
+    assert abs(band_db(x, 1_290, 1_310) - band_db(x, 490, 510) - 20 * np.log10(0.25)) < 1.0
