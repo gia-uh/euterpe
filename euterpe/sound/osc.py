@@ -89,16 +89,22 @@ class Sine(_Oscillator):
 class Saw(_Oscillator):
     """A sawtooth rising from -1 to 1 once per cycle: every harmonic k of freq, at amplitude 1/k
     (6 dB lower per octave). Band-limited with polyBLEP.
+
+    With antialias=False the ramp is computed directly, with no correction at the drop: every
+    harmonic above 24 000 Hz folds back to a lower, out-of-tune frequency. Useful to hear aliasing,
+    and for deliberately harsh, lo-fi tones.
     """
 
     params = (_FREQ,)
 
-    def __init__(self, freq: float | Unit = 440.0):
+    def __init__(self, freq: float | Unit = 440.0, *, antialias: bool = True):
+        self.antialias = antialias
         self._set_params(freq=freq)
         self.reset()
 
     def _naive(self, t, dt, n):
-        return 2.0 * t - 1.0 - _blep(t, dt)
+        ramp = 2.0 * t - 1.0
+        return ramp - _blep(t, dt) if self.antialias else ramp
 
 
 class Square(_Oscillator):
