@@ -12,6 +12,7 @@ files:
   - chapters/00-preface.md
   - chapters/01-what-sound-is.md
   - chapters/02-pitch-and-loudness.md
+  - chapters/03-timbre.md
 
 outputs:
   site:

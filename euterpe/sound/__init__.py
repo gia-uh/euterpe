@@ -3,8 +3,10 @@
 from euterpe.sound.core import BLOCK, RATE, Const, Gain, Mix, Param, Unit, render, rng
 from euterpe.sound.osc import Saw, Sine, Square, Triangle
 from euterpe.sound.shape import BitCrush
+from euterpe.sound.synth import Additive
 
 __all__ = [
+    "Additive",
     "BLOCK",
     "BitCrush",
     "RATE",
