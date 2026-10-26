@@ -108,7 +108,12 @@ class Segments(Unit):
     def block(self, n: int) -> np.ndarray:
         t = (self._done + np.arange(n)) / RATE
         self._done += n
-        return np.interp(t, self.times, self.levels).astype(np.float32)
+        # i: the first point after t, so at a repeated time t takes the level of the last one
+        i = np.searchsorted(self.times, t, side="right")
+        lo, hi = np.clip(i - 1, 0, len(self.times) - 1), np.clip(i, 0, len(self.times) - 1)
+        span = self.times[hi] - self.times[lo]
+        p = np.where(span > 0, (t - self.times[lo]) / np.where(span > 0, span, 1.0), 0.0)
+        return (self.levels[lo] + p * (self.levels[hi] - self.levels[lo])).astype(np.float32)
 
 
 class EnvelopeFollower(Unit):
@@ -140,7 +145,7 @@ class EnvelopeFollower(Unit):
             x = x.max(axis=1)
         # one-pole smoothing: each sample moves the level a fraction (1 - k) of the way to |x|
         # The rise/fall switch makes this a per-sample Python loop, about 0.03 s of CPU per second
-        # of audio; dynamics (Compressor, Gate) that build on it may need a vectorised detector.
+        # of audio. Chapter 7's dynamics (Compressor, Gate) measure level with an RMS detector instead.
         rise = np.exp(-1.0 / np.maximum(self._param("attack", n) * RATE, 1e-12))
         fall = np.exp(-1.0 / np.maximum(self._param("release", n) * RATE, 1e-12))
         out = np.empty(n, np.float64)

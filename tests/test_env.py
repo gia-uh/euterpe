@@ -54,6 +54,18 @@ def test_a_positive_curve_rises_faster_and_falls_faster_than_a_line():
     assert at(bowed, 0.1) > 0.99 and at(bowed, 0.25) == 0.0
 
 
+def test_a_positive_curve_releases_faster_than_a_line():
+    line = render(ADSR(attack=0.0, decay=0.0, sustain=1.0, release=0.1, gate=0.1), 0.3)
+    bowed = render(ADSR(attack=0.0, decay=0.0, sustain=1.0, release=0.1, gate=0.1, curve=0.8), 0.3)
+    assert at(bowed, 0.15) < at(line, 0.15) - 0.2
+
+
+def test_two_segment_points_at_one_time_make_a_jump():
+    x = render(Segments([(0.25, 0.0), (0.25, 1.0), (0.75, 1.0), (0.75, 0.0)]), 1.0)
+    i, j = int(0.25 * RATE), int(0.75 * RATE)
+    assert x[i - 1] == 0.0 and x[i] == 1.0 and x[j - 1] == 1.0 and x[j] == 0.0
+
+
 def test_a_zero_attack_starts_at_full_level():
     assert render(ADSR(attack=0.0, decay=0.1, sustain=0.5), 0.01)[0] == 1.0
 
