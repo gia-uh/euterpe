@@ -1,0 +1,38 @@
+name: book
+# Builds the book on every pull request and publishes it to GitHub Pages from
+# main. Every code block in the book runs during the build, so a block that
+# fails or a missing sound fails this workflow: it is the book's test.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: book-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with: { enable-cache: true, python-version: "3.12" }
+      - run: uv sync --group book
+      - run: uv run scriptorium render book/scriptorium.yaml --only site
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: book/site }
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
