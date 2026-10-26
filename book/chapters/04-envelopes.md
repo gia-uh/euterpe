@@ -6,7 +6,7 @@ Every sound in chapters 1 to 3 had the same level from its first sample to its l
 
 A sound that starts at full level on its first sample jumps from silence to its first value. Chapter 3 showed what a jump does to a spectrum: the saw jumps once per cycle, and that jump gives it harmonics at every multiple of its frequency. A single jump at the start of a note is no different. It contains energy at every frequency, and the ear hears it as a click.
 
-To make the jump as large as possible, the next sine starts at phase 0.25, a quarter of a cycle, where it is at its peak. Its level comes from `Segments(points)`, Euterpe's simplest envelope. `points` is a list of `(time, level)` pairs, in seconds; `Segments` draws a straight line from each point to the next, holds the first level before the first point and holds the last level after the last one. Two points at the same time make a jump.
+To make the jump as large as possible, the next sine starts at phase 0.25, a quarter of a cycle, where it is at its peak. It is switched on at 0.25 s and off at 0.75 s: 440 × 0.25 = 110 whole cycles and 440 × 0.75 = 330, so at both jumps the sine is back at its peak. Its level comes from `Segments(points)`, Euterpe's simplest envelope. `points` is a list of `(time, level)` pairs, in seconds; `Segments` draws a straight line from each point to the next, holds the first level before the first point and holds the last level after the last one. Two points at the same time make a jump.
 
 The first sound is silent until 0.25 s, jumps to full level, and jumps back to silence at 0.75 s. The second takes 10 ms to rise and 10 ms to fall.
 
@@ -250,7 +250,7 @@ for name, env in shapes.items():
     listen(Saw(220.0) * env * 0.3, 2.0, f"Saw at 220 Hz, {name}")
 ```
 
-The pluck and the tap are percussive; they differ only in their decay, 0.8 s against 0.12 s. The organ and the swell are sustained; they differ in their attack and release. Chapter 3 said timbre is the spectrum of a steady tone. A note is not steady, and the envelope is part of what tells instruments apart: a recording of a piano played backwards, with the same spectrum and a reversed envelope, does not sound like a piano.
+The pluck and the tap are percussive; they differ only in their decay, 0.8 s against 0.12 s. The organ and the swell are sustained; they differ in their attack and release. Chapter 3 said timbre is the spectrum of a steady tone. A note is not steady, and the envelope is part of what tells instruments apart: the four notes above share one saw, so one spectrum, and still sound like four instruments.
 
 The pluck still does not sound much like a guitar. In a real string the high harmonics die faster than the low ones, so the tone grows darker as it fades, while here every harmonic fades together. Changing the spectrum over time takes a filter, the subject of chapter 5.
 
@@ -328,7 +328,7 @@ listen(chord() + drum(), 2.0, "An organ chord and a drum")
 listen(chord() * duck + drum(), 2.0, "The same, the chord ducked by the drum's envelope")
 ```
 
-In the second, the chord drops by about 7 dB, to 0.45 of its level, when the drum strikes, and comes back as the drum fades, so the drum is heard more clearly at the same level. Chapter 7 builds compressors on the same follower.
+In the second, the chord drops by about 7 dB, to 0.45 of its level, when the drum strikes, and comes back as the drum fades, so the drum is heard more clearly at the same level. Chapter 7's compressor measures level the same way, with an RMS detector instead of peaks.
 
 ## Summary
 
