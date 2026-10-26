@@ -4,13 +4,18 @@ when: writing or revising a chapter of the book in book/chapters/
 
 The book teaches music to a programmer who knows none, and it is also where a reader first meets Euterpe's API. Both jobs decide what a chapter shows.
 
-## The code a reader sees is Euterpe code
+## Code that is knowledge stays visible
 
-A visible code block shows Euterpe making or changing sound: units, parameters, `render`, `listen`. Nothing else.
+A visible block is code the reader learns from and can retype and change. Two kinds qualify, when they are short and simple:
 
-- Plots, tables, measurements and arithmetic that only serve the explanation run in hidden blocks, `{run echo=false}`. The reader sees the figure or the table they print, not the code. A hidden block that needs a variable from the visible block above it uses `{run continue echo=false}`.
-- If a visible block needs numpy, a loop or a helper class to say something simple, the API is missing something. Propose the change to the API (a parameter, a method, a unit) in the pull request instead of hiding the workaround. Example: chapter 1 needed a saw without polyBLEP, so `Saw` gained `antialias=False` instead of the chapter defining a `NaiveSaw` class.
-- Keep visible blocks short: a few lines that a reader can retype and change.
+- Euterpe code that makes or changes sound: units, parameters, `render`, `listen`.
+- Short numpy or scipy code that computes the physics or maths the chapter teaches. Chapter 1 shows the comparison of the 44 000 Hz and 4 000 Hz samples and the `fold` rule, because a reader who doubts the claim wants to run and change exactly that code.
+
+Utility code runs hidden, in `{run echo=false}` blocks: plotting and drawing (matplotlib), formatting of tables and text, bookkeeping, level checks. A hidden block that needs a variable from the block above it uses `{run continue echo=false}`.
+
+- Never present a number as if the reader could reproduce it with code they cannot see. If the prose quotes a measured value, the code that measures it is on the page, or the number comes from a formula in the text.
+- If a visible block needs a workaround (a loop, a helper class, raw numpy) to say something simple in Euterpe, the API is missing something. Propose the change to the API (a parameter, a method, a unit) in the pull request instead of hiding or keeping the workaround. Example: chapter 1 needed a saw without polyBLEP, so `Saw` gained `antialias=False` instead of the chapter defining a `NaiveSaw` class.
+- Keep visible blocks short: a few lines, with every name in them explained in the prose around them.
 
 ## Sounds and figures
 
