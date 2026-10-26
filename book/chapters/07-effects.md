@@ -1,0 +1,544 @@
+# Effects
+
+The chapters so far made sounds: oscillators, envelopes, filters, FM, noise and models. An *effect* takes a sound that already exists and changes it. A guitar amplifier, an echo pedal, the reverb of a concert hall and the compressor on a radio station's output are all effects. Each one is a unit that takes another unit as its source, as a filter does, so they chain: a source, then a distortion, then a delay, then a reverb.
+
+This chapter covers five families. Delays add copies of the sound later in time. Moving delays (chorus, flanger) and the phaser make the copy's timing change as the sound plays. Distortion bends the wave and adds harmonics. Dynamics (compressor, limiter, gate) turn the volume up and down by themselves, following the level of the sound. Reverb adds the thousands of echoes a room makes. The chapter ends with stereo: placing a sound between two speakers.
+
+## Delay and echo
+
+`Delay(src, time, feedback, mix)` keeps the last few seconds of its source and plays them back `time` seconds later. Inside it is a *delay line*, a buffer that holds time × 48 000 samples: at 0.3 s, 14 400 of them. `mix` sets how much of the delayed copy is heard: the output is (1 − mix) × source + mix × delayed. `feedback` sends the delayed copy back into the line, so it comes out again, `time` seconds later, multiplied by `feedback` once more.
+
+Here a plucked string at 330 Hz goes through a delay of 0.3 s with feedback 0.45:
+
+```python {run}
+from euterpe.book import listen
+from euterpe.sound import Delay, Pluck
+
+note = Pluck(330.0, damping=0.99)
+listen(Delay(note, time=0.3, feedback=0.45, mix=0.5) * 0.7, 3.0, "A pluck with echoes every 0.3 s, feedback 0.45")
+```
+
+You hear the note, then the same note again every 0.3 s, quieter each time. Each echo is 0.45 times the one before, 20 × log₁₀ 0.45 = −6.9 dB, so the fifth echo is 4 × 6.9 = 28 dB below the first. With feedback 1 the echoes would never die away; the unit allows at most 0.99.
+
+The plot shows the same delay fed a single sample of 1, a click. The click itself comes out at 1 − mix = 0.5, and each echo after it at 0.5 × 0.45ᵏ⁻¹:
+
+```python {run echo=false}
+import matplotlib.pyplot as plt
+import numpy as np
+
+from euterpe.book import show
+from euterpe.sound import Const, Delay, Segments, render
+
+click = Segments([(0.0, 1.0), (1 / 48000, 0.0)])
+x = render(Delay(click, time=0.3, feedback=0.45, mix=0.5), 1.6)
+t = np.arange(len(x)) / 48000
+fig, ax = plt.subplots(figsize=(7, 2.4))
+ax.vlines(t[x > 1e-4], 0, x[x > 1e-4], linewidth=2)
+ax.set_xlabel("time (s)")
+ax.set_ylabel("level")
+ax.set_ylim(0, 0.6)
+fig.tight_layout()
+show(fig, "A click through Delay(time=0.3, feedback=0.45, mix=0.5): the click, then echoes every 0.3 s")
+```
+
+### Short delays colour the sound
+
+A delay is only heard as an echo when the copy arrives late enough. Below about 30 to 50 ms the ear fuses the two into one sound with a new tone. Chapter 5 explained why: adding a copy delayed by T seconds is a comb filter. A sine whose period fits a whole number of times into T comes back in step and doubles; one with half a period left over comes back opposite and cancels. So the spectrum gets peaks at every multiple of 1 / T Hz and dips halfway between them.
+
+The same noise burst, with a copy at 1 ms, 10 ms, 40 ms and 150 ms, one after the other:
+
+```python {run}
+from euterpe.book import listen
+from euterpe.sound import ADSR, Delay, WhiteNoise
+
+for ms in (1, 10, 40, 150):
+    burst = WhiteNoise(seed=7) * ADSR(attack=0.001, decay=0.08, sustain=0.0, gate=0.1) * 0.5
+    listen(Delay(burst, time=ms / 1000, feedback=0.0, mix=0.5), 0.6, f"A noise burst plus a copy {ms} ms later")
+```
+
+At 1 ms the burst sounds like a hollow tube: peaks every 1 000 Hz. At 10 ms the peaks are 100 Hz apart and the burst has a faint pitch, 100 Hz. At 40 ms the copy is just apart, a rough double hit. At 150 ms it is a clear echo.
+
+## Moving delays: chorus, flanger, phaser
+
+A delay whose time changes while the sound plays does more than add a copy. When the time grows, each sample of the copy comes out a little later than the one before it: the copy is stretched, and stretched sound is lower in pitch. When the time shrinks, the copy is squeezed and higher. If the delay grows by r seconds every second, the copy plays at 1 − r times its speed, and every frequency in it is multiplied by 1 − r.
+
+### Chorus
+
+`Chorus(src, rate, depth, mix)` mixes the source with a copy delayed by 20 ms plus or minus `depth` seconds, and swings the delay up and down `rate` times a second along a sine. The delay is depth × sin(2π × rate × t), so it changes fastest when it crosses the middle, at depth × 2π × rate seconds per second. With the defaults, depth 3 ms and rate 0.8 Hz:
+
+```python {run output=code}
+import numpy as np
+
+r = 0.003 * 2 * np.pi * 0.8
+print(f"the delay changes by up to {r:.4f} s per second")
+print(f"the copy's pitch moves by up to {100 * r:.2f} %, {1200 * np.log2(1 + r):.0f} cents")
+```
+
+A *cent* is a hundredth of one of chapter 2's equal steps, so 26 cents is about a quarter of a step. Two singers on the same note are never exactly in tune: they drift apart by a few cents and back. The chorus copies that drift, which is where its name comes from. Here is a saw at 220 Hz, alone and then with a chorus:
+
+```python {run}
+from euterpe.book import listen
+from euterpe.sound import ADSR, Biquad, Chorus, Saw
+
+saw = lambda: Biquad(Saw(220.0), "lowpass", cutoff=2500.0) * ADSR(gate=2.6, release=0.3) * 0.5
+listen(saw(), 3.0, "A filtered saw at 220 Hz, dry")
+listen(Chorus(saw(), rate=0.8, depth=0.003, mix=0.5), 3.0, "The same saw through a chorus")
+```
+
+`saw` is a function that builds a fresh saw each time it is called, because a unit keeps its own state and cannot be played in two places at once. The `ADSR` fades it out at the end. The chorused saw sounds wider and slowly shimmers. The two copies, a few cents apart, go in and out of step, which is the beating of chapter 3, spread over every harmonic at once.
+
+### Flanger
+
+`Flanger(src, rate, depth, feedback, mix)` uses a much shorter delay: from 0.5 ms up to 0.5 ms + `depth`, 2.5 ms by default. At those lengths the copy is not heard as a copy at all, only as the comb filter of the previous section, with peaks at multiples of 1 / T. As T sweeps from 0.5 ms to 2.5 ms, the first peak slides between 2 000 Hz and 400 Hz, and every other peak slides with it. `feedback` sends the delayed copy back in, which makes the peaks taller and narrower, as feedback did for `Comb` in chapter 5.
+
+A comb is easiest to hear on a sound that has every frequency, so here is white noise through a flanger sweeping once every 4 seconds:
+
+```python {run}
+from euterpe.book import listen
+from euterpe.sound import ADSR, Flanger, WhiteNoise
+
+noise = WhiteNoise(seed=3) * ADSR(attack=0.5, gate=7.2, release=0.6) * 0.15
+listen(Flanger(noise, rate=0.25, depth=0.004, feedback=0.7, mix=0.5), 8.0, "White noise through a flanger, rate 0.25 Hz, feedback 0.7")
+```
+
+The noise sounds like a jet passing overhead. The picture shows why: in this *spectrogram* time runs to the right, frequency goes up, and brighter means louder. The bright bands are the peaks of the comb, evenly spaced, rising and falling together.
+
+```python {run echo=false}
+import matplotlib.pyplot as plt
+import numpy as np
+
+from euterpe.book import show
+from euterpe.sound import Flanger, WhiteNoise, render
+
+x = render(Flanger(WhiteNoise(seed=3) * 0.15, rate=0.25, depth=0.004, feedback=0.7, mix=0.5), 8.0)
+fig, ax = plt.subplots(figsize=(7, 3))
+ax.specgram(x, NFFT=2048, Fs=48000, noverlap=1024, cmap="magma", vmin=-110)
+ax.set_ylim(0, 8000)
+ax.set_xlabel("time (s)")
+ax.set_ylabel("frequency (Hz)")
+fig.tight_layout()
+show(fig, "Spectrogram of white noise through the flanger: the comb's peaks sweep together")
+```
+
+### Phaser
+
+`Phaser(src, rate, stages, mix)` sounds close to a flanger but works differently. It passes the source through a chain of `stages` *allpass* filters, which chapter 5 met: an allpass keeps the level of every frequency and only delays it, by a different amount at each frequency. The phaser's allpasses each delay a frequency by a quarter of its period, 90°, at a *turning frequency* that sweeps from 200 Hz to 2 000 Hz and back, `rate` times a second. Below that frequency they delay less, above it more, up to half a period.
+
+Mixed with the source, the chained copy cancels wherever its total delay is half a period, 180°. Four stages reach 180° at one frequency and 540° at a higher one, so they make two notches. Unlike the comb of a flanger, whose peaks are evenly spaced all the way up, a phaser has only stages / 2 notches, unevenly spaced, so its sweep sounds softer:
+
+```python {run}
+from euterpe.book import listen
+from euterpe.sound import ADSR, Biquad, Phaser, Saw
+
+saw = Biquad(Saw(110.0), "lowpass", cutoff=4000.0) * ADSR(gate=5.4, release=0.5) * 0.5
+listen(Phaser(saw, rate=0.3, stages=8, mix=0.5), 6.0, "A saw at 110 Hz through an 8-stage phaser, rate 0.3 Hz")
+```
+
+Eight stages give four notches that move together. Try `stages=2`: a single notch, and a much gentler sweep.
+
+## Distortion
+
+The effects so far are linear: a sine in gives a sine out, at the same frequency. *Distortion* is not. A *waveshaper* passes each sample through a fixed curve, and a curve that bends the wave adds new frequencies to it. Chapter 1's `BitCrush` was one: its curve was a staircase.
+
+`Shaper(src, kind, drive)` has three curves. Each multiplies the sample by `drive` / 2 first and then bends it:
+
+- `"tanh"`, the hyperbolic tangent: straight near 0 and bending smoothly towards ±1.
+- `"soft"`, the cubic u − u³/3, which stops rising at u = 1 and stays flat beyond.
+- `"hard"`, a clip: straight up to ±1, then flat. An amplifier pushed past its supply voltage does this.
+
+The output is scaled so a full-scale input comes out at −1 dBFS, so turning up `drive` changes the shape and not the peak. The curves are drawn here at drive 4:
+
+```python {run echo=false}
+import matplotlib.pyplot as plt
+import numpy as np
+
+from euterpe.book import show
+
+u = np.linspace(-1, 1, 400) * 2
+curves = {
+    "tanh": np.tanh(u) / np.tanh(2),
+    "soft": (np.clip(u, -1, 1) - np.clip(u, -1, 1) ** 3 / 3) / (2 / 3),
+    "hard": np.clip(u, -1, 1),
+}
+fig, ax = plt.subplots(figsize=(4.5, 3.2))
+ax.plot(u / 2, u / 2, color="0.75", linestyle="--", label="no shaper")
+for name, y in curves.items():
+    ax.plot(u / 2, 0.891 * y, label=name)
+ax.set_xlabel("input sample")
+ax.set_ylabel("output sample")
+ax.legend(fontsize=8)
+fig.tight_layout()
+show(fig, "The three curves of Shaper at drive 4: each input sample maps to one output sample")
+```
+
+A sine pushed through a curve stays periodic with the same period, so whatever the curve adds must be harmonics, multiples of the sine's frequency. The block measures the first seven harmonics of a sine at 220 Hz through each curve, in dB:
+
+```python {run output=code}
+import numpy as np
+
+from euterpe.sound import Shaper, Sine, render
+
+for kind in ("tanh", "soft", "hard"):
+    x = render(Shaper(Sine(220.0), kind, drive=4.0), 1.0)
+    amp = np.abs(np.fft.rfft(x)) * 2 / len(x)          # one bin per Hz, as in chapter 6
+    levels = [20 * np.log10(amp[220 * k] + 1e-9) for k in range(1, 8)]
+    print(f"{kind:>4}:", "  ".join(f"{v:6.1f}" for v in levels))
+```
+
+Two things show. First, the even harmonics (2nd, 4th, 6th) are at −150 dB or below: absent. All three curves are *odd*: the bottom half is the top half turned upside down, so the positive and negative halves of the sine are bent the same way, and a wave with that symmetry has only odd harmonics, as the square of chapter 3. Second, the curves bend the wave by different amounts at the same drive. The 7th harmonic is −40.6 dB after `tanh`, −35.1 dB after `hard` and −30.0 dB after `soft`, whose curve rises most steeply in the plot above and then turns flat at the same point as `hard`, with a rounder corner.
+
+More drive pushes more of the wave into the bend. Here is the same sine at drive 1, 4 and 16, through `tanh`:
+
+```python {run}
+from euterpe.book import listen
+from euterpe.sound import ADSR, Shaper, Sine
+
+for drive in (1.0, 4.0, 16.0):
+    listen(Shaper(Sine(220.0), "tanh", drive=drive) * ADSR(gate=1.2, release=0.2) * 0.5, 1.5, f"A sine at 220 Hz through tanh at drive {drive:g}")
+```
+
+At drive 1 you hear a sine with a slight buzz; at 16 the wave is nearly a square, and sounds like one.
+
+### Saturation and even harmonics
+
+`Saturator(src, drive, bias)` is a tanh with the wave shifted by `bias` before the curve: tanh(drive × (x + bias)). The shift makes the curve lopsided around the wave. The top half is bent more than the bottom half, the symmetry is gone, and the even harmonics appear. Tube amplifiers do the same, and the 2nd harmonic, an octave above the note, is why their distortion is called warm: it adds the note's own octave rather than a harsher odd harmonic. The shift also leaves an offset at 0 Hz, which the unit removes with a high-pass at 10 Hz.
+
+```python {run output=code}
+import numpy as np
+
+from euterpe.sound import Saturator, Sine, render
+
+x = render(Saturator(Sine(220.0), drive=4.0, bias=0.2), 1.0)
+amp = np.abs(np.fft.rfft(x)) * 2 / len(x)
+print("  ".join(f"{20 * np.log10(amp[220 * k]):6.1f}" for k in range(1, 8)))
+```
+
+The 2nd harmonic is now at −18.3 dB, nearly as loud as the 3rd at −16.7 dB, and the 4th and 6th are there too. Listen to the two side by side, a shaper and a saturator at the same drive on a bass note at 110 Hz:
+
+```python {run}
+from euterpe.book import listen
+from euterpe.sound import ADSR, Saturator, Shaper, Sine
+
+note = lambda: Sine(110.0) * ADSR(attack=0.005, decay=0.4, sustain=0.6, gate=1.2, release=0.3)
+listen(Shaper(note(), "tanh", drive=4.0) * 0.6, 1.6, "A 110 Hz note through tanh, drive 4: odd harmonics")
+listen(Saturator(note(), drive=4.0, bias=0.2) * 0.6, 1.6, "The same note through a saturator, drive 4, bias 0.2: odd and even")
+```
+
+### Two notes through one curve
+
+A curve does not treat a sum of sines as separate sines. Bending x + y gives terms in x², xy, x³, x²y and so on, and a product of two sines is a pair of sines at the sum and the difference of their frequencies. So two notes through a distortion produce new frequencies at combinations such as f₁ − f₂ and 2f₁ − f₂, called *intermodulation*.
+
+When the two notes are a fifth apart (frequency ratio 3 : 2, here 220 Hz and 330 Hz), every combination is a multiple of 110 Hz, so the new frequencies are harmonics of a 110 Hz note and the result still sounds like one chord. When they are 6 equal steps apart (a ratio of 2^(6/12) = 1.414, an interval called a *tritone*, 220 Hz and 311.1 Hz), the combinations fall on no common series:
+
+```python {run output=code}
+import numpy as np
+
+from euterpe.sound import Shaper, Sine, render
+
+for top in (330.0, 311.1):
+    x = render(Shaper(Sine(220.0) * 0.5 + Sine(top) * 0.5, "hard", drive=8.0), 1.0)
+    amp = np.abs(np.fft.rfft(x))
+    print(f"220 + {top} Hz, the ten loudest frequencies:", sorted(np.argsort(amp)[-10:].tolist()))
+```
+
+The fifth gives 110, 220, 330, 440 Hz and on, all multiples of 110. The tritone gives 38, 129, 402 and 493 Hz among others, a cluster that sounds rough:
+
+```python {run}
+from euterpe.book import listen
+from euterpe.sound import ADSR, Shaper, Sine
+
+for top, name in ((330.0, "a fifth"), (311.1, "a tritone")):
+    chord = Shaper(Sine(220.0) * 0.5 + Sine(top) * 0.5, "hard", drive=8.0)
+    listen(chord * ADSR(gate=1.7, release=0.2) * 0.5, 2.0, f"220 and {top:g} Hz, {name}, through a hard clip")
+```
+
+This is why rock guitarists playing through heavy distortion so often play only two notes a fifth apart, the *power chord*: richer chords turn into noise.
+
+## Dynamics
+
+*Dynamics* units watch how loud their source is and change its gain as it plays. To do that they need a *level detector*: a running measure of loudness. Euterpe's detector squares the samples, averages them over about 10 ms and takes the square root, the RMS of chapter 2, so a full-scale sine reads −3 dB.
+
+### Compressor
+
+`Compressor(src, threshold, ratio, attack, release, makeup)` leaves the source alone while its level is below `threshold` dB. Above it, every `ratio` dB more of input gives only 1 dB more of output. A sound 20 dB above a threshold of −30 dB, through ratio 4, comes out 20 / 4 = 5 dB above it, at −25 dB: the compressor took 15 dB away. The *makeup* gain in dB is added at the end, to bring the quieter result back up.
+
+The rule is a small function of the input level, here with threshold −30 dB and ratio 4:
+
+```python {run output=code}
+def compressed(level, threshold=-30.0, ratio=4.0):
+    return level if level < threshold else threshold + (level - threshold) / ratio
+
+for level in (-40, -30, -20, -10, 0):
+    print(f"in {level:4d} dB -> out {compressed(level):6.1f} dB")
+```
+
+Here is a saw at 110 Hz whose level jumps every second, quiet, loud, then medium. The block measures the RMS of each second, before and after a compressor with threshold −30 dB and ratio 4:
+
+```python {run output=code}
+import numpy as np
+
+from euterpe.sound import Compressor, Saw, Segments, render
+
+steps = [(0, 0.05), (1, 0.05), (1, 0.6), (2, 0.6), (2, 0.15), (3, 0.15)]
+before = render(Saw(110.0) * Segments(steps), 3.0)
+after = render(Compressor(Saw(110.0) * Segments(steps), threshold=-30.0, ratio=4.0), 3.0)
+db = lambda x: 20 * np.log10(np.sqrt(np.mean(x ** 2)))
+for s in range(3):
+    part = slice(s * 48000 + 4800, (s + 1) * 48000)   # skip the first 0.1 s of each second
+    print(f"second {s + 1}: in {db(before[part]):6.1f} dB, out {db(after[part]):6.1f} dB")
+```
+
+The first second, at −30.8 dB, is under the threshold and comes through untouched. The second, at −9.2 dB, comes out at −25.1 dB, within a few tenths of the rule's −24.8 dB. The difference between the loudest and quietest second fell from 21.6 dB to 5.7 dB. That is what a compressor is for: it shrinks the range between loud and soft, so a voice stays audible over a band, or a whole song sounds dense and even.
+
+`attack` and `release` set how fast the gain follows the level, in seconds: how quickly it comes down when the level rises and how quickly it goes back up when the level falls. The plot shows the level of each second-long step, before and after, and how the gain moves at each jump with the defaults, attack 10 ms and release 100 ms:
+
+```python {run echo=false}
+import matplotlib.pyplot as plt
+import numpy as np
+
+from euterpe.book import show
+from euterpe.sound import Compressor, Saw, Segments, render
+
+steps = [(0, 0.05), (1, 0.05), (1, 0.6), (2, 0.6), (2, 0.15), (3, 0.15)]
+before = render(Saw(110.0) * Segments(steps), 3.0)
+after = render(Compressor(Saw(110.0) * Segments(steps), threshold=-30.0, ratio=4.0), 3.0)
+
+
+def level(x, size=480):
+    frames = x[: len(x) // size * size].reshape(-1, size)
+    return 10 * np.log10((frames ** 2).mean(axis=1) + 1e-12)
+
+
+t = np.arange(len(before) // 480) * 0.01
+fig, ax = plt.subplots(figsize=(7, 2.8))
+ax.plot(t, level(before), label="before")
+ax.plot(t, level(after), label="after the compressor")
+ax.axhline(-30, color="0.6", linestyle="--", linewidth=1, label="threshold")
+ax.set_xlabel("time (s)")
+ax.set_ylabel("level (dB, 10 ms)")
+ax.legend(fontsize=8, loc="lower right")
+fig.tight_layout()
+show(fig, "Level of the stepped saw before and after Compressor(threshold=-30, ratio=4), every 10 ms")
+```
+
+At the jump to the loud step, at 1 s, the output overshoots for a few milliseconds before the gain comes down: that is the attack. At 2 s, when the level drops, the gain is still low, so the output dips to −36 dB and climbs back over about 0.2 s: that is the release. A slower attack lets more of the start of each note through, which keeps the click of a drum or a plucked string. A faster release makes the gain spring back sooner after a loud note, and on a fast release the quiet tail of each note swells as the gain recovers. Producers call the sound *pumping*, and some music uses it on purpose.
+
+A compressor is easiest to hear on a note that starts loud and decays, such as a pluck. The second version, compressed hard and lifted with makeup gain, keeps its attack but its tail stays loud for much longer. It is scaled by 0.3 instead of 0.5: the first 5 ms of the pluck pass before the gain has come down, and the makeup lifts that first peak by 10 dB too, which at 0.5 would reach full scale.
+
+```python {run}
+from euterpe.book import listen
+from euterpe.sound import Compressor, Pluck
+
+listen(Pluck(196.0, damping=0.99) * 0.5, 3.0, "A pluck at 196 Hz, dry")
+listen(Compressor(Pluck(196.0, damping=0.99), threshold=-30.0, ratio=8.0, attack=0.005, release=0.2, makeup=10.0) * 0.3, 3.0, "The same pluck compressed: ratio 8, makeup 10 dB")
+```
+
+### Limiter
+
+A *limiter* is a compressor that never lets a sample pass its ceiling. `Limiter(src, ceiling, release)` does that by looking ahead: it delays the source by 5 ms, 240 samples, so it sees each peak before it plays it, and lowers the gain over those 240 samples to arrive exactly at the ceiling. After the peak the gain returns to 1 with time constant `release`. It is the last unit before a file is written, the guard against clipping.
+
+Here a sine at four times full scale, which would clip badly, goes through a limiter at −1 dBFS:
+
+```python {run output=code}
+import numpy as np
+
+from euterpe.sound import Limiter, Sine, render
+
+loud = render(Sine(220.0) * 4.0, 1.0)
+safe = render(Limiter(Sine(220.0) * 4.0, ceiling=-1.0), 1.0)
+print(f"before: peak {20 * np.log10(np.abs(loud).max()):.2f} dBFS")
+print(f"after:  peak {20 * np.log10(np.abs(safe).max()):.2f} dBFS")
+print("delay:", np.argmax(safe != 0) - np.argmax(loud != 0), "samples")
+```
+
+The peak sits at the ceiling, and the output starts 240 samples, 5 ms, late. A limiter that works this hard flattens the top of every cycle, which is distortion: on a steady loud sine it is a shaper. Its job is to catch rare peaks, not to make a quiet sound loud.
+
+### Gate
+
+A *gate* is the opposite of a compressor: it turns the quiet parts down, to silence. `Gate(src, threshold, release)` passes its source while the level is above `threshold` dB and closes, fading to silence with time constant `release`, when it drops below. It opens in about 1 ms. The classic use is to remove noise between notes: the hiss of an amplifier, the bleed of other instruments into a drum's microphone.
+
+Here a pluck sits on a background of quiet hiss with an RMS of −59 dB (white noise at 0.002: its samples are spread evenly between −1 and 1, so its RMS is 1/√3 = 0.577 of its peak). A gate at −45 dB lets the note through and closes once the note falls below it:
+
+```python {run}
+from euterpe.book import listen
+from euterpe.sound import Gate, Pluck, WhiteNoise
+
+noisy = lambda: Pluck(262.0, damping=0.99) * 0.6 + WhiteNoise(seed=2) * 0.002
+listen(noisy(), 3.0, "A pluck over quiet hiss")
+listen(Gate(noisy(), threshold=-45.0, release=0.1), 3.0, "The same through a gate at -45 dB")
+```
+
+The hiss is gone from the end, but notice what else the gate takes: the last, quietest part of the note's decay is cut off with it. A gate cannot tell a quiet note from noise at the same level.
+
+## Reverb
+
+Clap your hands in a large hall. The sound reaches your ears first directly, then again from every wall, the ceiling, the floor, and from paths that bounce off several of them. The first few reflections arrive as separate echoes. After a few tens of milliseconds there are so many, so close together, that they blur into a smooth tail that fades away. That tail is *reverberation*, and how long it takes to fade is the main thing that makes a bathroom sound different from a cathedral.
+
+Rooms are measured by their *RT60*: the time the reverberation takes to fall by 60 dB, from loud to about silent. A living room has an RT60 of about 0.4 s, a concert hall about 2 s, a large stone church 5 s or more.
+
+### Feedback delay network
+
+A delay with feedback makes one train of echoes, evenly spaced, which sounds metallic. A room makes echoes whose number grows every millisecond. `FDNReverb(src, decay, size, damping, mix)` copies that with a *feedback delay network*: eight delay lines of different lengths, between 30 and 90 ms at size 1. The output of every line is mixed into the input of every other line, each with a sign + or −, so each echo that comes out of one line goes into all eight. One click becomes 8 echoes, then 64, then 512: after a few trips round the network the echoes are too dense to tell apart.
+
+Each line has a gain below 1, chosen from its length so that the tail falls 60 dB in `decay` seconds. A line of L samples is passed 48 000 / L times a second, so its gain is 10^(−3 × L / (48 000 × decay)): in decay seconds that compounds to 10^(−3) in level, −60 dB. `damping` puts a low-pass inside each line, so the high frequencies die faster than the low ones, as they do in a room with soft surfaces. `mix` sets how much reverb is heard against the dry sound.
+
+The plot shows a single click through two reverbs: the network, and the convolution reverb of the next section. The top half shows the first 80 ms, where the network's echoes are still separate spikes; the bottom half shows the level of both over 2.5 s, falling in a straight line in dB, which is what an exponential decay looks like:
+
+```python {run echo=false}
+import matplotlib.pyplot as plt
+import numpy as np
+
+from euterpe.book import show
+from euterpe.sound import ConvolutionReverb, FDNReverb, Segments, render
+
+click = lambda: Segments([(0.0, 1.0), (1 / 48000, 0.0)])
+fdn = render(FDNReverb(click(), decay=1.5, mix=1.0), 2.5)[:, 0]
+conv = render(ConvolutionReverb(click(), decay=1.5, mix=1.0), 2.5)[:, 0]
+fig, (top, bottom) = plt.subplots(2, 1, figsize=(7, 4.6))
+t = np.arange(len(fdn)) / 48000
+n = int(0.08 * 48000)
+top.plot(t[:n] * 1000, fdn[:n], linewidth=0.7, label="FDN")
+top.plot(t[:n] * 1000, conv[:n] - 0.3, linewidth=0.7, label="convolution (shifted down)")
+top.set_xlabel("time (ms)")
+top.legend(fontsize=8, loc="upper right")
+size = 480
+for name, x in (("FDN", fdn), ("convolution", conv)):
+    frames = x[: len(x) // size * size].reshape(-1, size)
+    bottom.plot(np.arange(len(frames)) * 0.01, 10 * np.log10((frames ** 2).mean(axis=1) + 1e-14), label=name, linewidth=1)
+bottom.axvline(1.5, color="0.6", linestyle="--", linewidth=1)
+bottom.set_xlabel("time (s)")
+bottom.set_ylabel("level (dB, 10 ms)")
+bottom.legend(fontsize=8)
+fig.tight_layout()
+show(fig, "A click through FDNReverb and ConvolutionReverb, both decay 1.5 s: the first 80 ms, and the level over 2.5 s")
+```
+
+The convolution reverb's line falls 60 dB from its start to the dashed line at 1.5 s. The network's falls a little faster: its damping removes the high frequencies sooner, and `decay` holds for the low ones. Its first echo arrives after 22 ms, the length of its shortest line at size 0.7. Here is a short pluck, dry, in a small room and in a large hall:
+
+```python {run}
+from euterpe.book import listen
+from euterpe.sound import FDNReverb, Pluck
+
+listen(Pluck(392.0, damping=0.98) * 0.6, 3.0, "A short pluck at 392 Hz, dry")
+listen(FDNReverb(Pluck(392.0, damping=0.98), decay=0.5, size=0.3, mix=0.3) * 0.6, 3.0, "In a small room: decay 0.5 s, size 0.3")
+listen(FDNReverb(Pluck(392.0, damping=0.98), decay=3.0, size=1.0, damping=0.5, mix=0.4) * 0.6, 5.0, "In a large hall: decay 3 s, size 1, damping 0.5")
+```
+
+`size` scales the delay lines. A small size packs the early echoes close together and the room sounds small even with a long decay, like a tiled bathroom. A large size spreads them, and you start to hear the space before the tail.
+
+The reverb's output is stereo even for a mono source. The left side is one mix of the eight lines and the right side another, with different signs, so the two sides carry different echoes. Through headphones the reverb surrounds the dry note instead of sitting inside it.
+
+### Convolution reverb
+
+The other way to make reverb starts from a recording of a click in a real room: its *impulse response*, everything the room does to one instant of sound. Any sound is a long row of instants, one per sample, and each one makes the room answer with a copy of the impulse response, scaled by that sample. Adding all those copies is called *convolution*, and the result is the sound played in that room. It is exact, and costs a lot of arithmetic, which the computer does with FFTs.
+
+`ConvolutionReverb(src, decay, mix, seed)` has no recording to use. It synthesizes the impulse response: white noise, a different one on each side, whose level falls 60 dB in `decay` seconds. The plot above shows it next to the network: dense from the very first millisecond, with no separate early echoes. Listen to both on the same pluck, both with a decay of 2 s:
+
+```python {run}
+from euterpe.book import listen
+from euterpe.sound import ConvolutionReverb, FDNReverb, Pluck
+
+listen(FDNReverb(Pluck(392.0, damping=0.98), decay=2.0, mix=0.35) * 0.6, 4.0, "A pluck through FDNReverb, decay 2 s")
+listen(ConvolutionReverb(Pluck(392.0, damping=0.98), decay=2.0, mix=0.35) * 0.6, 4.0, "The same pluck through ConvolutionReverb, decay 2 s")
+```
+
+The convolution tail is smoother and brighter. Its noise holds every frequency at the same level for the whole decay, so the high frequencies last as long as the low ones; the network, with its damping, darkens as it fades, as a real room does. The convolution reverb is also slower to compute. Which to use is a question of taste. A recorded impulse response would make the convolution reverb sound like one particular real room, and that is where it is strongest.
+
+## Stereo
+
+A stereo file has two channels, one for each speaker. A sound placed only in the left channel seems to come from the left; one with the same level in both seems to come from between the speakers.
+
+### Pan
+
+`Pan(src, pos)` places a mono sound: `pos` −1 is fully left, 0 the middle, 1 fully right. The obvious rule, left gain 1 − p and right gain p, makes the sound quieter in the middle: two speakers at half level carry half the power of one at full level, 2 × 0.5² = 0.5, which is −3 dB. So `Pan` uses a *constant-power* rule. It turns `pos` into an angle θ = (pos + 1) × π / 4, from 0 to π / 2, and uses cos θ for the left and sin θ for the right. Since cos² θ + sin² θ = 1, the total power never changes:
+
+```python {run output=code}
+import numpy as np
+
+for pos in (-1.0, -0.5, 0.0, 0.5, 1.0):
+    theta = (pos + 1) * np.pi / 4
+    left, right = np.cos(theta), np.sin(theta)
+    print(f"pos {pos:+.1f}: left {left:.3f}, right {right:.3f}, power {left ** 2 + right ** 2:.3f}")
+```
+
+In the middle each side gets 0.707, −3 dB. `pos` can be a unit, so a slow sine moves the sound from side to side, an *auto-pan*. Listen to this one through headphones:
+
+```python {run}
+from euterpe.book import listen
+from euterpe.sound import ADSR, Biquad, Pan, Saw, Sine
+
+tone = Biquad(Saw(220.0), "lowpass", cutoff=1500.0) * ADSR(gate=7.4, release=0.5) * 0.5
+listen(Pan(tone, pos=Sine(0.25)), 8.0, "A saw moving from side to side, once every 4 seconds")
+```
+
+### Width
+
+`Width(src, width)` changes how wide an existing stereo sound is. It splits the sound into a *mid* channel, (L + R) / 2, the part both sides share, and a *side* channel, (L − R) / 2, the part where they differ. It multiplies the side by `width` and puts the two back together: L = M + S, R = M − S. Width 0 removes the side, so both speakers play the same thing, mono. Width 1 changes nothing. Width 2 doubles the difference, and the sound seems to spread beyond the speakers.
+
+The reverb's tail is a good thing to try it on, because its two sides differ:
+
+```python {run}
+from euterpe.book import listen
+from euterpe.sound import FDNReverb, Pluck, Width
+
+for width in (0.0, 1.0, 2.0):
+    wet = FDNReverb(Pluck(330.0, damping=0.98), decay=2.0, mix=0.5) * 0.5
+    listen(Width(wet, width=width), 3.0, f"A reverberant pluck at width {width:g}")
+```
+
+At width 0 the tail sits in the middle of your head; at 2 it spreads around it. The dry pluck itself is the same on both sides, all mid, so its position does not change.
+
+## Putting a chain together
+
+Effects are usually chained in a fixed order, the order a guitarist puts pedals on the floor: first what shapes the tone (distortion), then what moves it (chorus), then what places it in time and space (delay, reverb), and last a limiter that guards the output. Every unit in this chain is one met in this chapter:
+
+```python {run}
+from euterpe.book import listen
+from euterpe.sound import Chorus, Delay, FDNReverb, Limiter, Pan, Pluck, Saturator
+
+note = Pluck(147.0, damping=0.995, brightness=0.7)
+tone = Chorus(Saturator(note, drive=3.0, bias=0.2), rate=0.6, depth=0.002)
+space = FDNReverb(Pan(Delay(tone, time=0.375, feedback=0.4, mix=0.3), pos=-0.3), decay=2.5, mix=0.3)
+listen(Limiter(space * 0.9, ceiling=-1.0), 6.0, "A pluck at 147 Hz: saturator, chorus, delay, pan, reverb and limiter")
+```
+
+Change the order and the sound changes. Distortion after the reverb would distort every echo of the tail together, and each echo would intermodulate with the others; a delay before the chorus would give every echo the same shimmer instead of one.
+
+## Summary
+
+- An effect is a unit whose source is another unit, so effects chain.
+- `Delay(src, time, feedback, mix)` adds the source again after `time` seconds; `feedback` repeats it, each echo `feedback` times the last. Below about 30 to 50 ms the copy is not heard as an echo but as a comb filter, with peaks every 1 / time Hz.
+- A delay that changes while it plays shifts the pitch of the copy by the rate of change. `Chorus` uses a 20 ms delay that swings a few cents of pitch, which thickens a sound; `Flanger` sweeps a delay of 0.5 to 2.5 ms, which slides a whole comb of peaks up and down; `Phaser` sweeps a chain of allpasses, which slides stages / 2 notches.
+- `Shaper(src, kind, drive)` bends each sample through tanh, a soft cubic or a hard clip. An odd curve adds odd harmonics only; more drive and a harsher curve make them louder. `Saturator` shifts the wave before the curve, which adds even harmonics too. Two notes through a curve also produce sums and differences of their frequencies, intermodulation.
+- `Compressor(src, threshold, ratio, attack, release, makeup)` divides by `ratio` how far the level goes above `threshold`: it shrinks the range between loud and soft. `Limiter(src, ceiling, release)` looks 5 ms ahead and keeps every sample under `ceiling`. `Gate(src, threshold, release)` silences what is quieter than `threshold`.
+- Reverb is the dense tail of echoes a room adds; RT60 is the time it takes to fall 60 dB. `FDNReverb(src, decay, size, damping, mix)` makes it with eight delay lines feeding each other; `ConvolutionReverb(src, decay, mix, seed)` convolves the source with a synthesized impulse response of decaying noise.
+- `Pan(src, pos)` places a mono sound between the speakers at constant power, cos θ left and sin θ right. `Width(src, width)` scales the difference between the sides: 0 is mono, 2 twice as wide.
+
+## Exercises
+
+1. In the first echo block, change `feedback=0.45` to `feedback=0.8`. How many dB quieter is each echo than the one before, and how many echoes does it take to fall 30 dB below the first?
+2. In the flanger block, change `feedback=0.7` to `feedback=-0.7`. Where are the peaks of the comb now, when the delay is at its shortest, 0.5 ms?
+3. In the compressor's measurement block, change `ratio=4.0` to `ratio=2.0`. Use the rule to predict the output level of the second second, then run the block to check it.
+
+### Answers
+
+1. Each echo is 0.8 times the one before: 20 × log₁₀ 0.8 = −1.9 dB. Falling 30 dB takes 30 / 1.94 = 15.5, so the 16th echo after the first is 30 dB below it. At 0.3 s apart, that is 4.8 s of echoes.
+2. A negative feedback flips the copy each time it comes back, so a frequency is reinforced when an odd number of half periods fits into the delay. The peaks move to the odd multiples of 1 / (2 × 0.0005) = 1 000 Hz: 1 000, 3 000, 5 000 Hz, and the dips to 0, 2 000, 4 000 Hz. The sweep sounds hollower, with no peak at the bottom of the spectrum.
+3. The second second goes in at −9.2 dB, 20.8 dB above the threshold. Ratio 2 halves that: −30 + 20.8 / 2 = −19.6 dB. The block prints a value within a few tenths of that.
+
+```python {run echo=false}
+# Level check: lint every sound in build/audio, this chapter's and any written before it.
+# It prints nothing unless one has an error.
+from pathlib import Path
+
+from euterpe.io import read
+from euterpe.lint import lint_audio
+
+failures = [
+    f"{path.name}: {finding.message}"
+    for path in sorted(Path("build/audio").glob("*.mp3"))
+    for finding in lint_audio(*read(path)).errors
+]
+if failures:
+    raise SystemExit("level check failed: " + "; ".join(failures))
+```
