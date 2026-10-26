@@ -12,7 +12,7 @@ uv add git+https://github.com/gia-uh/euterpe
 
 ## Example
 
-A plucked A3, rendered to MP3. This is the target API: `Pluck` arrives later in milestone 1.
+A plucked A3, rendered to MP3.
 
 ```python
 from euterpe.sound import Pluck, render

@@ -6,7 +6,7 @@ from euterpe.sound.filters import Allpass, Biquad, Comb, Formant, OnePole
 from euterpe.sound.noise import BrownNoise, LFSRNoise, PinkNoise, Wavetable, WhiteNoise
 from euterpe.sound.osc import Saw, Sine, Square, Triangle
 from euterpe.sound.shape import BitCrush
-from euterpe.sound.synth import Additive
+from euterpe.sound.synth import FM, Additive, Modal, Pluck
 
 __all__ = [
     "ADSR",
@@ -20,13 +20,16 @@ __all__ = [
     "Comb",
     "Const",
     "EnvelopeFollower",
+    "FM",
     "Formant",
     "Gain",
     "LFSRNoise",
     "Mix",
+    "Modal",
     "OnePole",
     "Param",
     "PinkNoise",
+    "Pluck",
     "Saw",
     "Segments",
     "Sine",

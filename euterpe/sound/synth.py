@@ -6,7 +6,9 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from euterpe.sound.core import RATE, Param, Unit
+from scipy.signal import lfilter
+
+from euterpe.sound.core import RATE, Param, Unit, rng
 
 _ONE = 1 << 32  # one cycle of phase in the fixed-point accumulators
 
@@ -51,3 +53,211 @@ class Additive(Unit):
         t = ((acc - inc) % _ONE) / _ONE
         waves = np.sin(2 * np.pi * t) * np.where(partial_hz < RATE / 2, self.amps, 0.0)
         return waves.sum(axis=1).astype(np.float32)
+
+
+def _phases(acc0: int, hz: np.ndarray) -> tuple[np.ndarray, int]:
+    """Phase in cycles [0, 1) for each sample of a fixed-point accumulator stepped by hz, and
+    the accumulator after the block."""
+    inc = np.round(hz / RATE * _ONE).astype(np.int64)
+    acc = acc0 + np.cumsum(inc)
+    return ((acc - inc) % _ONE) / _ONE, int(acc[-1] % _ONE) if len(hz) else acc0
+
+
+class FM(Unit):
+    """Two-operator frequency modulation: a sine carrier at freq whose phase is pushed back and
+    forth by a modulator sine at ratio * freq, index radians at most.
+
+    The spectrum is the carrier and sidebands at freq ± k * ratio * freq, for k = 1, 2, 3 …;
+    index sets how many are loud (about index + 1 on each side), so a rising index brightens the
+    tone. An integer ratio gives harmonics of freq; other ratios give inharmonic, bell-like
+    partials. feedback feeds the modulator's own output back into its phase, which turns it from
+    a sine towards a saw and adds harmonics of the modulator. Sidebands are not band-limited: one
+    that would pass 24 000 Hz folds back. The carrier is silent at or above 24 000 Hz, and the
+    modulator stops while it is there.
+    """
+
+    params = (
+        Param("freq", "Hz", 0.01, 24_000.0, "log", 440.0),
+        Param("ratio", "", 0.01, 32.0, "log", 1.0),
+        Param("index", "rad", 0.0, 20.0, default=1.0),
+        Param("feedback", "rad", 0.0, 1.5, default=0.0),
+    )
+
+    def __init__(
+        self,
+        freq: float | Unit,
+        ratio: float | Unit = 1.0,
+        index: float | Unit = 1.0,
+        feedback: float | Unit = 0.0,
+    ):
+        self._set_params(freq=freq, ratio=ratio, index=index, feedback=feedback)
+        self.reset()
+
+    def reset(self) -> None:
+        super().reset()
+        self._acc_c = self._acc_m = 0
+        self._last = (0.0, 0.0)  # the modulator's last two outputs, for feedback
+
+    def block(self, n: int) -> np.ndarray:
+        freq = self._param("freq", n).astype(np.float64)
+        mod_hz = freq * self._param("ratio", n)
+        index = self._param("index", n).astype(np.float64)
+        feedback = self._param("feedback", n).astype(np.float64)
+        tc, self._acc_c = _phases(self._acc_c, freq)
+        tm, self._acc_m = _phases(self._acc_m, mod_hz)
+        phase = 2 * np.pi * tm
+        if not feedback.any():
+            mod = np.sin(phase)
+            if n:
+                self._last = (float(mod[-1]), float(mod[-2]) if n > 1 else self._last[0])
+        else:
+            mod = np.empty(n)
+            a, b = self._last
+            for i in range(n):  # each sample needs the one before: no vector form
+                m = np.sin(phase[i] + feedback[i] * 0.5 * (a + b))  # the mean of two keeps it stable
+                mod[i], a, b = m, m, a
+            self._last = (a, b)
+        mod[mod_hz >= RATE / 2] = 0.0
+        out = np.sin(2 * np.pi * tc + index * mod)
+        out[freq >= RATE / 2] = 0.0
+        return out.astype(np.float32)
+
+
+class Pluck(Unit):
+    """A plucked string by the Karplus–Strong method: a short burst of noise circulates in a
+    delay line one period long, and on each trip an averaging filter takes away some of its high
+    frequencies and damping scales it down.
+
+    The spectrum is the harmonics of freq. They start as bright as the burst (brightness 0 is
+    dark, 1 is raw noise) and die away, the high ones sooner than the low ones, as in a real
+    string. damping, the gain of one trip (0.9 to 0.9999), sets how long the note rings.
+    position (0 to 0.5) is where the string is plucked, as a fraction of its length: it removes
+    the harmonics with a node there, so 0.5, the middle, removes the even ones; 0 removes none.
+    A first-order allpass in the loop adds the fraction of a sample the delay line cannot, so
+    the pitch is exact. All parameters are numbers: a string's length is set when it is plucked.
+    """
+
+    params = (
+        Param("freq", "Hz", 20.0, 6_000.0, "log"),
+        Param("damping", "", 0.9, 0.9999, default=0.996),
+        Param("brightness", "", 0.0, 1.0, default=0.5),
+        Param("position", "", 0.0, 0.5, default=0.0),
+    )
+
+    def __init__(
+        self,
+        freq: float,
+        damping: float = 0.996,
+        brightness: float = 0.5,
+        position: float = 0.0,
+        seed: int = 0,
+    ):
+        for name, v in (("freq", freq), ("damping", damping), ("brightness", brightness), ("position", position)):
+            if isinstance(v, Unit):
+                raise TypeError(f"Pluck.{name} must be a number, not a Unit")
+        self._set_params(freq=freq, damping=damping, brightness=brightness, position=position)
+        self.seed = int(seed)
+        v = self._values
+        period = RATE / v["freq"]  # the loop's delay, in samples
+        # delay line N + averaging filter (half a sample) + allpass d, with d in [0.1, 1.1)
+        rest = period - 0.5
+        self.n = int(np.floor(rest - 0.1))
+        d = rest - self.n
+        c = (1 - d) / (1 + d)  # allpass coefficient for a delay of d at low frequencies
+        g = v["damping"] / 2
+        self._b = np.array([1.0, c])
+        self._a = np.zeros(self.n + 3)
+        self._a[0], self._a[1] = 1.0, c
+        self._a[self.n] -= g * c
+        self._a[self.n + 1] -= g * (1 + c)
+        self._a[self.n + 2] -= g
+        self._burst = self._excitation(v["freq"], v["brightness"], v["position"], round(period))
+        self.reset()
+
+    def _excitation(self, freq: float, brightness: float, position: float, length: int) -> np.ndarray:
+        """One period of noise: every harmonic of freq below 24 000 Hz at a random phase, the k-th
+        at level 1 / (1 + (k * freq / cutoff) ** 2) with cutoff = freq * 2 ** (8 * brightness),
+        times the comb 2 * sin(pi * k * position) of the pluck position. A peak of 1."""
+        k = np.arange(1, int((RATE / 2 - 1) // freq) + 1)
+        level = 1 / (1 + (k * freq / (freq * 2 ** (8 * brightness))) ** 2)
+        if position > 0:
+            level = level * 2 * np.abs(np.sin(np.pi * k * position))
+        phase = rng(self.seed).uniform(0, 2 * np.pi, len(k))
+        t = np.arange(length) / RATE
+        x = (level[:, None] * np.cos(2 * np.pi * freq * k[:, None] * t[None, :] + phase[:, None])).sum(axis=0)
+        x -= x.mean()
+        return x / np.abs(x).max()
+
+    def reset(self) -> None:
+        super().reset()
+        self._pos = 0
+        self._zi = np.zeros(len(self._a) - 1)
+
+    def block(self, n: int) -> np.ndarray:
+        x = np.zeros(n)
+        lo, hi = self._pos, min(self._pos + n, len(self._burst))
+        if hi > lo:
+            x[: hi - lo] = self._burst[lo:hi]
+        self._pos += n
+        y, self._zi = lfilter(self._b, self._a, x, zi=self._zi)
+        return y.astype(np.float32)
+
+
+class Modal(Unit):
+    """A bank of resonators, one per mode: each rings as a decaying sine at its frequency in freqs,
+    falling 60 dB in its time in decays (seconds), at its amplitude in amps.
+
+    The spectrum is one narrow peak per mode, as many as given, at any ratios: a bar, a bell or
+    a plate is a list of modes. Each resonator is a two-pole filter on excite; with no excite it
+    is struck once, by a single impulse at the start, and each mode starts as a sine at its
+    amplitude. A mode at or above 24 000 Hz is left out.
+    """
+
+    def __init__(
+        self,
+        freqs: Sequence[float],
+        decays: Sequence[float],
+        amps: Sequence[float],
+        excite: Unit | None = None,
+    ):
+        f, t, a = (np.array([float(v) for v in xs], np.float64) for xs in (freqs, decays, amps))
+        if not len(f) == len(t) == len(a):
+            raise ValueError(f"Modal needs freqs, decays and amps of the same length, got {len(f)}, {len(t)}, {len(a)}")
+        if not np.all(np.isfinite(f) & (f > 0)):
+            raise ValueError("Modal freqs must be finite and > 0 Hz")
+        if not np.all(np.isfinite(t) & (t > 0)):
+            raise ValueError("Modal decays must be finite and > 0 seconds")
+        if not np.all(np.isfinite(a)):
+            raise ValueError("Modal amps must be finite")
+        self.freqs, self.decays, self.amps = f, t, a
+        self.excite = excite
+        self.channels = excite.channels if excite is not None else 1
+        keep = f < RATE / 2
+        w = 2 * np.pi * f[keep] / RATE
+        r = 10 ** (-3 / (t[keep] * RATE))  # 60 dB, a factor of 1000, in decay * RATE samples
+        self._ba = [
+            (np.array([0.0, amp * np.sin(wi) * ri]), np.array([1.0, -2 * ri * np.cos(wi), ri * ri]))
+            for wi, ri, amp in zip(w, r, a[keep])
+        ]
+        self.reset()
+
+    def inputs(self) -> list[Unit]:
+        return [self.excite] if self.excite is not None else []
+
+    def reset(self) -> None:
+        super().reset()
+        self._zi = [np.zeros((2, self.channels)) for _ in self._ba]
+        self._struck = False
+
+    def block(self, n: int) -> np.ndarray:
+        if self.excite is not None:
+            x = self.excite.block(n).astype(np.float64).reshape(n, -1)
+        else:
+            x = np.zeros((n, 1))
+            if n and not self._struck:
+                x[0], self._struck = 1.0, True
+        y = np.zeros((n, self.channels))
+        for i, (b, a) in enumerate(self._ba):
+            out, self._zi[i] = lfilter(b, a, x, axis=0, zi=self._zi[i])
+            y += out
+        return (y if self.channels == 2 else y[:, 0]).astype(np.float32)
