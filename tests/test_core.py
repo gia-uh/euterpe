@@ -59,3 +59,18 @@ def test_a_unit_used_twice_is_refused():
     r = Ramp()
     with pytest.raises(ValueError, match=r"Ramp is used twice"):
         render(r + r * 0.5, 0.01)
+
+
+def test_subtraction_and_negation_with_units_and_numbers():
+    ramp = render(Ramp(), 0.01)
+    assert np.array_equal(render(Ramp() - 1.0, 0.01), ramp - 1)
+    assert np.array_equal(render(1.0 - Ramp(), 0.01), 1 - ramp)
+    assert np.array_equal(render(-Ramp(), 0.01), -ramp)
+    assert np.array_equal(render(Ramp() - Ramp(step=2.0), 0.01), ramp - 2 * ramp)
+
+
+def test_subtraction_renders_the_same_in_any_block_size():
+    def make():
+        return 1.0 - (Ramp() - Ramp(step=0.5)) * 0.25 - -Ramp()
+
+    assert np.array_equal(render(make(), 0.5, block=BLOCK), render(make(), 0.5, block=37))

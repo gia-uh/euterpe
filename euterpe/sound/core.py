@@ -85,6 +85,15 @@ class Unit(ABC):
     def __radd__(self, other: Unit | float) -> Mix:
         return Mix(_unit(other), self)
 
+    def __sub__(self, other: Unit | float) -> Mix:
+        return Mix(self, _unit(other), gains=[1.0, -1.0])
+
+    def __rsub__(self, other: Unit | float) -> Mix:
+        return Mix(_unit(other), self, gains=[1.0, -1.0])
+
+    def __neg__(self) -> Gain:
+        return Gain(self, -1.0)
+
     def __mul__(self, gain: Unit | float) -> Gain:
         return Gain(self, gain)
 
