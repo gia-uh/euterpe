@@ -51,3 +51,19 @@ def test_durations_are_not_wildly_long():
     assert Pluck(220).duration < 10
     assert (Saw(220) * ADSR(gate=0.5, release=0.3)).duration == pytest.approx(0.8)
     assert (Saw(110) * Segments([(0, 0), (0.1, 1), (0.6, 0)])).duration == pytest.approx(0.6)
+
+
+def _burst():
+    return WhiteNoise(seed=2) * Segments([(0.0, 1.0), (0.06, 1.0), (0.06, 0.0)])
+
+
+@pytest.mark.parametrize("make", [
+    lambda: Comb(_burst(), delay=0.01, feedback=0.95),
+    lambda: Comb(_burst(), delay=0.01, feedback=-0.99),
+    lambda: Modal([440, 1214], decays=[1.2, 0.5], amps=[1, 0.5], excite=_burst()),
+])
+def test_resonant_units_are_silent_after_duration(make):
+    u = make()
+    d = u.duration
+    x = render(u, d + 0.5)
+    assert np.abs(x[round(d * RATE):]).max() < 1e-3

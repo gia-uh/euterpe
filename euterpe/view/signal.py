@@ -42,8 +42,30 @@ def _plain_log_ticks(ax) -> None:
 
 
 def _mark_default(clips, ax) -> None:
-    if any(c.defaulted for c in clips):
-        default_mark(ax)
+    for c in clips:
+        if c.defaulted:
+            default_mark(ax, c.seconds)
+            return
+
+
+def _channels(c: Clip) -> list[np.ndarray]:
+    return [c.samples] if c.channels == 1 else [c.samples[:, k] for k in range(c.channels)]
+
+
+def _power(c: Clip) -> np.ndarray:
+    """Power per sample, summed over the channels, so a panned sound keeps its level."""
+    return sum(ch.astype(np.float64) ** 2 for ch in _channels(c))
+
+
+_SHORT = 16  # fewer samples than this cannot be measured in frequency
+
+
+def _too_short(ax, clips) -> bool:
+    if all(len(c) >= _SHORT for c in clips):
+        return False
+    ax.text(0.5, 0.5, "too short to measure", transform=ax.transAxes, ha="center", va="center",
+            fontstyle="italic", fontsize=9, color=RULE)
+    return True
 
 
 def _draw_marks(ax, marks, scale=1.0, labels=True) -> None:
@@ -126,6 +148,7 @@ class Waveform(_Many):
         import matplotlib.pyplot as plt
 
         lo, hi = self.span or (0.0, max(c.seconds for c in self.clips))
+        hi = max(hi, lo + 1 / self.clips[0].rate)
         ms = hi - lo <= 0.1
         scale = 1000 if ms else 1
         k = len(self.clips) if self.separate else 1
@@ -206,8 +229,7 @@ class Default(View):
         what = "three cycles" if period else "10 ms"
         b.text(1.0, 1.04, f"{what} at {z0:.2g} s, magnified", transform=b.transAxes, ha="right", va="bottom",
                fontstyle="italic", fontsize=8.5, color=MADDER)
-        if c.defaulted:
-            default_mark(a)
+        _mark_default([c], a)
         return fig
 
 
@@ -220,10 +242,13 @@ class Spectrum(_Many):
         self.upto, self.f0, self.harmonics = upto, f0, harmonics
 
     def _stems(self, ax, c, color):
-        x = _mono(c)
-        win = np.hanning(len(x))
-        mag = np.abs(np.fft.rfft(x * win)) / max(win.sum() / 2, 1e-12)
-        f = np.fft.rfftfreq(len(x), 1 / c.rate)
+        ax.set_ylim(-60, 8)
+        ax.set_yticks([-60, -30, 0])
+        if _too_short(ax, [c]):
+            return
+        win = np.hanning(len(c))
+        mag = np.sqrt(sum(np.abs(np.fft.rfft(ch * win)) ** 2 for ch in _channels(c))) / max(win.sum() / 2, 1e-12)
+        f = np.fft.rfftfreq(len(c), 1 / c.rate)
         n = self.harmonics or int(self.upto // self.f0)
         for h in range(1, n + 1):
             fh = self.f0 * h
@@ -238,8 +263,6 @@ class Spectrum(_Many):
             if h <= 5:
                 ax.annotate(str(h), (fh, db), xytext=(0, 3), textcoords="offset points", ha="center",
                             fontsize=7, color=color)
-        ax.set_ylim(-60, 8)
-        ax.set_yticks([-60, -30, 0])
 
     def draw(self):
         import matplotlib.pyplot as plt
@@ -266,14 +289,17 @@ class Spectrum(_Many):
         fig, ax = plt.subplots(figsize=(self.width, 2.6))
         lines = []
         for i, c in enumerate(self.clips):
-            x = _mono(c)
-            nper = min(8192, max(256, len(x)))
-            f, p = welch(x, fs=c.rate, nperseg=nper)
+            if len(c) < _SHORT:
+                continue
+            nper = min(8192, len(c))
+            f, p = welch(np.stack(_channels(c)), fs=c.rate, nperseg=nper, axis=-1)
+            p = p.sum(axis=0)
             keep = (f >= 20) & (f <= self.upto)
             fc, pc = _smooth(f[keep], p[keep])
             db = 10 * np.log10(np.maximum(pc, _FLOOR ** 2))
             (line,) = ax.plot(fc, db, color=SERIES[i % len(SERIES)], lw=1.2)
             lines.append(line)
+        _too_short(ax, self.clips)
         ax.set_xscale("log")
         ax.set_xlim(20, self.upto)
         ax.minorticks_off()
@@ -300,10 +326,11 @@ class Spectrogram(_Many):
         fig, axes = plt.subplots(1, k, figsize=(self.width, 2.8), sharey=True, squeeze=False,
                                  gridspec_kw={"wspace": 0.12})
         for i, (c, ax) in enumerate(zip(self.clips, axes[0])):
-            x = _mono(c)
-            nper = min(4096, max(256, len(x) // 4))
-            f, t, s = stft(x, fs=c.rate, nperseg=nper, noverlap=nper * 7 // 8)
-            db = 10 * np.log10(np.maximum(s, _FLOOR ** 2))
+            if _too_short(ax, [c]):
+                continue
+            nper = min(4096, max(8, len(c) // 4))
+            f, t, s = stft(np.stack(_channels(c)), fs=c.rate, nperseg=nper, noverlap=nper * 7 // 8, axis=-1)
+            db = 10 * np.log10(np.maximum(s.sum(axis=0), _FLOOR ** 2))
             db -= max(float(db.max()), 10 * np.log10(_FLOOR ** 2) + 70)
             keep = (f >= self.lo * 0.9) & (f <= self.hi * 1.1)
             ax.pcolormesh(t, f[keep], np.clip(db[keep], -70, 0), cmap=inkmap(), shading="gouraud",
@@ -311,6 +338,7 @@ class Spectrogram(_Many):
             ax.set_yscale("log")
             ax.set_ylim(self.lo, self.hi)
             ax.set_yticks([])
+
             ax.minorticks_off()
             ax.spines["left"].set_visible(False)
             ax.spines["bottom"].set_position(("outward", 4))
@@ -336,15 +364,15 @@ class Level(_Many):
         fig, ax = plt.subplots(figsize=(self.width, 2.4))
         lines = []
         for i, c in enumerate(self.clips):
-            x = _mono(c)
-            size = max(1, round(self.every * c.rate))
-            frames = x[: len(x) // size * size].reshape(-1, size)
-            db = 10 * np.log10(np.maximum((frames ** 2).mean(axis=1), _FLOOR ** 2))
+            pw = _power(c)
+            size = min(max(1, round(self.every * c.rate)), max(1, len(pw)))
+            frames = pw[: len(pw) // size * size].reshape(-1, size)
+            db = 10 * np.log10(np.maximum(frames.mean(axis=1), _FLOOR ** 2))
             t = np.arange(len(db)) * self.every
             (line,) = ax.step(t, db, where="post", color=SERIES[i % len(SERIES)], lw=1.1)
             lines.append(line)
-        ax.set_xlim(0, max(c.seconds for c in self.clips))
-        top = max(float(np.nanmax(line.get_ydata())) for line in lines)
+        ax.set_xlim(0, max(max(c.seconds for c in self.clips), 1 / self.clips[0].rate))
+        top = max((float(np.nanmax(line.get_ydata())) for line in lines if len(line.get_ydata())), default=0.0)
         ax.set_ylim(max(ax.get_ylim()[0], top - 80), top + 3)
         _draw_marks(ax, self.marks)
         _name_lines(ax, lines, self.labels)

@@ -90,14 +90,16 @@ class Unit(ABC):
         return worst if isinstance(v, Unit) else v
 
     def take(self, seconds: float | None = None):
-        """Render into a Clip. Without seconds: duration, or 1 s (marked as the default)."""
+        """Render into a Clip. Without seconds: duration, at most MAX_DEFAULT s, or 1 s if it never
+        ends; those two are marked as defaulted so a view says so."""
         from euterpe.sound.clip import Clip
 
-        if seconds is None and self.duration is not None:
-            seconds = self.duration
-        if seconds is None:
-            return Clip(render(self, 1.0), defaulted=True)
-        return Clip(render(self, seconds))
+        if seconds is not None:
+            return Clip(render(self, seconds))
+        d = self.duration
+        if d is None or d > MAX_DEFAULT:
+            return Clip(render(self, 1.0 if d is None else MAX_DEFAULT), defaulted=True)
+        return Clip(render(self, d))
 
     def view(self):
         """The default view: what display() shows."""
@@ -153,6 +155,9 @@ def _after(d: float | None, tail: float) -> float | None:
     """A source's duration plus a tail, or None if the source never ends."""
     return None if d is None else d + tail
 
+
+# the longest a unit is rendered without being asked for seconds
+MAX_DEFAULT = 10.0
 
 # ln(1000): the number of time constants an exponential decay takes to fall 60 dB
 LN60 = float(np.log(1000.0))

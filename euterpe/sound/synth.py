@@ -229,8 +229,11 @@ class Modal(Unit):
 
     @property
     def duration(self) -> float | None:
-        """The slowest mode's time to fall from its amplitude to -60 dBFS, after the excitation."""
-        tail = max((t * max(0.0, 3 + np.log10(abs(a))) / 3 for t, a in zip(self.decays, self.amps) if a), default=0.0)
+        """The slowest mode's time to fall to -60 dBFS after the excitation: struck, from its
+        amplitude; driven, from what a full-scale input at its frequency can build up, amp / (2 (1 - r))."""
+        r = 10 ** (-3 / (self.decays * RATE))
+        peak = np.abs(self.amps) * (1.0 if self.excite is None else 1 / (2 * (1 - r)))
+        tail = max((t * max(0.0, 3 + np.log10(p)) / 3 for t, p in zip(self.decays, peak) if p), default=0.0)
         start = 0.0 if self.excite is None else self.excite.duration
         return _after(start, float(tail))
 

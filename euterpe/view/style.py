@@ -122,7 +122,7 @@ def keyboard_strip(ax, lo: float, hi: float, width: float = 0.022) -> None:
                         ha="right", va="center", fontsize=7.5, fontstyle="italic", color=INK)
 
 
-def default_mark(ax) -> None:
-    """Say on the drawing that its length is the 1 s default, not a choice."""
-    ax.text(1.0, 1.02, "1 s (default)", transform=ax.transAxes, ha="right", va="bottom",
+def default_mark(ax, seconds: float = 1.0) -> None:
+    """Say on the drawing that its length is a default, not a choice."""
+    ax.text(1.0, 1.02, f"{seconds:g} s (default)", transform=ax.transAxes, ha="right", va="bottom",
             fontsize=7.5, fontstyle="italic", color=RULE)

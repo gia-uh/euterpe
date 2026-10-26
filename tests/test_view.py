@@ -43,6 +43,13 @@ from euterpe.sound import Clip, Pan, Saw, WhiteNoise
 from euterpe.view import default, level, spectrogram, spectrum, waveform
 
 
+@pytest.fixture(autouse=True)
+def _close_figures():
+    yield
+    import matplotlib.pyplot as plt
+    plt.close("all")
+
+
 def _svg(view):
     data = view.svg()
     ET.fromstring(data)  # parses
@@ -229,3 +236,30 @@ def test_end_labels_do_not_overlap():
 def test_level_marks_name_moments_in_time():
     fig = level(Pluck(220).take(0.5), marks=[(0.3, "here")]).figure()
     assert any(t.get_text() == "here" for t in fig.axes[0].texts)
+
+
+@pytest.mark.parametrize("n", [0, 1, 100, 400])
+@pytest.mark.parametrize("make", [
+    lambda c: waveform(c), lambda c: default(c), lambda c: spectrum(c), lambda c: spectrum(c, f0=220),
+    lambda c: spectrogram(c), lambda c: level(c),
+])
+def test_very_short_clips_draw(n, make):
+    _svg(make(Clip(np.zeros(n) + 0.1)))
+
+
+def test_level_of_a_hard_panned_sine_counts_both_channels():
+    line = level(Pan(Sine(440) * 0.5, 1.0).take(0.5)).figure().axes[0].lines[0]
+    assert np.median(line.get_ydata()) == pytest.approx(-9.0, abs=0.3)
+
+
+def test_stems_of_a_panned_sine_match_the_mono_sine():
+    def top(c):
+        return max(float(np.max(l.get_ydata())) for l in spectrum(c, f0=440).figure().axes[0].lines)
+    assert top(Pan(Sine(440) * 0.5, 1.0).take(0.5)) == pytest.approx(top((Sine(440) * 0.5).take(0.5)), abs=0.5)
+
+
+def test_a_very_long_default_is_capped_and_says_so():
+    c = Pluck(55, damping=0.9999).take()
+    assert c.seconds == 10.0 and c.defaulted
+    fig = default(Pluck(55, damping=0.9999)).figure()
+    assert any(t.get_text() == "10 s (default)" for ax in fig.axes for t in ax.texts)

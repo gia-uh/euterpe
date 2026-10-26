@@ -190,7 +190,8 @@ class _Delayed(Unit):
     def duration(self) -> float | None:
         """The source's plus the echoes until the feedback has brought them down 60 dB."""
         g = abs(self.g)
-        trips = LN60 / -np.log(g) if 0 < g < 1 else 1.0
+        # the feedback also builds the level up, by up to 1 / (1 - |g|), before it decays
+        trips = (LN60 + np.log(1 / (1 - g))) / -np.log(g) if 0 < g < 1 else 1.0
         return _after(self.src.duration, float(self._values["delay"] * (trips + 1)))
 
     def __init__(self, src: Unit, delay: float, gain: float):
