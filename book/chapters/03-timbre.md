@@ -14,7 +14,7 @@ for wave in (Sine, Triangle, Square, Saw):
     listen(wave(220.0) * 0.5, 1.5, f"{wave.__name__} at 220 Hz")
 ```
 
-All four have the same pitch: you could sing along with any of them on the same note. The plot shows one cycle of each, 1/220 of a second, about 4.5 ms.
+All four have the same pitch: you could sing along with any of them on the same note. The plot shows two cycles of each, about 9.1 ms; each period is 1/220 of a second, 4.5 ms.
 
 ```python {run echo=false}
 import matplotlib.pyplot as plt
@@ -60,7 +60,7 @@ Each column is a harmonic, from 220 Hz to 1 760 Hz. The sine has only its fundam
 - The square has only the odd harmonics, 1, 3, 5, 7, also at 1/k: 1.273, 0.424 (a third), 0.254 (a fifth).
 - The triangle has only the odd harmonics too, but at 1/k²: 0.811, 0.090 (a ninth), 0.032 (a twenty-fifth).
 
-The fundamentals are larger than 1 for the square and smaller for the triangle, although all three waves peak at 1. A sine of amplitude 1.273 is taller than the square, but the other harmonics pull the sum back down to 1 everywhere. The exact values are 4/π for the square, 2/π for the saw and 8/π² for the triangle; they come from Fourier's formula for each shape, and they matter less than the pattern.
+The fundamentals are larger than 1 for the square and smaller for the saw and the triangle, although all three waves peak at 1. A sine of amplitude 1.273 is taller than the square, but the other harmonics pull the sum back down to 1 everywhere. The exact values are 4/π for the square, 2/π for the saw and 8/π² for the triangle; they come from Fourier's formula for each shape, and they matter less than the pattern.
 
 The plot shows the same spectra up to 6 000 Hz, in decibels. Each harmonic is a line at its frequency, as tall as its level in dB, so equal steps down mean equal ratios, as in chapter 2.
 
@@ -101,7 +101,7 @@ for wave in (Sine, Triangle, Square, Saw):
     print(f"{wave.__name__:8}  low {shares[0]:5.1f} %   mid {shares[1]:5.1f} %   high {shares[2]:4.1f} %")
 ```
 
-At 220 Hz only the fundamental is below 250 Hz, so the low band is the fundamental's share. The sine has all of its energy there. The triangle keeps 98.6 % there, the square 81.7 % and the saw 61.6 %. The saw puts 2.2 % of its energy above 4 000 Hz: the smallest number in the table, and the one that makes it the brightest. A mix whose high band holds almost nothing sounds muffled; one whose high band holds a large share sounds harsh. Later chapters use these numbers to balance a mix.
+At 220 Hz only the fundamental is below 250 Hz, so the low band is the fundamental's share. The sine has all of its energy there. The triangle keeps 98.6 % there, the square 81.7 % and the saw 61.6 %. The saw puts the most energy above 4 000 Hz, 2.2 %, against 1.5 % for the square and 0.0 % for the triangle; that is what makes it the brightest. A mix whose high band holds almost nothing sounds muffled; one whose high band holds a large share sounds harsh. Later chapters use these numbers to balance a mix.
 
 ## Building sounds from sines
 
@@ -174,7 +174,19 @@ axes[0].set_ylim(-1.3, 1.3)
 show(fig, "One cycle of a saw built from 1, 4, 16 and 109 harmonics, over Saw in grey")
 ```
 
-Each harmonic added makes the ramp straighter and the drop steeper. Next to the drop the sum overshoots: with 109 harmonics it reaches 1.17 where the saw reaches 1. The overshoot moves closer to the drop as harmonics are added, but it does not get smaller. It is called the *Gibbs phenomenon*, and it is the price of stopping at a finite number of harmonics, as a sampled wave must.
+Each harmonic added makes the ramp straighter and the drop steeper. Next to the drop the sum overshoots: it goes above 1, where the saw stops. This block prints the highest sample in one second of each sum:
+
+```python {run output=code}
+import numpy as np
+
+from euterpe.sound import Additive, render
+
+for n in (4, 16, 109):
+    partials = [(k, -2 / (np.pi * k)) for k in range(1, n + 1)]
+    print(f"{n:3} harmonics: highest sample {render(Additive(220.0, partials), 1.0).max():.3f}")
+```
+
+With 4 harmonics the sum stays below 1, but from 16 on it overshoots, and with 109 it reaches 1.17. The overshoot moves closer to the drop as harmonics are added, but it does not get smaller: it approaches about 9 % of the jump, which is 2, so the peak approaches 1.18. It is called the *Gibbs phenomenon*, and it is the price of stopping at a finite number of harmonics, as a sampled wave must.
 
 So which is the better saw? The 109-harmonic sum is exactly the saw with every harmonic below 24 000 Hz and nothing above, so nothing can fold back. `Saw` is cheaper to compute, one formula per sample instead of 109 sines, and its polyBLEP correction is only an approximation. This block compares their harmonics 1, 10, 50 and 100, each multiplied by k so that the ideal value is 2/π = 0.637 for every one:
 
@@ -208,7 +220,7 @@ print(np.array_equal(render(Additive(220.0, saw_partials(200)), 1.0), render(Add
 
 A square spends the first half of each cycle at +1 and the second half at −1. So its second half is its first half turned upside down: if T is the period, the value at time t + T/2 is minus the value at t. The triangle has the same property: it rises in the first half and falls by the same path in the second.
 
-Now look at one harmonic. Harmonic k does k cycles per period, so in half a period it does k/2 cycles. When k is even, k/2 is a whole number, and half a period later the harmonic is back at the same value. When k is odd, it is half a cycle further on, which is the same sine upside down. Shift the whole wave by half a period, then: the even harmonics stay the same and the odd ones flip. For a square that shift must flip the whole wave, and a sum can flip only if every part of it flips. So a square, and any wave whose second half mirrors its first, has no even harmonics.
+Now look at one harmonic. Harmonic k does k cycles per period, so in half a period it does k/2 cycles. When k is even, k/2 is a whole number, and half a period later the harmonic is back at the same value. When k is odd, it is half a cycle further on, which is the same sine upside down. Shift the whole wave by half a period, then: the even harmonics stay the same and the odd ones flip. For a square that shift must flip the whole wave. A wave has only one spectrum, so each harmonic of the shifted wave must equal minus the same harmonic of the wave. An even harmonic h is unchanged by the shift, so h = −h, and that holds only when h is zero. So a square, and any wave whose second half mirrors its first, has no even harmonics.
 
 The saw does not have this property: its second half continues the same rising ramp. This block checks it on the samples. At 200 Hz a cycle is exactly 240 samples, so half a cycle is 120 samples, and `x[120:240] + x[:120]` is zero wherever the second half mirrors the first:
 
@@ -251,7 +263,7 @@ The gain is 0.35 rather than 0.5 because a square is louder than the other waves
 ## Exercises
 
 1. In the saw built from harmonics, change `range(1, n + 1)` to `range(1, n + 1, 2)`. Which wave does it approach, and why does it come out at a lower level than `Square`?
-2. In the spectrum table, replace `Square` with `lambda f: Square(f, duty=0.25)`, a square that stays high for only a quarter of each cycle. Which harmonics are missing now? (The table prints `function` for its name.)
+2. In the spectrum table, replace `Square` with `lambda f: Square(f, duty=0.25)`, a square that stays high for only a quarter of each cycle. Which harmonics are missing now? (The table prints `<lambda>` for its name.)
 3. In the block that builds the saw, raise the frequency from `220.0` to `2_000.0`. How many harmonics are left below 24 000 Hz, and how does the 16-harmonic version compare with the 109-harmonic one?
 
 ### Answers
