@@ -160,12 +160,16 @@ class OnePole(_Filter):
 
 class _Delayed(Unit):
     """A filter built on a delay line of round(delay * RATE) samples, run in chunks no longer
-    than the delay so each chunk is computed from samples already in the line."""
+    than the delay so each chunk is computed from samples already in the line. Its delay and
+    gain are numbers: a moving delay is a chorus or a flanger, not a comb."""
 
     def __init__(self, src: Unit, delay: float, gain: float):
         self.src = src
         self.channels = src.channels
         gain_name = self.params[1].name
+        for name, v in (("delay", delay), (gain_name, gain)):
+            if isinstance(v, Unit):
+                raise TypeError(f"{type(self).__name__}.{name} must be a number, not a Unit")
         self._set_params(**{"delay": delay, gain_name: gain})
         self.d = max(1, round(self._values["delay"] * RATE))
         self.g = self._values[gain_name]

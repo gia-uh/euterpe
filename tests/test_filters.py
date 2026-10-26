@@ -2,8 +2,9 @@ import numpy as np
 import pytest
 
 from euterpe.sound.core import render
-from euterpe.sound.filters import Biquad, Comb, Formant
-from euterpe.sound.osc import Sine
+from euterpe.sound.env import Segments
+from euterpe.sound.filters import Allpass, Biquad, Comb, Formant, OnePole
+from euterpe.sound.osc import Saw, Sine
 from euterpe.sound.noise import WhiteNoise
 from tests.helpers import band_db
 
@@ -41,9 +42,6 @@ def test_formant_vowels_differ():
 
 
 # Beyond the plan's tests.
-
-from euterpe.sound.filters import Allpass, OnePole  # noqa: E402
-from euterpe.sound.osc import Saw  # noqa: E402
 
 
 def test_bandpass_keeps_its_centre_and_notch_removes_it():
@@ -101,3 +99,15 @@ def test_bad_arguments_are_refused():
         Comb(Sine(), 0.01, 1.0)
     with pytest.raises(ValueError, match="vowel"):
         Formant(Sine(), "y")
+
+
+def test_a_modulated_cutoff_moves():
+    x = render(Biquad(WhiteNoise(seed=1), "lowpass", cutoff=Segments([(0.0, 200.0), (1.0, 8_000.0)])), 1.0)
+    assert band_db(x[-9_600:], 4_000, 24_000) - band_db(x[:9_600], 4_000, 24_000) > 20
+
+
+def test_comb_and_allpass_take_numbers_only():
+    with pytest.raises(TypeError, match="Comb.feedback must be a number, not a Unit"):
+        Comb(Sine(), 0.01, Sine(1.0))
+    with pytest.raises(TypeError, match="Allpass.delay must be a number, not a Unit"):
+        Allpass(Sine(), Sine(1.0) * 0.001 + 0.002, 0.5)
