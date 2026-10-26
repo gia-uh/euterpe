@@ -97,9 +97,13 @@ def test_a_short_gap_and_trailing_silence_are_not_silence_findings():
     assert not found(lint_audio(x), "A-SILENCE")
 
 
+def balance(report):
+    return found(report, "A-BALANCE-LOW") + found(report, "A-BALANCE-MID") + found(report, "A-BALANCE-HIGH")
+
+
 def test_balance_of_a_low_tone():
     report = lint_audio(sine(freq=100.0))
-    low, mid, high = found(report, "A-BALANCE")
+    low, mid, high = balance(report)
     assert all(f.severity == "metric" for f in (low, mid, high))
     assert low.value > 0.99 and mid.value + high.value < 0.01
     assert low.value + mid.value + high.value == pytest.approx(1.0)
@@ -107,7 +111,7 @@ def test_balance_of_a_low_tone():
 
 @pytest.mark.parametrize("freq, band", [(200.0, 0), (300.0, 1), (1_000.0, 1), (3_500.0, 1), (5_000.0, 2), (8_000.0, 2)])
 def test_balance_puts_a_tone_in_its_band(freq, band):
-    shares = [f.value for f in found(lint_audio(sine(freq=freq)), "A-BALANCE")]
+    shares = [f.value for f in balance(lint_audio(sine(freq=freq)))]
     assert shares[band] > 0.99
 
 
@@ -145,7 +149,7 @@ def test_empty_audio_reports_only_its_peak():
 
 def test_balance_of_antiphase_stereo_counts_both_channels():
     x = sine(freq=100.0)
-    low, mid, high = found(lint_audio(np.stack([x, -x], axis=1)), "A-BALANCE")
+    low, mid, high = balance(lint_audio(np.stack([x, -x], axis=1)))
     assert low.value > 0.99
 
 
@@ -162,3 +166,25 @@ def test_the_clip_count_leaves_out_isolated_full_scale_samples():
     x[2_000:2_002] = 1.0       # two: not clipping
     (f,) = found(lint_audio(x), "A-CLIP")
     assert f.value == 3
+
+
+def test_a_sound_that_stops_30_ms_before_the_end_still_has_a_tail():
+    x = np.concatenate([sine(), np.zeros(int(0.03 * RATE), np.float32)])
+    assert found(lint_audio(x), "A-TAIL")
+
+
+def test_one_clipping_channel_is_clipping():
+    loud = np.clip(render(Sine(1_000.0) * 2.0, 1.0), -1, 1)
+    assert found(lint_audio(np.stack([loud, np.zeros_like(loud)], axis=1)), "A-CLIP")
+
+
+def test_one_channel_still_sounding_is_a_tail():
+    x = np.stack([sine(), np.concatenate([sine(0.5), np.zeros(RATE // 2, np.float32)])], axis=1)
+    assert found(lint_audio(x), "A-TAIL")
+
+
+def test_value_reads_one_rule():
+    report = lint_audio(sine())
+    assert report.value("A-PEAK") == pytest.approx(-6.02, abs=0.05)
+    assert report.value("A-BALANCE-MID") > 0.99
+    assert report.value("A-CLIP") is None

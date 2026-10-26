@@ -29,6 +29,10 @@ class Report:
         """The findings with severity error."""
         return [f for f in self.findings if f.severity == "error"]
 
+    def value(self, rule: str) -> float | None:
+        """The value of the first finding of rule, or None when the rule found nothing."""
+        return next((f.value for f in self.findings if f.rule == rule), None)
+
     def to_json(self) -> str:
         """The findings as JSON: {"findings": [{rule, severity, message, value, at}, ...]}."""
         return json.dumps({"findings": [asdict(f) for f in self.findings]}, indent=2)

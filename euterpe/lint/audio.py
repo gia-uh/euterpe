@@ -10,7 +10,7 @@ from euterpe.lint.finding import Finding, Report
 
 QUIET_DB = -60.0       # below this a stretch counts as silence
 CLIP = 0.999           # a sample at or above this magnitude counts as full scale
-BANDS = ((0.0, 250.0, "low"), (250.0, 4_000.0, "mid"), (4_000.0, np.inf, "high"))
+BANDS = ((0.0, 250.0, "LOW"), (250.0, 4_000.0, "MID"), (4_000.0, np.inf, "HIGH"))
 
 
 def _db(x: float) -> float:
@@ -24,7 +24,9 @@ def _peak(x: np.ndarray) -> float:
 def lint_audio(samples: np.ndarray, rate: int = 48_000, *, loop: bool = False) -> Report:
     """Measure samples, (n,) or (n, channels), and report peak, loudness and common faults.
 
-    With loop, also check that the end joins the start without a jump.
+    With loop, also check that the end joins the start without a jump. The energy balance is
+    three findings, A-BALANCE-LOW (below 250 Hz), A-BALANCE-MID (250-4000 Hz) and
+    A-BALANCE-HIGH (above 4000 Hz), each with its share of the energy as value.
     """
     x = np.asarray(samples, np.float64)
     chans = x if x.ndim == 2 else x[:, None]
@@ -87,7 +89,7 @@ def lint_audio(samples: np.ndarray, rate: int = 48_000, *, loop: bool = False) -
         for lo, hi, name in BANDS:
             share = float(energy[(freqs >= lo) & (freqs < hi)].sum() / energy.sum())
             span = f"below {hi:.0f} Hz" if lo == 0 else f"above {lo:.0f} Hz" if hi == np.inf else f"{lo:.0f}-{hi:.0f} Hz"
-            findings.append(Finding("A-BALANCE", "metric", f"{name} ({span}): {100 * share:.1f} % of the energy", share))
+            findings.append(Finding(f"A-BALANCE-{name}", "metric", f"{span}: {100 * share:.1f} % of the energy", share))
 
     if loop and len(x):
         jump = float(np.abs(chans[-1] - chans[0]).max())
