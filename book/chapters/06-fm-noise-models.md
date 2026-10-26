@@ -11,7 +11,7 @@ from euterpe.book import listen
 from euterpe.sound import ADSR, Sine
 
 vibrato = Sine(Sine(5.0) * 10 + 440)
-listen(vibrato * ADSR(gate=1.7, release=0.3) * 0.4, 2.0, "A sine at 440 Hz with 5 Hz vibrato")
+listen(vibrato * ADSR(gate=1.7, release=0.3) * 0.4, 2.2, "A sine at 440 Hz with 5 Hz vibrato")
 ```
 
 This is *vibrato*: the pitch wobbles, as a singer's does on a held note. The inner `Sine(5.0)` is the *modulator*, the sine that does the moving. The outer one is the *carrier*, the sine that is heard. When the modulator is slow, the ear follows the pitch as it moves. When the modulator is itself at an audible frequency, a few hundred Hz, the pitch moves too fast to follow. The ear hears a single steady tone with a new timbre.
@@ -24,11 +24,13 @@ import numpy as np
 from euterpe.sound import FM, render
 
 t = np.arange(48_000) / 48_000
-by_hand = np.sin(2 * np.pi * 220 * t + 2.0 * np.sin(2 * np.pi * 220 * t))
-print(np.abs(render(FM(220.0, ratio=1.0, index=2.0), 1.0) - by_hand).max())
+fm = render(FM(220.0, ratio=1.0, index=2.0), 1.0)
+for f in (220.0, round(220 / 48_000 * 2**32) / 2**32 * 48_000):
+    by_hand = np.sin(2 * np.pi * f * t + 2.0 * np.sin(2 * np.pi * f * t))
+    print(f"{f:.7f} Hz: largest difference {np.abs(fm - by_hand).max():.1e}")
 ```
 
-The two agree to about 0.00005, the rounding of 32-bit samples. Pushing the phase is the same as moving the frequency: a phase that runs ahead faster is a higher frequency. So this is also called *phase modulation*, and the two names are used for the same thing. The famous synthesizers that use it, such as Yamaha's DX7 of 1983, compute it this way.
+Against 220 Hz the two agree to about 0.00005. The gap is not in the formula but in the frequency. `FM`, like every oscillator in Euterpe, keeps its phase in a fixed-point counter that counts one cycle as 2³² steps, so it advances by a whole number of steps per sample: round(220 / 48 000 × 2³²). That is 220.0000025 Hz, and after one second the two waves have drifted 0.00005 apart. Against that frequency, the second line, they agree to 3 × 10⁻⁸, the rounding of 32-bit samples. Pushing the phase is the same as moving the frequency: a phase that runs ahead faster is a higher frequency. So this is also called *phase modulation*, and the two names are used for the same thing. The famous synthesizers that use it, such as Yamaha's DX7 of 1983, compute it this way.
 
 ### Sidebands
 
@@ -42,7 +44,8 @@ from euterpe.sound import FM, render
 
 x = render(FM(1000.0, ratio=0.15, index=2.0), 1.0)
 amp = np.abs(np.fft.rfft(x)) * 2 / len(x)   # one bin per Hz: amp[f] is the level at f Hz
-for k in range(5):
+print(f"carrier: 1000 Hz {amp[1000]:.3f}, J_0(2) = {abs(jv(0, 2.0)):.3f}")
+for k in range(1, 5):
     print(f"k={k}: {1000 + 150 * k} Hz {amp[1000 + 150 * k]:.3f}, {1000 - 150 * k} Hz {amp[1000 - 150 * k]:.3f}, J_k(2) = {abs(jv(k, 2.0)):.3f}")
 ```
 
@@ -122,11 +125,14 @@ The three notes are A3, C♯4 and E4, the chord of A major. Each `epiano` builds
 
 ```python {run}
 from euterpe.book import listen
-from euterpe.sound import ADSR, FM
+from euterpe.sound import ADSR, FM, OnePole
 
 for feedback in (0.0, 1.5):
-    listen(FM(110.0, ratio=1.0, index=1.5, feedback=feedback) * ADSR(gate=1.0, release=0.2) * 0.4, 1.3, f"FM at 110 Hz, index 1.5, feedback {feedback:g}")
+    tone = OnePole(FM(110.0, ratio=1.0, index=1.5, feedback=feedback), 20.0, kind="highpass")
+    listen(tone * ADSR(gate=1.0, release=0.2) * 0.4, 1.3, f"FM at 110 Hz, index 1.5, feedback {feedback:g}")
 ```
+
+A modulator that leans to one side also pushes the carrier off-centre, so feedback adds a DC offset (chapter 4). The `OnePole` high-pass at 20 Hz removes it, as chapter 5 showed.
 
 ## The colours of noise
 
@@ -150,14 +156,15 @@ Each line is relative to its first band. White noise stays within a fraction of 
 
 ```python {run}
 from euterpe.book import listen
-from euterpe.sound import ADSR, BrownNoise, PinkNoise, WhiteNoise
+from euterpe.sound import ADSR, BrownNoise, OnePole, PinkNoise, WhiteNoise
 
-listen(WhiteNoise(seed=1) * ADSR(gate=1.7, release=0.3) * 0.25, 2.0, "White noise")
-listen(PinkNoise(seed=1) * ADSR(gate=1.7, release=0.3) * 1.0, 2.0, "Pink noise")
-listen(BrownNoise(seed=1) * ADSR(gate=1.7, release=0.3) * 1.0, 2.0, "Brown noise")
+listen(WhiteNoise(seed=1) * ADSR(gate=1.7, release=0.3) * 0.25, 2.2, "White noise")
+listen(PinkNoise(seed=1) * ADSR(gate=1.7, release=0.3) * 1.0, 2.2, "Pink noise")
+brown = OnePole(BrownNoise(seed=1), 20.0, kind="highpass")
+listen(brown * ADSR(gate=1.7, release=0.3) * 1.0, 2.2, "Brown noise")
 ```
 
-White noise hisses like a detuned radio. Pink sounds even from bottom to top, like steady rain; it is the noise engineers play through speakers to check them, because a meter that reads in octaves shows it flat. Brown is a deep roar, like surf heard from a distance. `PinkNoise` and `BrownNoise` come out at an RMS level of 0.18, which is why they need a gain of 1.0 where white noise, at an RMS of 0.58, needs 0.25.
+White noise hisses like a detuned radio. Pink sounds even from bottom to top, like steady rain; it is the noise engineers play through speakers to check them, because a meter that reads in octaves shows it flat. Brown is a deep roar, like surf heard from a distance. Brown noise has so much of its energy at the lowest frequencies that two seconds of it do not average 0, so a `OnePole` high-pass at 20 Hz (chapter 5) takes away what lies below hearing. `PinkNoise` and `BrownNoise` come out at an RMS level of 0.18, which is why they need a gain of 1.0 where white noise, at an RMS of 0.58, needs 0.25.
 
 ```python {run echo=false}
 import matplotlib.pyplot as plt
@@ -200,16 +207,19 @@ A register of b bits has 2^b − 1 states other than all zeros, and with this fe
 
 ```python {run}
 from euterpe.book import listen
-from euterpe.sound import ADSR, LFSRNoise
+from euterpe.sound import ADSR, LFSRNoise, OnePole
 
 for rate in (2_000.0, 12_000.0):
-    listen(LFSRNoise(rate=rate) * ADSR(gate=0.8, release=0.2) * 0.12, 1.0, f"LFSR noise stepped at {rate:.0f} Hz")
-listen(LFSRNoise(rate=12_000.0, short=True) * ADSR(gate=0.8, release=0.2) * 0.12, 1.0, "Short LFSR noise at 12000 Hz: a 127-step loop")
+    noise = OnePole(LFSRNoise(rate=rate), 20.0, kind="highpass")
+    listen(noise * ADSR(gate=0.8, release=0.2) * 0.12, 1.2, f"LFSR noise stepped at {rate:.0f} Hz")
+listen(LFSRNoise(rate=12_000.0, short=True) * ADSR(gate=0.8, release=0.2) * 0.12, 1.2, "Short LFSR noise at 12000 Hz: a 127-step loop")
 ```
+
+Over a whole period the register gives one more +1 than −1, an average of 1 / 32 767, but one second at 2 000 steps covers only 2 000 of them, and those do not average 0: the high-pass at 20 Hz takes that offset away. The short register repeats every 127 steps, so it averages 1 / 127 over any whole number of loops, too little to matter.
 
 ### Tables of steps
 
-The same chips played tones from a *wavetable*: one cycle of a wave stored as a short list of numbers, read out over and over. `Wavetable(table, freq)` plays any list as one cycle, `freq` times a second, holding each value as a step. A chip of that era stored 32 values of 4 bits each, 16 possible levels. The block below rounds one cycle of a sine to those 16 levels and plays it next to the true sine:
+The same chips played tones from a *wavetable*: one cycle of a wave stored as a short list of numbers, read out over and over. `Wavetable(table, freq)` plays any list as one cycle, `freq` times a second, holding each value as a step. A chip of that era stored 32 values of 4 bits each, 16 possible levels. The block below rounds one cycle of a sine to those 16 levels and plays it next to the true sine. Rounding moves some steps up more than others, so the table's average is not quite 0; subtracting its mean centres it, so it has no DC offset (chapter 4).
 
 ```python {run}
 import numpy as np
@@ -218,6 +228,7 @@ from euterpe.book import listen
 from euterpe.sound import ADSR, Sine, Wavetable
 
 table = np.round((np.sin(2 * np.pi * np.arange(32) / 32) + 1) * 7.5) / 7.5 - 1
+table = table - table.mean()
 listen(Sine(220.0) * ADSR(gate=1.0, release=0.2) * 0.4, 1.3, "A sine at 220 Hz")
 listen(Wavetable(table, 220.0) * ADSR(gate=1.0, release=0.2) * 0.4, 1.3, "A 32-step, 16-level sine at 220 Hz")
 ```
@@ -252,7 +263,7 @@ def snare():
     pitch = ADSR(attack=0.0, decay=0.04, sustain=0.0, gate=1.0) * 60 + 180
     skin = Sine(pitch) * ADSR(attack=0.001, decay=0.12, sustain=0.0, release=0.0, gate=1.0, curve=0.7)
     wires = Biquad(WhiteNoise(seed=2), "highpass", cutoff=1000.0) * ADSR(attack=0.001, decay=0.22, sustain=0.0, release=0.0, gate=1.0, curve=0.8)
-    return skin * 0.5 + wires * 0.4
+    return skin * 0.35 + wires * 0.3
 
 listen(snare(), 0.6, "A snare: a falling tone at 240 to 180 Hz and high-passed noise")
 ```
@@ -265,14 +276,15 @@ A guitar string, plucked, starts with the shape the finger gave it. That shape r
 
 ### Step 1: noise in a delay line
 
-The pluck is a short burst of noise, one period long: at 220 Hz, 1/220 s, 4.5 ms. It goes into a comb whose delay is the same period and whose feedback is 0.996, so it circulates and comes back 220 times a second, losing 0.4 % at each trip. `Segments` makes the burst's envelope: 1 from the start to 1/220 s, then 0.
+The pluck is a short burst of noise, one period long: at 220 Hz, 1/220 s, 4.5 ms. It goes into a comb whose delay is the same period and whose feedback is 0.996, so it circulates and comes back 220 times a second, losing 0.4 % at each trip. `Segments` makes the burst's envelope: 1 from the start to 1/220 s, then 0. The burst's 218 random samples do not average exactly 0, and the comb boosts 0 Hz as much as it boosts each harmonic, so a `OnePole` high-pass at 20 Hz removes that offset, as in chapter 5. The `ADSR` at the end, with no attack and full sustain, only fades the note out over 0.4 s from 2.4 s on, as a hand laid on the string would, so that the sound ends before the file does.
 
 ```python {run}
 from euterpe.book import listen
-from euterpe.sound import Comb, Segments, WhiteNoise
+from euterpe.sound import ADSR, Comb, OnePole, Segments, WhiteNoise
 
 burst = WhiteNoise(seed=1) * Segments([(0.0, 1.0), (1 / 220, 1.0), (1 / 220, 0.0)])
-listen(Comb(burst, delay=1 / 220, feedback=0.996) * 0.5, 2.0, "A burst of noise circulating in a comb at 220 Hz")
+string = OnePole(Comb(burst, delay=1 / 220, feedback=0.996), 20.0, kind="highpass")
+listen(string * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4) * 0.25, 3.0, "A burst of noise circulating in a comb at 220 Hz")
 ```
 
 It has a pitch, 220 Hz, because the burst repeats every 1/220 s, and a sound that repeats f times a second has the harmonics of f (chapter 3). But it does not sound like a string. It buzzes, with a hard, electric edge, and its tone never changes as it fades, because the comb loses the same 0.4 % at every frequency.
@@ -294,17 +306,17 @@ The first harmonic loses 7.9 dB in a second and the fifth 12.6. The twentieth lo
 
 ### Step 3: the exact pitch
 
-The delay line holds a whole number of samples. 48 000 / 220 = 218.2, and the averaging filter adds half a sample of delay, because its output sits halfway between the two samples it averages. A loop of 218 + 0.5 samples plays at 48 000 / 218.5 = 219.7 Hz. A higher note has a shorter period, so the same fraction of a sample is a larger part of it, and the error tends to grow with the pitch; how large it is for one note also depends on how its period rounds. The block computes it for five A's, from A2 to A6, in cents (chapter 2: 100 cents is a semitone):
+The delay line holds a whole number of samples, N, and the averaging filter adds half a sample of delay, because its output sits halfway between the two samples it averages. So the loop is N + 0.5 samples long, and the best N is the one that brings N + 0.5 closest to the period: round(period − 0.5). For 220 Hz the period is 48 000 / 220 = 218.2 samples, the best loop is 218.5, and it plays at 48 000 / 218.5 = 219.7 Hz. The loop can miss the period by up to half a sample, and half a sample is a larger part of a shorter period, so the possible error grows with the pitch. The block computes it for five A's, from A2 to A6, in cents (chapter 2: 100 cents is a semitone):
 
 ```python {run output=code}
 import numpy as np
 
 for f in (110, 220, 440, 880, 1760):
-    played = 48_000 / (round(48_000 / f) + 0.5)
+    played = 48_000 / (round(48_000 / f - 0.5) + 0.5)
     print(f"{f:4} Hz: plays {played:7.2f} Hz, {1200 * np.log2(played / f):6.1f} cents")
 ```
 
-At 880 Hz the note is 30 cents flat, almost a third of a semitone: clearly out of tune. 1 760 Hz comes out closer, 14 cents, only because its period, 27.3 samples, rounds down where 880 Hz's, 54.5, rounds up. The fix, from David Jaffe and Julius Smith's paper of the same year, is a third filter in the loop: a first-order *allpass*, like chapter 5's but with a delay of one sample, which passes every frequency at its level and delays it by any fraction of a sample its coefficient asks for. With it the loop can be any length, not only a whole number of samples plus a half.
+How far each note is off depends on where its period falls between two loop lengths: 880 Hz has a period of 54.55 samples, and 54.5 is almost exact, 1.4 cents. 1 760 Hz has 27.27 samples, and the nearest loop, 27.5, is 14 cents flat, a seventh of a semitone, which a trained ear hears in a chord. At the worst, half a sample out of 27.27 would be 1200 × log₂(27.77 / 27.27) = 31 cents. The higher the note, the worse the worst case, and a string instrument must be in tune everywhere. The fix, from David Jaffe and Julius Smith's paper of the same year, is a third filter in the loop: a first-order *allpass*, like chapter 5's but with a delay of one sample, which passes every frequency at its level and delays it by any fraction of a sample its coefficient asks for. With it the loop can be any length, not only a whole number of samples plus a half.
 
 ### Pluck
 
@@ -312,13 +324,13 @@ At 880 Hz the note is 30 cents flat, almost a third of a semitone: clearly out o
 
 ```python {run}
 from euterpe.book import listen
-from euterpe.sound import Pluck
+from euterpe.sound import ADSR, Pluck
 
 note = Pluck(220.0, damping=0.996, seed=1)
-listen(note * 0.5, 2.0, "A plucked A3", id="pluck-a3")
+listen(note * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4) * 0.8, 3.0, "A plucked A3", id="pluck-a3")
 ```
 
-The block's three lines are the whole instrument. The spectrogram shows the difference from step 1: in the comb, every harmonic fades at the same rate; in the pluck, the high ones vanish first.
+The line that makes `note` is the whole instrument. The `ADSR` is the same hand on the string as in step 1: left alone, at damping 0.996 the first harmonic loses 7.9 dB a second, so it takes 60 / 7.9 = 7.6 s to fall 60 dB. The spectrogram shows the difference from step 1: in the comb, every harmonic fades at the same rate; in the pluck, the high ones vanish first.
 
 ```python {run echo=false}
 import matplotlib.pyplot as plt
@@ -348,40 +360,50 @@ show(fig, "A burst circulating in a comb, and the same idea as Pluck: in the plu
 
 ```python {run}
 from euterpe.book import listen
-from euterpe.sound import Pluck
+from euterpe.sound import ADSR, Pluck
 
 for damping in (0.99, 0.996, 0.999):
-    listen(Pluck(220.0, damping=damping, seed=1) * 0.5, 2.0, f"A plucked A3, damping {damping}")
+    listen(Pluck(220.0, damping=damping, seed=1) * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4) * 0.8, 3.0, f"A plucked A3, damping {damping}")
 ```
 
-At 0.99 the note is short and muffled, like a string damped by the palm of the hand. At 0.999 it rings like a harp. `brightness` is the softness of what plucks it, from a fingertip (dark) to a hard plectrum (bright):
+At 0.99 the note is short and muffled, like a string damped by the palm of the hand. At 0.999 it rings like a harp. `brightness` is the softness of what plucks it, from a fingertip (dark) to a hard plectrum (bright). `Pluck` gives every burst the same energy, but a bright burst holds much of it in high harmonics, and step 2 showed that those are gone within a fraction of a second. So over the whole note a bright pluck is quieter. The gains 0.42, 0.5 and 1.0 compensate, so the three differ in tone and not in loudness, and the second block measures them:
 
 ```python {run}
 from euterpe.book import listen
-from euterpe.sound import Pluck
+from euterpe.sound import ADSR, Pluck
 
-for brightness in (0.1, 0.5, 0.9):
-    listen(Pluck(220.0, brightness=brightness, seed=1) * 0.5, 2.0, f"A plucked A3, brightness {brightness}")
+plucks = {}
+for brightness, gain in ((0.1, 0.42), (0.5, 0.5), (0.9, 1.0)):
+    plucks[brightness] = Pluck(220.0, brightness=brightness, seed=1) * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4) * gain
+    listen(plucks[brightness], 3.0, f"A plucked A3, brightness {brightness}")
+```
+
+```python {run continue output=code}
+from euterpe.lint import lint_audio
+from euterpe.sound import render
+
+for brightness, unit in plucks.items():
+    print("brightness", brightness, ":", [f.message for f in lint_audio(render(unit, 3.0)).findings if f.rule == "A-LUFS"])
 ```
 
 `position` is where the string is plucked, as a fraction of its length from one end, from 0 to 0.5. A string plucked at its middle cannot vibrate in any pattern that needs the middle to stand still, and those are the even harmonics: the 2nd has a still point at the middle, the 4th too, and so on. So `position=0.5` removes every even harmonic, and the tone turns hollow, as the square of chapter 3 does. Guitarists play near the bridge, at about 0.1, for a thin, bright tone, and over the sound hole, nearer 0.25, for a round one:
 
 ```python {run}
 from euterpe.book import listen
-from euterpe.sound import Pluck
+from euterpe.sound import ADSR, Pluck
 
 for position in (0.1, 0.25, 0.5):
-    listen(Pluck(220.0, damping=0.998, brightness=0.8, position=position, seed=1) * 0.5, 2.0, f"A plucked A3, position {position}")
+    listen(Pluck(220.0, damping=0.998, brightness=0.8, position=position, seed=1) * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4), 3.0, f"A plucked A3, position {position}")
 ```
 
-Strings are often played together. Three plucks at once are a strummed chord:
+Strings are often played together. Five plucks at once are a strummed chord, held a little longer:
 
 ```python {run}
 from euterpe.book import listen
-from euterpe.sound import Pluck
+from euterpe.sound import ADSR, Pluck
 
 chord = Pluck(110.0, seed=1) + Pluck(164.81, seed=2) + Pluck(220.0, seed=3) + Pluck(277.18, seed=4) + Pluck(329.63, seed=5)
-listen(chord * 0.2, 3.0, "An A major chord on five plucked strings")
+listen(chord * ADSR(attack=0.0, sustain=1.0, gate=3.0, release=0.5) * 0.4, 3.7, "An A major chord on five plucked strings")
 ```
 
 The notes are A2, E3, A3, C♯4 and E4, the shape of an A chord on a guitar. They all start at the same instant, which a strum does not quite do; scores, later in the book, place notes in time.
@@ -406,14 +428,14 @@ It is a xylophone or a glockenspiel, depending on what you imagine striking it. 
 ```python {run continue output=code}
 import numpy as np
 
-from euterpe.sound import Biquad, Modal, render
+from euterpe.sound import Modal, render
 
-first = render(Biquad(Modal([440.0], [1.2], [1.0]), "bandpass", cutoff=440.0, q=4.0), 1.3)
+first = render(Modal([440.0], [1.2], [1.0]), 1.3)
 start, at_decay = np.abs(first[:4800]).max(), np.abs(first[57_120:57_600]).max()
 print(round(float(20 * np.log10(at_decay / start)), 1), "dB after 1.2 s")
 ```
 
-It has fallen 58.8 dB, close to the 60 its decay time promises. The two levels are peaks read in short windows, the first 0.1 s and the 10 ms before 1.2 s, not at the exact instants 0 and 1.2 s, so the measured fall comes out a little short. The spectrogram shows the four modes as four lines, the higher ones shorter:
+It has fallen 59.5 dB, close to the 60 its decay time promises. The two levels are peaks read in short windows, the first 0.1 s and the 10 ms that end at 1.2 s, so the second peak comes from a moment up to 10 ms before 1.2 s, when the mode had not quite finished its fall. The spectrogram shows the four modes as four lines, the higher ones shorter:
 
 ```python {run continue echo=false}
 import matplotlib.pyplot as plt
@@ -447,7 +469,7 @@ soft = Modal([440 * r for r in [1, 2.76, 5.40, 8.93]], decays=[1.2, 0.5, 0.25, 0
 listen(soft * 0.1, 2.0, "The same bar struck with a soft mallet")
 ```
 
-The pitch and the decay are the same; the attack has lost its click, and the upper modes are quieter. The gain is 0.1 where the struck bar had 0.3, although the noise never rises above 0.2. A resonator keeps adding up whatever part of its input arrives in step with its own ringing, so 5 ms of noise, 240 samples, puts more energy into the low modes than one sample of 1 does.
+The pitch and the decay are the same; the attack has lost its click, and the upper modes are quieter. The gain is 0.1 where the struck bar had 0.3, although the mallet is quieter than a sample of 1. A resonator keeps adding up whatever part of its input arrives in step with its own ringing, so 5 ms of noise, 240 samples, puts more energy into the low modes than one sample of 1 does.
 
 ### A bell
 
@@ -460,7 +482,7 @@ from euterpe.sound import Modal
 ratios = [0.5, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.2]
 decays = [6.0, 4.0, 3.5, 3.0, 2.5, 1.5, 1.0, 0.6]
 amps = [0.6, 1.0, 0.7, 0.5, 0.8, 0.4, 0.3, 0.2]
-listen(Modal([220 * r for r in ratios], decays, amps) * 0.25, 5.0, "A bell with its prime at 220 Hz: eight modes")
+listen(Modal([220 * r for r in ratios], decays, amps) * 0.18, 5.0, "A bell with its prime at 220 Hz: eight modes")
 ```
 
 The minor third at 1.2 gives a bell its slightly sad colour. Compare it with the FM bell earlier in the chapter: FM made inharmonic partials from two sines and one ratio, and put every one of them where the ratio placed it; the modal bell takes each frequency, level and decay from a list, so it can copy a real object that has been measured. FM is cheap and has few knobs. A modal model costs one filter per mode and can be as exact as the measurements behind it.
@@ -484,8 +506,8 @@ The minor third at 1.2 gives a bell its slightly sad colour. Compare it with the
 ### Answers
 
 1. It is no longer a bell. The sidebands are at 200 ± 400 k Hz: 600, 1 000, 1 400 Hz above and, mirrored, 200, 600, 1 000 Hz from below, all odd multiples of 200 Hz. Only odd harmonics, as in the square of chapter 3, so the tone is hollow, close to a clarinet, and it has a clear pitch at 200 Hz.
-2. Each trip now keeps 0.98 × cos(π × 220 / 48 000) of the first harmonic, and 220 trips a second give 20 × log₁₀ of that to the 220th power: about −38.6 dB in one second, about five times as much as at 0.996. The note dies within a second and sounds muted, like a pizzicato on a violin.
-3. It sounds like a shaker or a brush on a snare: the noise now reaches down to 1 500 Hz, where most of its energy is, so it is louder and less like metal.
+2. Each trip now keeps 0.98 × cos(π × 220 / 48 000) of the first harmonic, and 220 trips a second give 20 × log₁₀ of that to the 220th power: about −38.8 dB in one second, about five times as much as at 0.996. The note dies within a second and sounds muted, like a pizzicato on a violin.
+3. It sounds less like metal and more like a shaker, or brushes on a snare. The level hardly changes: white noise has the same energy in every Hz, so keeping 24 000 − 1 500 = 22 500 Hz of it instead of 24 000 − 7 000 = 17 000 Hz is 22 500 / 17 000 = 1.32 times the power, 1.2 dB. What changes is the timbre: the hat now holds the band from 1 500 to 7 000 Hz, where the ear is most sensitive, so it sounds fuller and less like a cymbal.
 
 ```python {run echo=false}
 # Level check: lint every sound in build/audio, this chapter's and any written before it.
