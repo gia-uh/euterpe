@@ -874,7 +874,7 @@ wheels = [
 [[package]]
 name = "scriptorium"
 version = "0.10.0"
-source = { git = "https://github.com/apiad/scriptorium#6095b65b29ef43616d048d98f5e01f391fe62df1" }
+source = { git = "https://github.com/apiad/scriptorium#99e4e3675cee92251dc3cfbf392b83110d27d035" }
 dependencies = [
     { name = "markdown-it-py" },
     { name = "mdit-py-plugins" },
