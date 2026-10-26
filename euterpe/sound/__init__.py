@@ -6,6 +6,16 @@ from euterpe.sound.filters import Allpass, Biquad, Comb, Formant, OnePole
 from euterpe.sound.noise import BrownNoise, LFSRNoise, PinkNoise, Wavetable, WhiteNoise
 from euterpe.sound.osc import Saw, Sine, Square, Triangle
 from euterpe.sound.shape import BitCrush, Compressor, Gate, Limiter, Saturator, Shaper
+from euterpe.sound.space import (
+    Chorus,
+    ConvolutionReverb,
+    Delay,
+    FDNReverb,
+    Flanger,
+    Pan,
+    Phaser,
+    Width,
+)
 from euterpe.sound.synth import FM, Additive, Modal, Pluck
 
 __all__ = [
@@ -16,10 +26,15 @@ __all__ = [
     "BitCrush",
     "BLOCK",
     "BrownNoise",
+    "Chorus",
     "Comb",
     "Compressor",
     "Const",
+    "ConvolutionReverb",
+    "Delay",
     "EnvelopeFollower",
+    "FDNReverb",
+    "Flanger",
     "FM",
     "Formant",
     "Gain",
@@ -29,7 +44,9 @@ __all__ = [
     "Mix",
     "Modal",
     "OnePole",
+    "Pan",
     "Param",
+    "Phaser",
     "PinkNoise",
     "Pluck",
     "RATE",
@@ -43,6 +60,7 @@ __all__ = [
     "Unit",
     "Wavetable",
     "WhiteNoise",
+    "Width",
     "render",
     "rng",
 ]
