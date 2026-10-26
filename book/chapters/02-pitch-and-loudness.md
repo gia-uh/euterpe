@@ -25,7 +25,7 @@ listen(Sine(Square(1.0) * 110 + 1_870) * 0.5, 4.0, "1 980 Hz and 1 760 Hz in tur
 listen(Sine(Square(1.0) * 880 + 2_640) * 0.5, 4.0, "3 520 Hz and 1 760 Hz in turn: an octave")
 ```
 
-The first pair is 220 Hz apart, like the octave above, but it sounds like a small step. The second pair is 1 760 Hz apart and sounds like the same leap as 440 and 220. What the ear hears as the distance between two pitches is the ratio of their frequencies, not the difference. Equal ratios sound like equal steps, so pitch is the logarithm of frequency: each octave adds the same amount to the pitch, while the frequency doubles.
+The first pair is 220 Hz apart, like the octave above, but it sounds like a small step: its ratio is 1 980 / 1 760 = 1.125, close to what the next section calls two semitones (1.122). The second pair is 1 760 Hz apart and sounds like the same leap as 440 and 220. What the ear hears as the distance between two pitches is the ratio of their frequencies, not the difference. Equal ratios sound like equal steps, so pitch is the logarithm of frequency: each octave adds the same amount to the pitch, while the frequency doubles.
 
 The plot shows the 88 keys of a piano, from the lowest (27.5 Hz) to the highest (4 186 Hz). On a linear axis the low half of the keyboard is squeezed against the bottom. On a logarithmic axis, where each doubling takes the same height, the keys lie on a straight line.
 
@@ -76,7 +76,13 @@ for k, name in enumerate(names):
     print(f"| {k} | {name} | {2 ** (k / 12):.4f} | {440 * 2 ** (k / 12):.2f} |")
 ```
 
-The octave number goes up at C, not at A, for historical reasons: B4 is followed by C5. The C just below A4 is C4, called *middle C*, at 261.63 Hz, nine steps below A4. In general a note n steps above A4 has the frequency 440 × 2^(n/12), and n may be negative. MIDI, the standard for sending notes between instruments and programs, numbers the notes by semitone with A4 = 69 and middle C = 60. Musicians also split each semitone into 100 *cents*, to talk about notes that are slightly out of tune.
+The octave number goes up at C, not at A, for historical reasons: B4 is followed by C5. The C just below A4 is C4, called *middle C*, at 261.63 Hz, nine steps below A4. In general a note n steps above A4 has the frequency 440 × 2^(n/12), and n may be negative. MIDI, the standard for sending notes between instruments and programs, numbers the notes by semitone with A4 = 69 and middle C = 60. Musicians also split each semitone into 100 *cents*, to talk about notes that are slightly out of tune. So the MIDI note m has the frequency 440 × 2^((m − 69)/12), and one cent is a ratio of 2^(1/1200):
+
+```python {run echo=false}
+for m in (60, 69, 81):
+    print(f"- MIDI note {m}: {440 * 2 ** ((m - 69) / 12):.2f} Hz")
+print(f"- one cent: a ratio of {2 ** (1 / 1200):.6f}, a change of 0.058 %")
+```
 
 ## Amplitude and decibels
 
@@ -139,7 +145,7 @@ for freq in (100.0, 1_000.0, 3_000.0, 12_000.0):
 
 On most loudspeakers and headphones the 3 000 Hz sine sounds the loudest and the 100 Hz sine much quieter, although their samples swing equally far. The ear is most sensitive between about 2 000 and 5 000 Hz, where the ear canal resonates, and grows less sensitive towards low frequencies, and again above about 10 000 Hz. (Small loudspeakers also play 100 Hz weakly, which adds to the effect.)
 
-*Loudness* is how loud a sound seems, and it can be estimated from the samples. The standard method, ITU-R BS.1770, weights the frequencies with a filter called K-weighting: it cuts the lowest frequencies and raises everything above about 2 000 Hz by 4 dB. Then it averages the power over 400-millisecond blocks and ignores blocks that are nearly silent. The result is in *LUFS*, loudness units relative to full scale, where one loudness unit is one decibel. `A-LUFS` is this measurement. Here it is for a sine at gain 0.5, at frequencies across the range of hearing:
+*Loudness* is how loud a sound seems, and it can be estimated from the samples. The standard method, ITU-R BS.1770, weights the frequencies with a filter called K-weighting: a high-pass filter cuts frequencies below about 40 Hz, and a shelf raises everything above about 2 000 Hz by up to 4 dB. Then it averages the power over blocks of 400 milliseconds, each overlapping the next by 75 %, and leaves out quiet blocks in two passes. First every block below −70 LUFS goes. Then every block more than 10 loudness units below the average of the remaining blocks goes, and the average of what is left is the result. So the silence between two notes does not lower a sound's loudness. The result is in *LUFS*, loudness units relative to full scale, where one loudness unit is one decibel. `A-LUFS` is this measurement. Here it is for a sine at gain 0.5, at frequencies across the range of hearing:
 
 ```python {run echo=false}
 import matplotlib.pyplot as plt
@@ -165,7 +171,7 @@ The measurement follows the ear at the bottom: a 100 Hz sine measures about 2 dB
 
 ### The same peak, different shapes
 
-The shape of a wave changes its loudness too. Here are the four waves of chapter 1 at 220 Hz, all at gain 0.5, all peaking at −6 dBFS:
+The shape of a wave changes its loudness too. Here are four basic waveforms, `Sine`, `Triangle`, `Square` and `Saw`, at 220 Hz, all at gain 0.5, all peaking at −6 dBFS. A triangle rises and falls in straight lines. A saw rises in a straight line and drops back at once, as in chapter 1. A square jumps between its high and its low value and stays at each for half a cycle. Chapter 3 looks at their shapes and what they contain.
 
 ```python {run}
 from euterpe.book import listen
@@ -175,7 +181,7 @@ for wave in (Sine, Triangle, Square, Saw):
     listen(wave(220.0) * 0.5, 1.5, f"{wave.__name__} at 220 Hz, gain 0.5")
 ```
 
-The square sounds the loudest. It spends almost all of its time at +0.5 or −0.5, so it carries more power than the others, which pass through the values in between. The table measures each one. *RMS*, the root of the mean of the squared samples, is the average power expressed as an amplitude, in dBFS:
+The square sounds the loudest. It spends almost all of its time at +0.5 or −0.5, so it carries more power than the others, which pass through the values in between. The table measures each one. *RMS*, the root of the mean of the squared samples, is the average power expressed as an amplitude, in dBFS. A square's samples are all at its peak, so its RMS equals its peak. A sine's RMS is its peak divided by √2, 3 dB lower. A triangle's and a saw's are the peak divided by √3, 4.8 dB lower, because they pass evenly through every value from −peak to +peak:
 
 ```python {run echo=false}
 import numpy as np
@@ -192,7 +198,7 @@ for wave in (Sine, Triangle, Square, Saw):
     print(f"| {wave.__name__} | {v['A-PEAK']:.1f} | {rms:.1f} | {v['A-LUFS']:.1f} |")
 ```
 
-The peaks are equal, and the loudness spans 5 dB: the square measures −6.6 LUFS, the triangle −11.7. The saw has about the same RMS as the triangle but measures 0.5 dB louder, because more of its energy sits at high harmonics, which K-weighting raises. To make the square as loud as the sine, lower it by the difference, 3.4 dB. That is a gain of 10^(−3.4/20) = 0.68 on top of the 0.5, so about 0.34:
+The peaks are equal to within 0.1 dB, and the loudness spans 5 dB: the square measures −6.6 LUFS, the triangle −11.7. The saw has about the same RMS as the triangle but measures 0.5 dB louder, because more of its energy sits at high harmonics, which K-weighting raises. To make the square as loud as the sine, lower it by the difference, 3.4 dB. That is a gain of 10^(−3.4/20) = 0.68 on top of the 0.5, so about 0.34:
 
 ```python {run}
 from euterpe.book import listen
@@ -229,7 +235,8 @@ The square still sounds brighter and buzzier than the sine, because it has harmo
 3. In the last example, replace `Square` with `Saw` and find the gain that makes it as loud as the sine, using the table of the four waves. Check your answer with `lint_audio`.
 
 ```python {run echo=false}
-# Level check: lint every sound this chapter plays. It prints nothing unless one has an error.
+# Level check: lint every sound in build/audio, this chapter's and any written before it.
+# It prints nothing unless one has an error.
 from pathlib import Path
 
 from euterpe.io import read

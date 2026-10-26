@@ -293,7 +293,8 @@ Rounding changes the shape of the wave, so it adds frequencies that were not the
 3. The sine keeps its note: 440 Hz is below 3 000 Hz, so nothing folds, and the held steps add a faint high whine. 3 080 Hz lands at 2 920 Hz and 5 720 Hz at 280 Hz. Neither is a multiple of 440 Hz (2 920 / 440 is about 6.6), which is why the crushed saw sounds out of tune with itself.
 
 ```python {run echo=false}
-# Level check: lint every sound this chapter plays. It prints nothing unless one has an error.
+# Level check: lint every sound in build/audio, this chapter's and any written before it.
+# It prints nothing unless one has an error.
 from pathlib import Path
 
 from euterpe.io import read
