@@ -5,6 +5,7 @@ import pytest
 
 from euterpe.cli import main
 from euterpe.io import read, write
+from tests.helpers import peak_hz
 
 PIECE = '''
 from euterpe.sound import Saw, Sine
@@ -42,6 +43,9 @@ def test_render_passes_the_seed_and_the_rate(piece, tmp_path):
     assert main(["render", f"{piece}:seeded", "-o", str(out), "--seconds", "1", "--seed", "1", "--rate", "44100"]) == 0
     x, rate = read(out)
     assert rate == 44_100 and len(x) == 44_100
+    other = tmp_path / "t.wav"
+    assert main(["render", f"{piece}:seeded", "-o", str(other), "--seconds", "1", "--seed", "2"]) == 0
+    assert peak_hz(read(other)[0]) == pytest.approx(660.0, abs=1.0)    # seeded(2) is 220 * 3 Hz
 
 
 def test_lint_a_clipped_file_exits_1(tmp_path, capsys):
