@@ -1,7 +1,7 @@
 # Euterpe, the book. Every code block runs when the book builds, from this
 # directory; the sounds and figures it writes land in build/.
 theme: book
-base-url: https://gia-uh.github.io/euterpe/
+base-url: https://uhgia.org/euterpe/
 execute: {timeout: 120}
 
 vars:
