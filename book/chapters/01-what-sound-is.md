@@ -20,7 +20,7 @@ tone = Sine(440.0) * 0.5
 listen(tone, 2.0, "A sine wave at 440 Hz")
 ```
 
-`listen` is a helper for this book, which is why it lives in `euterpe.book` and not in the library proper, `euterpe.sound`. It writes an MP3 file under `build/audio/` in the current directory and prints a line that the book turns into a player. Run in your own terminal, it leaves that file for you to open in any audio player. To choose the file name yourself, use the library's `render(tone, 2.0, to="tone.wav")`.
+`listen` is a helper for this book, so it lives in `euterpe.book` and not in the library proper, `euterpe.sound`. It writes an MP3 file under `build/audio/`: the book turns it into a player, and in your own terminal it leaves the file for you to open.
 
 A tone held at one steady frequency in a piece of music is a *note*. This one is the note musicians call A, the one orchestras tune to (chapter 2 explains note names). A sine is the plainest tone there is: it sounds like a tuning fork or a soft whistle. Every other sound in this book is built from sines, or analysed as a sum of them, so it is worth knowing well.
 
@@ -106,7 +106,7 @@ Two facts finish the argument. First, a sine repeats every full cycle, sin(x + 2
 
 sin(2π · (48 000 − f) · n / 48 000) = −sin(2π · f · n / 48 000)
 
-The samples of the sine at 48 000 − f are the samples of the sine at f, upside down: every sample has the opposite sign. The ear cannot hear that difference. Turning a sine upside down is the same as shifting it in time by half a cycle, and the ear does not hear a constant shift in time of a steady tone (a shift of where its cycle starts, called its *phase*); it hears the frequency and the amplitude. So after sampling, a sine at 48 000 − f sounds exactly like a sine at f, although each of its samples is the negative of the other's.
+The samples of the sine at 48 000 − f are the samples of the sine at f, upside down: every sample has the opposite sign. The ear cannot hear that difference. Turning a sine upside down is the same as shifting it in time by half a cycle, and the ear does not hear a constant shift in time of a steady tone (a shift of where its cycle starts, called its *phase* and measured in cycles); it hears the frequency and the amplitude. So after sampling, a sine at 48 000 − f sounds exactly like a sine at f, although each of its samples is the negative of the other's.
 
 With numbers: a sine at 44 000 Hz advances 44/48 of a cycle from one sample to the next. Since a full cycle brings it back to where it was, 44/48 of a cycle forward lands on the same point as 4/48 of a cycle backward, and 4/48 of a cycle per sample is what a 4 000 Hz sine advances. Going backward through a sine traces it upside down. Comparing the two, one millisecond of samples:
 
@@ -116,7 +116,7 @@ import numpy as np
 n = np.arange(48)  # one millisecond of sample numbers
 high = np.sin(2 * np.pi * 44_000 * n / 48_000)
 low = np.sin(2 * np.pi * 4_000 * n / 48_000)
-print(np.abs(high + low).max())  # largest difference from the upside-down 4 000 Hz samples
+print(np.abs(high - (-low)).max())  # largest difference between high and low upside down
 ```
 
 The difference is rounding error in the last digits of the floats. In the plot, the thin line is the 44 000 Hz wave and the thick one is the 4 000 Hz wave turned upside down; the samples, the dots, lie on both.
@@ -159,7 +159,7 @@ Euterpe's *oscillators*, the units that make a repeating wave (`Sine` and the `S
 
 A sine has one frequency, so it is easy to keep below the limit. Most sounds are not sines. A *saw wave* rises steadily from −1 to 1 and then drops back at once, once per cycle. Chapter 3 shows that such a wave is a sum of sines at every whole multiple of its frequency, called its *harmonics*: harmonic k is at k times the frequency and has 1/k of the first one's amplitude. A 10 000 Hz saw contains 10 000 Hz at amplitude 1, 20 000 Hz at 1/2, 30 000 Hz at 1/3, and so on without end. The first harmonic is the frequency you hear as the note.
 
-Why does a saw have harmonics so far up? Because of the drop. A sine of frequency f takes half a cycle, 1 / (2f) seconds, to go from its lowest value to its highest, and it cannot get there faster. A sum of sines can change only as fast as its sines do. The saw drops from 1 to −1 between one sample and the next, in 1/48 000 of a second, so drawing that drop needs sines whose half cycle is shorter than one sample: sines above 24 000 Hz. Spread the drop over two samples and slower sines can draw most of it, so much less is needed above 24 000 Hz.
+Why does a saw have harmonics so far up? Because of the drop. A sine of frequency f takes half a cycle, 1 / (2f) seconds, to go from its lowest value to its highest, and it cannot get there faster. A sum of sines can change only as fast as its sines do, so the ideal saw, which drops in no time, needs harmonics without end (chapter 3). Sampled, it drops in one sample, 1/48 000 of a second, which takes sines above 24 000 Hz; the samples store only what lies below, and the rest folds back. A drop spread over two samples, 1/24 000 of a second, is half a cycle at 12 000 Hz, slow enough for sines below 24 000 Hz to draw.
 
 Every harmonic above 24 000 Hz folds back. Here is the rule from the last section as a function, applied to the first seven harmonics of the 10 000 Hz saw:
 
@@ -176,7 +176,7 @@ Adding `rate / 2` before the remainder `%` and taking it away after gives the si
 
 The 5th harmonic, 50 000 Hz, is heard at 2 000 Hz, far below the note itself. A folded harmonic usually does not sit at a multiple of the note's frequency, so it does not blend into the note's tone. It sounds like a separate whistle that does not belong to the note.
 
-To hear the difference, Euterpe's `Saw` can be told to skip its correction. With `antialias=False` it computes the wave the direct way: take the position in the cycle, from 0 to 1, and scale it to run from −1 to 1, with the whole drop between two samples. The normal `Saw` adds a small correction to the sample just before each drop and the sample just after it, so the drop becomes a short slope two samples wide instead of a cliff. The correction is called *polyBLEP*. A BLEP, a band-limited step, is the shape a jump takes once it is *band-limited*, that is, once everything above a limit (here 24 000 Hz) is removed from it; "poly" because the correction is a short polynomial. The plot shows a few samples around one drop of a 1 100 Hz saw:
+To hear the difference, Euterpe's `Saw` can be told to skip its correction. With `antialias=False` it computes the wave the direct way: take the position in the cycle, from 0 to 1, and scale it to run from −1 to 1, with the whole drop between two samples. The normal `Saw` adds a small correction to the sample just before each drop and the sample just after it: it turns each cliff into a two-sample slope. The correction is called *polyBLEP*, for polynomial band-limited step. The plot shows a few samples around one drop of a 1 100 Hz saw:
 
 ```python {run echo=false}
 import matplotlib.pyplot as plt
@@ -198,7 +198,7 @@ ax.legend(loc="lower left")
 show(fig, "Eight samples around one drop of a 1 100 Hz saw: polyBLEP moves the two samples next to the drop")
 ```
 
-Both saws below sweep from 1 000 Hz up to 23 000 Hz in four seconds (the captions write 1 000 Hz as 1 kHz, a kilohertz). Their frequency is not a number but a unit: a parameter may be either, and a saw given a unit reads its frequency from it again at every sample. The unit is half a cycle of a slow sine. `Sine(0.125)` completes one cycle every 8 seconds, so in 4 seconds it covers half a cycle. `phase` is measured in cycles, from 0 to 1, and sets where the sine starts: at phase 0 it starts at 0 and rises, and at phase 0.75 it starts three quarters through its cycle, at its lowest value, −1. Over the next half cycle it rises to 1. Times 11 000, that runs from −11 000 to 11 000; plus 12 000, from 1 000 to 23 000.
+Both saws below sweep from 1 000 Hz up to 23 000 Hz in four seconds (the captions write 1 000 Hz as 1 kHz, a kilohertz). Their frequency is not a number but a unit: a parameter may be either, and a saw given a unit reads its frequency from it again at every sample. The unit is half a cycle of a slow sine. `Sine(0.125)` completes one cycle every 8 seconds, so in 4 seconds it covers half a cycle. `phase`, from 0 to 1, sets where the sine starts: at phase 0 it starts at 0 and rises, and at phase 0.75 it starts three quarters through its cycle, at its lowest value, −1. Over the next half cycle it rises to 1. Times 11 000, that runs from −11 000 to 11 000; plus 12 000, from 1 000 to 23 000.
 
 ```python {run}
 from euterpe.book import listen
@@ -232,13 +232,13 @@ axes[0].set_ylabel("frequency (Hz)")
 show(fig, "The two sweeps: harmonics fold back from 24 kHz without the correction")
 ```
 
-In the right panel each harmonic reaches the top edge, 24 000 Hz, and comes back down as a falling line. Those falling lines are the extra tones you heard. The left panel has them too, much fainter: polyBLEP reduces aliasing, it does not remove it. For most notes of real music that is enough: they sit far below 23 000 Hz, and the lower the note, the higher the first harmonic that folds, so the quieter it is.
+In the right panel each harmonic reaches the top edge, 24 000 Hz, and comes back down as a falling line. Those falling lines are the extra tones you heard. The left panel has them too, darker: polyBLEP reduces aliasing, it does not remove it. For most notes of real music that is enough: they sit far below 23 000 Hz, and the lower the note, the higher the number k of the first harmonic that folds, so its amplitude 1/k is smaller.
 
 ## How fine each sample is
 
-Each sample is a number, and a file stores it with a fixed number of bits. With b bits a sample can take 2 to the power b different values (`2 ** b` in Python). CD audio uses 16 bits, 65 536 values. Rounding every sample to the nearest allowed value is called *quantisation*. The rounding error, the difference between the exact value and the rounded one, is a small signal added to the sound. It is never more than half the step between two neighbouring values. Each bit removed halves the number of values, so it doubles the step and the largest error. At 16 bits the largest error is about 1/65 000 of full scale, too quiet to hear in normal listening, which is why 16 bits was enough for the CD.
+Each sample is a number, and a file stores it with a fixed number of bits. With b bits a sample can take 2 to the power b different values (`2 ** b` in Python). CD audio uses 16 bits, 65 536 values. Rounding every sample to the nearest allowed value is called *quantisation*. The rounding error, the difference between the exact value and the rounded one, is a small signal added to the sound. It is never more than half the step between two neighbouring values. The range from −1 to 1 is 2 wide, so with b bits the step is 2 / (2**b − 1) and the largest error half of that. At 16 bits the largest error is 1/65 535 of full scale, too quiet to hear in normal listening, which is why 16 bits was enough for the CD.
 
-A 32-bit float is finite too, so the samples Euterpe computes are already quantised, though far more finely than any file stores them. When `render(..., to="tone.wav")` writes a WAV file, an uncompressed file of samples, it stores 24-bit integers: each sample is multiplied by 8 388 608 (`2 ** 23`), rounded to a whole number and stored in 3 bytes. The largest number 24 bits hold is 8 388 607, so a sample of exactly 1 is stored as 8 388 607. The step is 1/8 388 608 of full scale, far below hearing.
+A 32-bit float is finite too, so the samples Euterpe computes are already quantised, though far more finely than any file stores them. When `render(..., to="tone.wav")` writes a WAV file, an uncompressed file of samples, it stores 24-bit integers: each sample is multiplied by 8 388 608 (`2 ** 23`), rounded to a whole number and stored in 3 bytes. 24-bit signed integers go from −8 388 608 to 8 388 607, so a sample of exactly 1 is stored as 8 388 607. The largest error is half the step, 1/16 777 216 of full scale, far below hearing.
 
 `BitCrush` rounds each sample to `2 ** bits - 1` levels spread evenly between −1 and 1. That is one level fewer than the bits allow, so that the levels are symmetric and 0 is one of them: silence stays silent. Here is the 440 Hz sine with 16, 6, 4 and 2 bits:
 
@@ -270,27 +270,27 @@ ax.legend(loc="lower left")
 show(fig, "One cycle of the 440 Hz sine with 16, 4 and 2 bits")
 ```
 
-Rounding changes the shape of the wave, so it adds frequencies that were not there. At 6 bits the error is small and changes erratically from one sample to the next, without repeating. An error that does not repeat has no single frequency, so its energy spreads thinly over all of them, and that is heard as *hiss*, like a radio tuned between stations. At 2 bits the error is as large as the wave and has the same shape in every cycle. An error that repeats with every cycle repeats 440 times a second, so it is made of harmonics of 440 Hz, and that is heard as a *buzz* at the note's own pitch.
+Rounding changes the shape of the wave, so it adds frequencies that were not there. At 440 Hz a cycle is 48 000 / 440 = 109.09 samples, so the samples land at different points of the wave in each cycle. At 6 bits the error is small and depends on where each sample lands, so it does not repeat in a short pattern: its energy spreads thinly over many frequencies, heard as *hiss*, like a radio between stations. At 2 bits the error is as large as the wave and follows its shape in every cycle. An error that repeats with every cycle is made of harmonics of 440 Hz, heard as a *buzz* at the note's own *pitch*: the perceived height of a sound, set by its frequency.
 
 ## Summary
 
 - A sound is air pressure that changes over time. In a computer it is a list of numbers between −1 and 1, the samples.
 - Euterpe takes 48 000 samples per second. Between two samples nothing is stored; playback fills the gaps with the smooth wave that has nothing above half the sample rate.
 - A sine at f and one at 48 000 − f have the same samples, upside down. So the highest frequency a sample rate can hold is half of it, the Nyquist frequency, 24 000 Hz here: more than two samples per cycle. A higher frequency folds back to a lower one.
-- A sharp jump needs high frequencies. A saw's drop gives it harmonics far above its own frequency, and they fold back as tones that do not belong to the note. polyBLEP turns each drop into a two-sample slope, which makes the folded tones much fainter.
+- A sharp jump needs high frequencies. A saw's drop gives it harmonics far above its own frequency, and they fold back as tones that do not belong to the note. polyBLEP turns each drop into a two-sample slope, which weakens the folded tones without removing them.
 - Each sample is rounded to a finite number of levels. Fewer bits mean a larger rounding error: a hiss when the error is small, a buzz when it is as large as the wave.
 
 ## Exercises
 
-1. In the first example, change `440.0` to `220.0`, then to `880.0`. Each doubling of the frequency sounds like the same note, only higher. Chapter 2 calls a doubling an octave.
+1. In the first example, change `440.0` to `220.0`, then to `880.0`, and listen. How does each compare with 440 Hz?
 2. In the folding example, change `10_000` to `7_000` in both places and `range(1, 8)` to `range(1, 11)`, for the first ten harmonics of a 7 000 Hz saw. Ten is enough: the 10th has a tenth of the first one's amplitude, and those after it are quieter still. Which of the ten land below 7 000 Hz, the note itself? Then, in the sweep example, change `11_000 + 12_000` to `3_000 + 4_000`, a sweep from 1 000 to 7 000 Hz, and listen to the saw with `antialias=False`: do falling tones remain?
-3. In the `BitCrush` example, change `bits=bits` to `bits=bits, downsample=8` and listen. `BitCrush` now keeps every 8th sample and repeats it for the next 7, so only 6 000 different values remain each second: in effect a sample rate of 6 000 Hz, with a Nyquist frequency of 3 000 Hz. Then replace `Sine` with `Saw`, in the import line too. The saw's 7th harmonic, 3 080 Hz, is now above the Nyquist frequency: where does it land? Compute `fold(3_080, rate=6_000)` with the function from the folding example, then do the same for the 13th harmonic, 5 720 Hz. Are the results multiples of 440 Hz?
+3. In the `BitCrush` example, change `bits=bits` to `bits=bits, downsample=8` and listen. `BitCrush` now keeps every 8th sample and repeats it for the next 7, so only 6 000 different values remain each second: in effect a sample rate of 6 000 Hz, with a Nyquist frequency of 3 000 Hz. What happens to the sine's note? Then replace `Sine` with `Saw`, in the import line too. The saw's 7th harmonic, 3 080 Hz, is now above the Nyquist frequency: where does it land? Compute `fold(3_080, rate=6_000)` with the function from the folding example, then do the same for the 13th harmonic, 5 720 Hz. Are the results multiples of 440 Hz?
 
 ### Answers
 
-1. 220 Hz sounds lower and 880 Hz higher, and both sound like the same note as 440 Hz: the A one octave down and one octave up.
-2. Harmonic 6 lands at 6 000 Hz and harmonic 7 at 1 000 Hz. The others land at 7 000, 14 000, 21 000, 20 000, 13 000, 8 000, 15 000 and 22 000 Hz. In the narrower sweep the falling tones remain, fainter: at every frequency of the sweep some harmonics lie above 24 000 Hz, and the lower the note, the higher (and quieter) the first one that folds.
-3. 3 080 Hz lands at 2 920 Hz and 5 720 Hz at 280 Hz. Neither is a multiple of 440 Hz (2 920 / 440 is about 6.6), which is why the crushed saw sounds out of tune with itself.
+1. 220 Hz sounds lower and 880 Hz higher, and both sound like the same note as 440 Hz: the A one octave down and one octave up. Chapter 2 calls a doubling of the frequency an octave.
+2. Harmonic 6 lands at 6 000 Hz and harmonic 7 at 1 000 Hz. The others land at 7 000, 14 000, 21 000, 20 000, 13 000, 8 000, 15 000 and 22 000 Hz. In the narrower sweep the falling tones remain, fainter: at every frequency of the sweep some harmonics lie above 24 000 Hz, and the lower the note, the higher the number k of the first one that folds, so its amplitude 1/k is smaller.
+3. The sine keeps its note: 440 Hz is below 3 000 Hz, so nothing folds, and the held steps add a faint high whine. 3 080 Hz lands at 2 920 Hz and 5 720 Hz at 280 Hz. Neither is a multiple of 440 Hz (2 920 / 440 is about 6.6), which is why the crushed saw sounds out of tune with itself.
 
 ```python {run echo=false}
 # Level check: every sound this chapter plays stays below full scale.
