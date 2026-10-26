@@ -74,11 +74,22 @@ def test_a_note_cut_mid_sound_has_a_tail():
     assert not found(lint_audio(x), "A-TAIL")
 
 
+def test_a_tail_at_minus_40_dbfs_still_sounds():
+    x = np.concatenate([sine(), sine(0.1, amp=0.01)])
+    (f,) = found(lint_audio(x), "A-TAIL")
+    assert f.value == pytest.approx(-40.0, abs=0.1)
+
+
 def test_a_gap_of_three_seconds_between_two_notes():
     x = np.concatenate([sine(), np.zeros(3 * RATE, np.float32), sine()])
     (f,) = found(lint_audio(x), "A-SILENCE")
     assert f.severity == "warn" and f.at == pytest.approx(1.0, abs=0.02)
     assert f.value == pytest.approx(3.0, abs=0.02)
+
+
+def test_a_gap_filled_at_minus_40_dbfs_is_not_silence():
+    x = np.concatenate([sine(), sine(3.0, amp=0.01), sine()])
+    assert not found(lint_audio(x), "A-SILENCE")
 
 
 def test_a_short_gap_and_trailing_silence_are_not_silence_findings():
@@ -92,6 +103,12 @@ def test_balance_of_a_low_tone():
     assert all(f.severity == "metric" for f in (low, mid, high))
     assert low.value > 0.99 and mid.value + high.value < 0.01
     assert low.value + mid.value + high.value == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("freq, band", [(200.0, 0), (300.0, 1), (1_000.0, 1), (3_500.0, 1), (5_000.0, 2), (8_000.0, 2)])
+def test_balance_puts_a_tone_in_its_band(freq, band):
+    shares = [f.value for f in found(lint_audio(sine(freq=freq)), "A-BALANCE")]
+    assert shares[band] > 0.99
 
 
 def test_a_loop_whose_ends_do_not_meet():
