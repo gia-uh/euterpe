@@ -18,9 +18,9 @@ note = Pluck(330.0, damping=0.99)
 listen(Delay(note, time=0.3, feedback=0.45, mix=0.5) * 0.7, 3.0, "A pluck with echoes every 0.3 s, feedback 0.45")
 ```
 
-You hear the note, then the same note again every 0.3 s, quieter each time. Each echo is 0.45 times the one before, 20 × log₁₀ 0.45 = −6.9 dB, so the fifth echo is 4 × 6.9 = 28 dB below the first. With feedback 1 the echoes would never die away; the unit allows at most 0.99.
+You hear the note, then the same note again every 0.3 s, quieter each time. Each echo is 0.45 times the one before, 20 × log₁₀ 0.45 = −6.9 dB. Counting the first echo as echo 1, echo k is k − 1 steps after it, so it is (k − 1) × 6.9 dB below the first: echo 5 is 4 × 6.9 = 28 dB below it. With feedback 1 the echoes would never die away; the unit allows at most 0.99.
 
-The plot shows the same delay fed a single sample of 1, a click. The click itself comes out at 1 − mix = 0.5, and each echo after it at 0.5 × 0.45ᵏ⁻¹:
+The plot shows the same delay fed a single sample of 1, a click. The click itself comes out at 1 − mix = 0.5. Echo 1 also comes out at 0.5, since it is the copy at mix = 0.5, and echo k at 0.5 × 0.45ᵏ⁻¹:
 
 ```python {run echo=false}
 import matplotlib.pyplot as plt
@@ -56,21 +56,23 @@ for ms in (1, 10, 40, 150):
     listen(Delay(burst, time=ms / 1000, feedback=0.0, mix=0.5), 0.6, f"A noise burst plus a copy {ms} ms later")
 ```
 
-At 1 ms the burst sounds like a hollow tube: peaks every 1 000 Hz. At 10 ms the peaks are 100 Hz apart and the burst has a faint pitch, 100 Hz. At 40 ms the copy is just apart, a rough double hit. At 150 ms it is a clear echo.
+At 1 ms the burst sounds like a hollow tube: peaks every 1 000 Hz. At 10 ms the peaks are 100 Hz apart and the burst has a faint pitch, 100 Hz. At 40 ms the copy is just far enough apart to hear as two hits, a rough double hit. At 150 ms it is a clear echo.
 
 ## Moving delays: chorus, flanger, phaser
 
-A delay whose time changes while the sound plays does more than add a copy. When the time grows, each sample of the copy comes out a little later than the one before it: the copy is stretched, and stretched sound is lower in pitch. When the time shrinks, the copy is squeezed and higher. If the delay grows by r seconds every second, the copy plays at 1 − r times its speed, and every frequency in it is multiplied by 1 − r.
+A delay whose time changes while the sound plays does more than add a copy. When the time grows, each sample of the copy comes out a little later than the one before it: the copy is stretched, and stretched sound is lower in pitch. When the time shrinks, the copy is squeezed and higher. If the delay grows by r seconds every second, the copy plays at 1 − r times its speed: after 1 s the copy has fallen r s further behind, so in that second it played only 1 − r s of sound. Every frequency in it is multiplied by 1 − r.
 
 ### Chorus
 
-`Chorus(src, rate, depth, mix)` mixes the source with a copy delayed by 20 ms plus or minus `depth` seconds, and swings the delay up and down `rate` times a second along a sine. The delay is depth × sin(2π × rate × t), so it changes fastest when it crosses the middle, at depth × 2π × rate seconds per second. With the defaults, depth 3 ms and rate 0.8 Hz:
+`Chorus(src, rate, depth, mix)` mixes the source with a copy delayed by 20 ms plus or minus `depth` seconds, and swings the delay up and down `rate` times a second along a sine: at time t the delay is 0.020 + depth × sin(2π × rate × t) seconds. How fast does it change? Picture a point going round a circle of radius `depth`, `rate` times a second: it travels 2π × depth × rate per second, and the sine is its height, which moves fastest when the point crosses the middle, where it moves straight up or down. So the delay changes by at most 2π × depth × rate seconds per second. The block computes it both ways for the defaults, depth 3 ms and rate 0.8 Hz: by the formula, and from the delay curve itself, as the largest change between two samples times 48 000:
 
 ```python {run output=code}
 import numpy as np
 
-r = 0.003 * 2 * np.pi * 0.8
-print(f"the delay changes by up to {r:.4f} s per second")
+t = np.arange(48000) / 48000
+delay = 0.020 + 0.003 * np.sin(2 * np.pi * 0.8 * t)
+r = 2 * np.pi * 0.003 * 0.8
+print(f"by the formula: {r:.4f} s per second; from the curve: {np.abs(np.diff(delay)).max() * 48000:.4f}")
 print(f"the copy's pitch moves by up to {100 * r:.2f} %, {1200 * np.log2(1 + r):.0f} cents")
 ```
 
@@ -98,7 +100,7 @@ In the chorus every harmonic of the saw beats with its moving copy, each at its 
 
 ### Flanger
 
-`Flanger(src, rate, depth, feedback, mix)` uses a much shorter delay: from 0.5 ms up to 0.5 ms + `depth`, 2.5 ms by default. At those lengths the copy is not heard as a copy at all, only as the comb filter of the previous section, with peaks at multiples of 1 / T. As T sweeps from 0.5 ms to 2.5 ms, the first peak slides between 2 000 Hz and 400 Hz, and every other peak slides with it. `feedback` sends the delayed copy back in, which makes the peaks taller and narrower, as feedback did for `Comb` in chapter 5.
+`Flanger(src, rate, depth, feedback, mix)` uses a much shorter delay: from 0.5 ms up to 0.5 ms + `depth`. At those lengths the copy is not heard as a copy at all, only as the comb filter of the previous section, with peaks at multiples of 1 / T. The example below uses depth 0.004, so T sweeps from 0.5 ms to 4.5 ms, and the first peak slides between 1 / 0.0005 = 2 000 Hz and 1 / 0.0045 = 222 Hz, every other peak sliding with it. `feedback`, from −0.95 to 0.95, sends the delayed copy back in, which makes the peaks taller and narrower, as feedback did for `Comb` in chapter 5. A negative feedback flips the copy each time it goes round, and the flanger then also mixes the copy in upside down: a frequency is reinforced where an odd number of half periods fits into T, so the peaks move to the odd multiples of 1 / (2T).
 
 A comb is easiest to hear on a sound that has every frequency, so here is white noise through a flanger sweeping once every 4 seconds:
 
@@ -131,9 +133,9 @@ show(fig, "Spectrogram of white noise through the flanger: the comb's peaks swee
 
 ### Phaser
 
-`Phaser(src, rate, stages, mix)` sounds close to a flanger but works differently. It passes the source through a chain of `stages` *allpass* filters, which chapter 5 met: an allpass keeps the level of every frequency and only delays it, by a different amount at each frequency. The phaser's allpasses each delay a frequency by a quarter of its period, 90°, at a *turning frequency* that sweeps from 200 Hz to 2 000 Hz and back, `rate` times a second. Below that frequency they delay less, above it more, up to half a period.
+`Phaser(src, rate, stages, mix)` sounds close to a flanger but works differently. It passes the source through a chain of `stages` *allpass* filters, which chapter 5 met: an allpass keeps the level of every frequency and only delays it, by a different amount at each frequency. Each of the phaser's allpasses has a *turning frequency*, where it delays a sine by a quarter of its period, 90°. Below that frequency it delays less, above it more, up to half a period, 180°, at 24 000 Hz. All the stages share one turning frequency, which sweeps from 200 Hz to 2 000 Hz and back, `rate` times a second, so n stages delay n × 90° there.
 
-Mixed with the source, the chained copy cancels wherever its total delay is half a period, 180°. Four stages reach 180° at one frequency and 540° at a higher one, so they make two notches. A chain of n stages delays up to n × 180°, reached at 24 000 Hz, so it has n / 2 notches below that, rounded down. Unlike the comb of a flanger, whose peaks are evenly spaced all the way up, a phaser has only these few notches, unevenly spaced, so its sweep sounds softer:
+Mixed with the source, the chained copy cancels wherever its total delay is an odd number of half periods: 180°, 540°, 900° and so on. Four stages delay 4 × 90° = 360° at the turning frequency, so they pass 180° at one frequency below it and 540° at one above it, two notches; they never reach 900°, since four stages give at most 720°. In general n stages reach at most n × 180°, so they have n / 2 notches, rounded down. A flanger's comb has peaks at 1, 2, 3, 4 ... times one frequency, evenly spaced all the way up. A phaser has only these few notches, and they are not at multiples of one frequency, so its sweep sounds softer:
 
 ```python {run}
 from euterpe.book import listen
@@ -149,7 +151,7 @@ Eight stages give four notches that move together. Try `stages=2`: a single notc
 
 The effects so far add copies of the sound, and a delay that does not move adds no new frequencies: a sine in gives a sine out, at the same frequency. *Distortion* does add new ones. A *waveshaper* passes each sample through a fixed curve, and a curve that bends the wave adds new frequencies to it. Chapter 1's `BitCrush` was one: its curve was a staircase.
 
-`Shaper(src, kind, drive)` has three curves. Each multiplies the sample by `drive` / 2 first and then bends it:
+`Shaper(src, kind, drive)` has three curves. Each multiplies the sample by `drive` / 2 first and then bends it. The half is there so that drive 2 puts a full-scale input exactly at u = 1, where the soft and hard curves stop rising, and drive 1 bends only a little:
 
 - `"tanh"`, the hyperbolic tangent: straight near 0 and bending smoothly towards ±1.
 - `"soft"`, the cubic u − u³/3, which stops rising at u = 1 and stays flat beyond.
@@ -210,7 +212,7 @@ At drive 1 you hear a sine with a slight buzz; at 16 the wave is nearly a square
 
 ### Saturation and even harmonics
 
-`Saturator(src, drive, bias)` is a tanh with the wave shifted by `bias` before the curve: tanh(drive × (x + bias)). The shift makes the curve lopsided around the wave. The top half is bent more than the bottom half, the symmetry is gone, and the even harmonics appear. Tube amplifiers do the same, and the 2nd harmonic, an octave above the note, is why their distortion is called warm: it adds the note's own octave rather than a harsher odd harmonic. The shift also leaves an offset at 0 Hz, which the unit removes with a high-pass at 10 Hz.
+`Saturator(src, drive, bias)` is a tanh with the wave shifted by `bias` before the curve: tanh(drive / 2 × (x + bias)), with `drive` halved as in `Shaper`, so the same drive means the same push into the curve in both. The shift makes the curve lopsided around the wave. The top half is bent more than the bottom half, the symmetry is gone, and the even harmonics appear. Tube amplifiers do the same, and the 2nd harmonic, an octave above the note, is why their distortion is called warm: it adds the note's own octave rather than a harsher odd harmonic. The shift also leaves an offset at 0 Hz, which the unit removes with a high-pass at 10 Hz.
 
 ```python {run output=code}
 import numpy as np
@@ -219,10 +221,10 @@ from euterpe.sound import Saturator, Sine, render
 
 x = render(Saturator(Sine(220.0), drive=4.0, bias=0.2), 1.0)
 amp = np.abs(np.fft.rfft(x)) * 2 / len(x)
-print("  ".join(f"{20 * np.log10(amp[220 * k]):6.1f}" for k in range(1, 8)))
+print("  ".join(f"{20 * np.log10(amp[220 * k] + 1e-12):6.1f}" for k in range(1, 8)))
 ```
 
-The 2nd harmonic is now at −15.0 dB, nearly as loud as the 3rd at −13.3 dB, and the 4th and 6th are there too. The plot puts the four spectra side by side, the first ten harmonics of 220 Hz marked, odd ones in blue and even ones in orange:
+The 2nd harmonic is now at −17.7 dB, as loud as the 3rd, and the 4th and 6th are there too. The plot puts the four spectra side by side, the first ten harmonics of 220 Hz marked, odd ones in blue and even ones in orange:
 
 ```python {run echo=false}
 import matplotlib.pyplot as plt
@@ -265,7 +267,7 @@ listen(Saturator(note(), drive=4.0, bias=0.2) * 0.6, 1.6, "The same note through
 
 ### Two notes through one curve
 
-A curve does not treat a sum of sines as separate sines. Bending x + y gives terms in x², xy, x³, x²y and so on, and a product of two sines is a pair of sines at the sum and the difference of their frequencies. So two notes through a distortion produce new frequencies at combinations such as f₁ − f₂ and 2f₁ − f₂, called *intermodulation*.
+A curve does not treat a sum of sines as separate sines. Any of these curves can be written, near 0, as a sum of powers of its input: x, x³, x⁵ and so on for an odd curve, which is why an odd curve on one sine gives odd harmonics. Feed it the sum of two notes, x + y, and the powers mix them: (x + y)³ = x³ + 3x²y + 3xy² + y³ already holds x²y and xy². Products of sines turn into sines at sums and differences of frequencies, by the high-school identity sin a × sin b = ½ [cos(a − b) − cos(a + b)]. So x²y, with x at f₁ and y at f₂, holds frequencies such as 2f₁ − f₂ and 2f₁ + f₂. Two notes through a distortion produce these new frequencies, called *intermodulation*.
 
 When the two notes are a fifth apart (frequency ratio 3 : 2, here 220 Hz and 330 Hz), every combination is a multiple of 110 Hz, so the new frequencies are harmonics of a 110 Hz note and the result still sounds like one chord. When they are 6 equal steps apart (a ratio of 2^(6/12) = 1.414, an interval called a *tritone*, 220 Hz and 311.1 Hz), the combinations fall on no common series:
 
@@ -281,7 +283,7 @@ for top in (330.0, 311.1):
     print(f"220 + {top} Hz, the ten loudest (Hz):", ", ".join(f"{f:g}" for f in loudest))
 ```
 
-The block renders 10 s so that the spectrum has a bin every 0.1 Hz and 311.1 Hz falls exactly on one; over 1 s the bins are 1 Hz apart and its energy would spill into the bins at 311 and 312 Hz. The fifth gives 110, 220, 330, 440 Hz and on, all multiples of 110. The tritone gives 128.9 Hz (2 × 220 − 311.1), 37.8 Hz (3 × 220 − 2 × 311.1), 402.2 Hz (2 × 311.1 − 220) and more, on no common series, a cluster that sounds rough:
+The block renders 10 s so that the spectrum has a bin every 0.1 Hz and 311.1 Hz falls exactly on one; over 1 s the bins are 1 Hz apart and its energy would spill into the bins at 311 and 312 Hz. The fifth gives 110, 220, 330, 440 Hz and on, all multiples of 110: 110 Hz itself is 2 × 220 − 330. The tritone gives 128.9 Hz (2 × 220 − 311.1), 37.8 Hz (3 × 220 − 2 × 311.1), 402.2 Hz (2 × 311.1 − 220) and more, on no common series, a cluster that sounds rough:
 
 ```python {run}
 from euterpe.book import listen
@@ -292,7 +294,7 @@ for top, name in ((330.0, "a fifth"), (311.1, "a tritone")):
     listen(chord * ADSR(gate=1.7, release=0.2) * 0.5, 2.0, f"220 and {top:g} Hz, {name}, through a hard clip")
 ```
 
-This is why rock guitarists playing through heavy distortion so often play only two notes a fifth apart, the *power chord*: richer chords turn into noise.
+This is why rock guitarists play only two notes a fifth apart through heavy distortion, the *power chord*.
 
 ## Dynamics
 
@@ -312,7 +314,7 @@ for level in (-40, -30, -20, -10, 0):
     print(f"in {level:4d} dB -> out {compressed(level):6.1f} dB")
 ```
 
-Here is a saw at 110 Hz whose level jumps every second, quiet, loud, then medium. The block measures the RMS of each second, before and after a compressor with threshold −30 dB and ratio 4:
+Here is a saw at 110 Hz whose level jumps every second, quiet, loud, then medium. `Segments` takes (time, value) pairs and draws straight lines between them, as in chapter 4; two pairs at the same time make a jump. A saw's RMS is its peak divided by √3 (chapter 2), so the quiet step at 0.05 should read 20 × log₁₀(0.05 / √3) = −30.8 dB. The block measures the RMS of each second, before and after a compressor with threshold −30 dB and ratio 4:
 
 ```python {run output=code}
 import numpy as np
@@ -330,7 +332,7 @@ for s in range(3):
 
 The first second, at −30.8 dB, is under the threshold and comes through untouched. The second, at −9.2 dB, comes out at −25.1 dB, within a few tenths of the rule's −24.8 dB. The difference between the loudest and quietest second fell from 21.6 dB to 5.7 dB. That is what a compressor is for: it shrinks the range between loud and soft, so a voice stays audible over a band, or a whole song sounds dense and even.
 
-`attack` and `release` set how fast the gain follows the level, in seconds: how quickly it comes down when the level rises and how quickly it goes back up when the level falls. The plot shows the level of each second-long step, before and after, and how the gain moves at each jump with the defaults, attack 10 ms and release 100 ms:
+`attack` and `release` set how fast the gain follows the level: how quickly it comes down when the level rises and how quickly it goes back up when the level falls. Each is a *time constant*, chapter 4's time scale: the time the gain takes to cover 63 % of the way to its new value. The plot shows the level every 10 ms, before and after, with the defaults, attack 10 ms and release 100 ms:
 
 ```python {run echo=false}
 import matplotlib.pyplot as plt
@@ -361,35 +363,51 @@ fig.tight_layout()
 show(fig, "Level of the stepped saw before and after Compressor(threshold=-30, ratio=4), every 10 ms")
 ```
 
-At the jump to the loud step, at 1 s, the output overshoots for about 40 ms before the gain comes down: that is the attack. Two delays add up there. The detector's 10 ms average needs time to see the new level, and the gain then follows what it sees with its own 10 ms attack, so the level settles over a few times 10 ms. At 2 s, when the level drops, the gain is still low, so the output dips to −36 dB and climbs back over about 0.2 s: that is the release. A slower attack lets more of the start of each note through, which keeps the click of a drum or a plucked string. A faster release makes the gain spring back sooner after a loud note, and on a fast release the quiet tail of each note swells as the gain recovers. Producers call the sound *pumping*, and some music uses it on purpose.
+The block reads the numbers off the plot's orange line: its 10 ms levels from 1.00 s, the lowest level after 2 s, and when it gets back to within 1 dB of where it settles:
 
-A compressor is easiest to hear on a note that starts loud and decays, such as a pluck. The second version goes through a compressor with a very low threshold, −55 dB, ratio 8 and 30 dB of makeup gain. The first 5 ms of the pluck pass before the gain has come down, and the makeup would lift that first peak far above full scale, so a `Limiter`, the next section's unit, catches it:
+```python {run continue output=code}
+out = level(after)                       # one level every 10 ms, from the plot
+print("from 1.00 s:", "  ".join(f"{v:.1f}" for v in out[100:106]), "dB")
+low = 200 + int(out[200:].argmin())
+settled = out[290:].mean()
+back = 200 + int(np.argmax(out[200:] > settled - 1))
+print(f"lowest after 2 s: {out[low]:.1f} dB at {low / 100:.2f} s; within 1 dB of {settled:.1f} dB at {back / 100:.2f} s")
+```
+
+*Attack.* At the jump to the loud step, at 1 s, the output overshoots for about 40 ms before it settles near −25 dB. Two delays add up there: the detector's 10 ms average needs time to see the new level, and the gain then follows what it sees with its own 10 ms attack. A slower attack lets more of the start of each note through, which keeps the click of a drum or a plucked string.
+
+*Release.* At 2 s the level drops, but the gain is still low, so the output dips well below where it settles and climbs back with the 100 ms release, taking about 0.2 s.
+
+*Pumping.* A fast release makes the gain spring back soon after each loud note, so the quiet tail of every note swells as the gain recovers. Producers call the sound *pumping*, and some music uses it on purpose.
+
+A compressor is easiest to hear on a note that starts loud and decays, such as a pluck. The second version goes through a compressor with a very low threshold, −55 dB, ratio 8, release 0.2 s and 30 dB of makeup gain, then is scaled by 0.5 and passes a `Limiter`, the next section's unit, for a reason the measurement shows:
 
 ```python {run}
 from euterpe.book import listen
 from euterpe.sound import Compressor, Limiter, Pluck
 
-dry = lambda: Pluck(196.0, damping=0.99) * 0.5
-held = lambda: Limiter(Compressor(Pluck(196.0, damping=0.99), threshold=-55.0, ratio=8.0, attack=0.005, release=0.2, makeup=30.0) * 0.5, ceiling=-1.5)
-listen(dry(), 4.5, "A pluck at 196 Hz, dry")
-listen(held(), 4.5, "The same pluck compressed: threshold -55 dB, ratio 8, makeup 30 dB")
+held = Compressor(Pluck(196.0, damping=0.99), threshold=-55.0, ratio=8.0, attack=0.005, release=0.2, makeup=30.0)
+listen(Pluck(196.0, damping=0.99) * 0.5, 4.5, "A pluck at 196 Hz, dry")
+listen(Limiter(held * 0.5, ceiling=-1.5), 4.5, "The same pluck compressed: threshold -55 dB, ratio 8, makeup 30 dB")
 ```
 
-The block measures the level of 0.1 s of each, every half second, from the units of the block above:
+The block measures 0.1 s every half second of the compressor's input, the plain pluck, and of its output, both before the 0.5 and the limiter, so the rows compare directly. The third row is what the rule predicts from the input row: −55 + (input + 55) / 8 above the threshold, the input itself below it, plus the 30 dB of makeup:
 
-```python {run continue output=code}
+```python {run output=code}
 import numpy as np
 
-from euterpe.sound import render
+from euterpe.sound import Compressor, Pluck, render
 
 db = lambda x: 20 * np.log10(np.sqrt(np.mean(x ** 2)))
-print("second:    ", "  ".join(f"{i * 0.5:6.1f}" for i in range(6)))
-for name, unit in (("dry", dry()), ("compressed", held())):
-    x = render(unit, 3.0)
-    print(f"{name:>10}:", "  ".join(f"{db(x[i * 24000 : i * 24000 + 4800]):6.1f}" for i in range(6)))
+level = lambda x: [db(x[i * 24000 : i * 24000 + 4800]) for i in range(6)]
+into = level(render(Pluck(196.0, damping=0.99), 3.0))
+out = level(render(Compressor(Pluck(196.0, damping=0.99), threshold=-55.0, ratio=8.0, attack=0.005, release=0.2, makeup=30.0), 3.0))
+rule = [(v if v < -55 else -55 + (v + 55) / 8) + 30 for v in into]
+for name, row in (("second", [0, 0.5, 1, 1.5, 2, 2.5]), ("input", into), ("output", out), ("rule", rule)):
+    print(f"{name:>6}:", "  ".join(f"{v:6.1f}" for v in row))
 ```
 
-The dry note falls about 19 dB a second, from −31.0 dB at 0.5 s to −59.4 dB at 2 s. While the note is above the threshold, the compressor divides that fall by the ratio: 19 / 8 is about 2.4 dB a second, and the compressed note goes from −30.9 dB to −34.1 dB over the same 1.5 s, about 2.1 dB a second, close to the rule's 2.4. It holds its tail like a note that is still being played. Its start is quieter than the dry one, −25.8 dB against −19.6 dB: that first tenth of a second is what the compressor squeezes hardest. After 2.5 s the note nears the threshold and the compressor lets it fall at its own rate again.
+From 0.5 s to 2.0 s the input falls 28.4 dB, about 19 dB a second, and the output falls 3.2 dB, about 2.1 dB a second, close to the 19 / 8 = 2.4 dB a second of the rule: the note holds its tail as if it were still being played. The output sits about 3.5 dB below the rule's row because of the release: as the note falls, the gain should rise by 19 × 7 / 8 = 16.6 dB a second, and a gain that follows with a 0.2 s time constant trails about 0.2 s behind, 16.6 × 0.2 = 3.3 dB short (set `release=0.001` and the two rows agree within 0.1 dB). At 0 s the output is −0.2 dB, nearly full scale: the first 5 ms pass before the gain has come down, and the makeup lifts them 30 dB, which is why the version you heard is halved and limited. Between 2.0 and 2.5 s the input falls below −55 dB, from −53.4 to −62.5, and from there the output only adds the makeup and falls as fast as the note.
 
 ### Limiter
 
@@ -469,11 +487,11 @@ Rooms are measured by their *RT60*: the time the reverberation takes to fall by 
 
 ### Feedback delay network
 
-A delay with feedback makes one train of echoes, evenly spaced, which sounds metallic. A room makes echoes whose number grows every millisecond. `FDNReverb(src, decay, size, damping, mix)` copies that with a *feedback delay network*: eight delay lines of different lengths, between 30 and 90 ms at size 1. The output of every line is mixed into the input of every other line, each with a sign + or −, so each echo that comes out of one line goes into all eight. One click becomes 8 echoes, then 64, then 512: after a few trips round the network the echoes are too dense to tell apart.
+A delay with feedback makes one train of echoes, evenly spaced, which sounds metallic. A room makes echoes whose number grows every millisecond. `FDNReverb(src, decay, size, damping, mix)` copies that with a *feedback delay network*: eight delay lines of different lengths, between 30 and 90 ms at size 1, scaled by `size` (default 0.7) and each moved by up to 10 % by the seed. A stereo source is mixed to mono before the lines. The output of every line is mixed into the input of every other line, each with a sign + or −, so each echo that comes out of one line goes into all eight. One click becomes 8 echoes, then 64, then 512: after a few trips round the network the echoes are too dense to tell apart.
 
 Each line has a gain below 1, chosen from its length so that the tail falls 60 dB in `decay` seconds. A line of L samples is passed 48 000 / L times a second, so its gain is 10^(−3 × L / (48 000 × decay)): in decay seconds that compounds to 10^(−3) in level, −60 dB. `damping` puts a low-pass inside each line, so the high frequencies die faster than the low ones, as they do in a room with soft surfaces. `mix` sets how much reverb is heard against the dry sound.
 
-The plot shows a single click through two reverbs: the network, and the convolution reverb of the next section. The top half shows the first 80 ms, where the network's echoes are still separate spikes; the bottom half shows the level of both over 2.5 s, falling in a straight line in dB, which is what an exponential decay looks like:
+The plot shows a single click through two reverbs, both with decay 1.5 s: the network, with its defaults size 0.7 and damping 0.3, and the convolution reverb of the next section. The top half shows the first 80 ms, where the network's echoes are still separate spikes; the bottom half shows the level of both over 2.5 s, falling in a straight line in dB, which is what an exponential decay looks like:
 
 ```python {run echo=false}
 import matplotlib.pyplot as plt
@@ -490,6 +508,8 @@ t = np.arange(len(fdn)) / 48000
 n = int(0.08 * 48000)
 top.plot(t[:n] * 1000, fdn[:n], linewidth=0.7, label="FDN")
 top.plot(t[:n] * 1000, conv[:n] - 0.3, linewidth=0.7, label="convolution (shifted down)")
+first = np.argmax(np.abs(fdn) > 1e-6) / 48
+top.annotate(f"first echo {first:.1f} ms", (first, 0.02), (first + 4, 0.18), fontsize=8, arrowprops={"arrowstyle": "->"})
 top.set_xlabel("time (ms)")
 top.legend(fontsize=8, loc="upper right")
 size = 480
@@ -504,7 +524,7 @@ fig.tight_layout()
 show(fig, "A click through FDNReverb and ConvolutionReverb, both decay 1.5 s: the first 80 ms, and the level over 2.5 s")
 ```
 
-The convolution reverb's line falls 60 dB from its start to the dashed line at 1.5 s. The network's falls a little faster: its damping removes the high frequencies sooner, and `decay` holds for the low ones. Its first echo arrives after 22 ms, the length of its shortest line at size 0.7. Here is a short pluck, dry, in a small room and in a large hall:
+The convolution reverb's line falls 60 dB from its start to the dashed line at 1.5 s. The network's falls a little faster: its damping removes the high frequencies sooner, and `decay` holds for the low ones. Its first echo arrives after 21.6 ms, marked on the plot: the shortest line, 30 ms × 0.7 = 21 ms, moved a little by the seed. Here is a short pluck, dry, in a small room and in a large hall:
 
 ```python {run}
 from euterpe.book import listen
@@ -521,7 +541,7 @@ The reverb's output is stereo even for a mono source. The left side is one mix o
 
 ### Convolution reverb
 
-The other way to make reverb starts from a recording of a click in a real room: its *impulse response*, everything the room does to one instant of sound. Any sound is a long row of instants, one per sample, and each one makes the room answer with a copy of the impulse response, scaled by that sample. Adding all those copies is called *convolution*, and the result is the sound played in that room. It is exact, and costs a lot of arithmetic, which the computer does with FFTs.
+The other way to make reverb starts from a recording of a click in a real room: its *impulse response*, everything the room does to one instant of sound. Any sound is a long row of instants, one per sample, and each one makes the room answer with a copy of the impulse response, scaled by that sample. Adding all those copies is called *convolution*, and the result is the sound played in that room. Done that way it costs a lot: with a response 3 s long, 144 000 samples, every output sample needs 144 000 multiplications. The FFT makes it cheaper, because convolving two signals is the same as multiplying their spectra frequency by frequency, and an FFT computes a spectrum in far fewer steps than that; why the two are the same is beyond this book.
 
 `ConvolutionReverb(src, decay, mix, seed)` has no recording to use. It synthesizes the impulse response: white noise, a different one on each side, whose level falls 60 dB in `decay` seconds. The plot above shows it next to the network: dense from the very first millisecond, with no separate early echoes. Listen to both on the same pluck, both with a decay of 2 s:
 
@@ -533,7 +553,7 @@ listen(FDNReverb(Pluck(392.0, damping=0.98), decay=2.0, mix=0.35) * 0.6, 4.0, "A
 listen(ConvolutionReverb(Pluck(392.0, damping=0.98), decay=2.0, mix=0.35) * 0.6, 4.0, "The same pluck through ConvolutionReverb, decay 2 s")
 ```
 
-The convolution tail is smoother and brighter. Its noise holds every frequency at the same level for the whole decay, so the high frequencies last as long as the low ones; the network, with its damping, darkens as it fades, as a real room does. The convolution reverb is also slower to compute. Which to use is a question of taste. A recorded impulse response would make the convolution reverb sound like one particular real room, and that is where it is strongest.
+The convolution tail is smoother and brighter. Its noise holds every frequency at the same level for the whole decay, so the high frequencies last as long as the low ones; the network, with its damping, darkens as it fades, as a real room does. With a recorded response instead of noise, a convolution reverb sounds like one particular real room.
 
 ## Stereo
 
@@ -541,7 +561,7 @@ A stereo file has two channels, one for each speaker. A sound placed only in the
 
 ### Pan
 
-`Pan(src, pos)` places a mono sound: `pos` −1 is fully left, 0 the middle, 1 fully right. The obvious rule, with p = (pos + 1) / 2 running from 0 to 1, left gain 1 − p and right gain p, makes the sound quieter in the middle: two speakers at half level carry half the power of one at full level, 2 × 0.5² = 0.5, which is −3 dB. So `Pan` uses a *constant-power* rule. It turns `pos` into an angle θ = (pos + 1) × π / 4, from 0 to π / 2, and uses cos θ for the left and sin θ for the right. Since cos² θ + sin² θ = 1, the total power never changes:
+`Pan(src, pos)` places a mono sound: `pos` −1 is fully left, 0 the middle, 1 fully right. Recall from chapter 2 that power goes as amplitude squared. The obvious rule, with p = (pos + 1) / 2 running from 0 to 1, left gain 1 − p and right gain p, makes the sound quieter in the middle: two speakers at half level carry half the power of one at full level, 2 × 0.5² = 0.5, which is −3 dB. So `Pan` uses a *constant-power* rule. It turns `pos` into an angle θ = (pos + 1) × π / 4, from 0 to π / 2, and uses cos θ for the left and sin θ for the right. Since cos² θ + sin² θ = 1, the total power never changes:
 
 ```python {run output=code}
 import numpy as np
@@ -593,13 +613,13 @@ space = FDNReverb(Pan(Delay(tone, time=0.375, feedback=0.4, mix=0.3), pos=-0.3),
 listen(Limiter(space * 0.9, ceiling=-1.0), 7.0, "A pluck at 147 Hz: saturator, chorus, delay, pan, reverb and limiter")
 ```
 
-Change the order and the sound changes. Distortion after the reverb would distort every echo of the tail together, and each echo would intermodulate with the others; in the chain above, the chorus comes before the delay, so every echo repeats the shimmer of the note. With the delay first, each echo would pass through the chorus at a different moment of its sweep and shimmer differently.
+`FDNReverb` mixes its source to mono, so the `Pan` before it places the dry part of the sound, and the reverb fills both sides. Change the order and the sound changes. Distortion after the reverb would distort every echo of the tail together, and each echo would intermodulate with the others; in the chain above, the chorus comes before the delay, so every echo repeats the shimmer of the note. With the delay first, each echo would pass through the chorus at a different moment of its sweep and shimmer differently.
 
 ## Summary
 
 - An effect is a unit whose source is another unit, so effects chain.
 - `Delay(src, time, feedback, mix)` adds the source again after `time` seconds; `feedback` repeats it, each echo `feedback` times the last. Below about 30 to 50 ms the copy is not heard as an echo but as a comb filter, with peaks every 1 / time Hz.
-- A delay that changes while it plays shifts the pitch of the copy by the rate of change. `Chorus` uses a 20 ms delay that swings a few cents of pitch, which thickens a sound; `Flanger` sweeps a delay of 0.5 to 2.5 ms, which slides a whole comb of peaks up and down; `Phaser` sweeps a chain of allpasses, which slides a few notches, half as many as stages, rounded down.
+- A delay that changes while it plays shifts the pitch of the copy by the rate of change. `Chorus` uses a 20 ms delay that swings a few cents of pitch, which thickens a sound; `Flanger` sweeps a delay of 0.5 ms to 0.5 ms + depth, which slides a whole comb of peaks up and down; `Phaser` sweeps a chain of allpasses, which slides a few notches, half as many as stages, rounded down.
 - `Shaper(src, kind, drive)` bends each sample through tanh, a soft cubic or a hard clip. An odd curve adds odd harmonics only; more drive and a harsher curve make them louder. `Saturator` shifts the wave before the curve, which adds even harmonics too. Two notes through a curve also produce sums and differences of their frequencies, intermodulation.
 - `Compressor(src, threshold, ratio, attack, release, makeup)` divides by `ratio` how far the level goes above `threshold`: it shrinks the range between loud and soft. `Limiter(src, ceiling, release)` looks 5 ms ahead and keeps every sample under `ceiling`. `Gate(src, threshold, release)` silences what is quieter than `threshold`.
 - Reverb is the dense tail of echoes a room adds; RT60 is the time it takes to fall 60 dB. `FDNReverb(src, decay, size, damping, mix)` makes it with eight delay lines feeding each other; `ConvolutionReverb(src, decay, mix, seed)` convolves the source with a synthesized impulse response of decaying noise.
@@ -607,15 +627,21 @@ Change the order and the sound changes. Distortion after the reverb would distor
 
 ## Exercises
 
-1. In the first echo block, change `feedback=0.45` to `feedback=0.8`. How many dB quieter is each echo than the one before, and how many echoes does it take to fall 30 dB below the first?
-2. In the flanger block, change `feedback=0.7` to `feedback=-0.7`. Where are the peaks of the comb now, when the delay is at its shortest, 0.5 ms?
-3. In the compressor's measurement block, change `ratio=4.0` to `ratio=2.0`. Use the rule to predict the output level of the second second, then run the block to check it.
+1. In the first echo block, change `feedback=0.45` to `feedback=0.8`, and the render length from `3.0` to `6.0` to hear the echoes out. How many dB quieter is each echo than the one before, and which echo is the first one 30 dB below echo 1?
+2. In the flanger block, change `feedback=0.7` to `feedback=-0.7`. Where are the peaks of the comb when the delay is at its shortest, 0.5 ms?
+3. In the compressor's measurement block on the stepped saw, change `ratio=4.0` to `ratio=2.0`. Use the rule to predict the output level of the second second, then run the block to check it.
+4. In the saturator's measurement block, change `bias=0.2` to `bias=0.0`. What happens to the 2nd, 4th and 6th harmonics, and why?
+5. An FDN line is 1 440 samples long (30 ms) and decay is 2 s. What is its gain, how many dB does one trip lose, and how many trips does the sound make in 2 s?
+6. In the width block, replace the reverb with a pluck panned fully right, `wet = Pan(Pluck(330.0, damping=0.98), pos=1.0) * 0.5` (add `Pan` to the import), and listen at width 0. Where is the sound, and how much power does it keep?
 
 ### Answers
 
-1. Each echo is 0.8 times the one before: 20 × log₁₀ 0.8 = −1.9 dB. Falling 30 dB takes 30 / 1.94 = 15.5, so the 16th echo after the first is 30 dB below it. At 0.3 s apart, that is 4.8 s of echoes.
-2. A negative feedback flips the copy each time it comes back, so a frequency is reinforced when an odd number of half periods fits into the delay. The peaks move to the odd multiples of 1 / (2 × 0.0005) = 1 000 Hz: 1 000, 3 000, 5 000 Hz, and the dips to 0, 2 000, 4 000 Hz. The sweep sounds hollower, with no peak at the bottom of the spectrum.
+1. Each echo is 0.8 times the one before: 20 × log₁₀ 0.8 = −1.94 dB. Echo k is (k − 1) × 1.94 dB below echo 1, and 30 / 1.94 = 15.5, so k − 1 must be 16: echo 17 is the first one 30 dB down. At 0.3 s apart it comes 16 × 0.3 = 4.8 s after echo 1.
+2. With negative feedback the copy is flipped on each trip and mixed in upside down, so a frequency is reinforced when an odd number of half periods fits into the delay. The peaks move to the odd multiples of 1 / (2 × 0.0005) = 1 000 Hz: 1 000, 3 000, 5 000 Hz, and the dips to 0, 2 000, 4 000 Hz. The sweep sounds hollower, with no peak at the bottom of the spectrum.
 3. The second second goes in at −9.2 dB, 20.8 dB above the threshold. Ratio 2 halves that: −30 + 20.8 / 2 = −19.6 dB. The block prints a value within a few tenths of that.
+4. They fall to about −90 dB, some 70 dB below the odd ones, so they are gone to the ear; what is left comes from the start of the render, while the 10 Hz high-pass settles. With bias 0 the curve is tanh(drive / 2 × x), an odd curve, so the two halves of the sine are bent the same way and only odd harmonics remain. The odd harmonics now match the `tanh` row of the shaper's table exactly, since the curve is the same.
+5. The gain is 10^(−3 × 1 440 / (48 000 × 2)) = 10^(−0.045) = 0.902, so one trip loses 20 × log₁₀ 0.902 = −0.9 dB. A trip takes 30 ms, so in 2 s the sound makes 2 / 0.03 = 66.7 trips, and 66.7 × 0.9 = 60 dB: the RT60 is 2 s, as set.
+6. Panned fully right, the left side is 0 and the right side is the pluck, x. Width 0 keeps only the mid, (0 + x) / 2, on both sides, so the sound moves to the middle with each side at x / 2. Its power is 2 × 0.5² = 0.5 of what it was, −3 dB: the constant-power rule of `Pan` does not hold for Width.
 
 ```python {run echo=false}
 # Level check: lint every sound in build/audio, this chapter's and any written before it.
