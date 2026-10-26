@@ -665,7 +665,7 @@ def test_bitcrush_has_few_levels():
 <summary><span class="num">8</span><span><span class="ttl">Delay, modulation effects and space</span><span class="files">euterpe/sound/space.py · tests/test_space.py</span></span><span class="state"></span></summary>
 <div class="body">
 <h4>interfaces</h4>
-<p>Produces <code>Delay(src, time=0.25, feedback=0.3, mix=0.3)</code> (circular buffer carried across blocks); <code>Chorus(src, rate=0.8, depth=0.003, mix=0.5)</code>, <code>Flanger(src, rate=0.3, depth=0.002, feedback=0.5, mix=0.5)</code>, <code>Phaser(src, rate=0.5, stages=4, mix=0.5)</code>; <code>FDNReverb(src, decay=2.0, size=0.7, damping=0.3, mix=0.25, seed=0)</code> (8 delay lines, Hadamard mixing, decay as RT60 seconds); <code>ConvolutionReverb(src, decay=2.0, mix=0.25, seed=0)</code> (its impulse is exponentially decaying stereo noise, synthesized; block convolution by overlap-add with the tail carried); <code>Pan(src, pos=0.0)</code> (−1 to 1, constant power, stereo out); <code>Width(src, width=1.0)</code> (mid/side, 0–2).</p>
+<p>Produces <code>Delay(src, time=0.25, feedback=0.3, mix=0.3)</code> (circular buffer carried across blocks); <code>Chorus(src, rate=0.8, depth=0.003, mix=0.5)</code>, <code>Flanger(src, rate=0.3, depth=0.002, feedback=0.5, mix=0.5)</code>, <code>Phaser(src, rate=0.5, stages=4, mix=0.5)</code>; <code>FDNReverb(src, decay=2.0, size=0.7, damping=0.3, mix=0.25, seed=0)</code> (8 delay lines, Hadamard mixing, decay as RT60 seconds); <code>ConvolutionReverb(src, decay=2.0, mix=0.25, seed=0)</code> (its impulse is exponentially decaying stereo noise, synthesized; block convolution by overlap-add with the tail carried; as built, a direct 512-sample head and 512-sample overlap-save partitions counted from the start of the render); <code>Pan(src, pos=0.0)</code> (−1 to 1, constant power, stereo out); <code>Width(src, width=1.0)</code> (mid/side, 0–2).</p>
 <ol class="steps">
 <li>Write the failing tests:
 <script type="text/plain" data-lang="python">import numpy as np
@@ -712,7 +712,7 @@ def test_pan_is_constant_power():
         x = render(Pan(Sine(440.0), pos=pos), 0.1)
         power = (x ** 2).sum(axis=0).sum()
         assert abs(power - (render(Sine(440.0), 0.1) ** 2).sum()) / power < 0.01</script></li>
-<li>Run: fails. Implement. Run: passes. Note: convolution is compared with <code>allclose</code> because FFT rounding differs with block size; every other unit is bit-exact.</li>
+<li>Run: fails. Implement. Run: passes. Note: as built, convolution is bit-exact too, because its FFT partitions are counted from the start of the render, so the test compares with <code>array_equal</code>; every unit is bit-exact.</li>
 <li>Commit <code>feat(sound): delay, modulation effects, reverbs and stereo</code>.</li>
 </ol>
 </div></details>

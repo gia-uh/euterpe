@@ -85,7 +85,16 @@ listen(saw(), 3.0, "A filtered saw at 220 Hz, dry")
 listen(Chorus(saw(), rate=0.8, depth=0.003, mix=0.5), 3.0, "The same saw through a chorus")
 ```
 
-`saw` is a function that builds a fresh saw each time it is called, because a unit keeps its own state and cannot be played in two places at once. The `ADSR` fades it out at the end. The chorused saw sounds wider and slowly shimmers. The two copies, a few cents apart, go in and out of step, which is the beating of chapter 3, spread over every harmonic at once.
+`saw` is a function that builds a fresh saw each time it is called, because a unit keeps its own state and cannot be played in two places at once. The `ADSR` fades it out at the end. The chorused saw sounds thicker, as if two players were playing it, and it slowly shimmers. The shimmer is *beating*. Two tones close in frequency, added, drift in and out of step: when their peaks line up they add, and 1 / (2 × the difference) seconds later one is at its peak where the other is at its trough, and they cancel. So the sum gets louder and softer as many times a second as the difference of their frequencies. A copy 1.5 % higher than 220 Hz is at 223.3 Hz, and the pair beats 3.3 times a second:
+
+```python {run}
+from euterpe.book import listen
+from euterpe.sound import ADSR, Sine
+
+listen((Sine(220.0) + Sine(223.3)) * ADSR(gate=2.6, release=0.3) * 0.3, 3.0, "Sines at 220 and 223.3 Hz added: 3.3 beats a second")
+```
+
+In the chorus every harmonic of the saw beats with its moving copy, each at its own rate, since the k-th harmonic's copy is k times further off in Hz. The rates change as the delay swings, so no single beat stands out, and the result is a shimmer.
 
 ### Flanger
 
@@ -185,7 +194,7 @@ for kind in ("tanh", "soft", "hard"):
     print(f"{kind:>4}:", "  ".join(f"{v:6.1f}" for v in levels))
 ```
 
-Two things show. First, the even harmonics (2nd, 4th, 6th) are at −150 dB or below: absent. All three curves are *odd*: the bottom half is the top half turned upside down, so the positive and negative halves of the sine are bent the same way, and a wave with that symmetry has only odd harmonics, as the square of chapter 3. The fundamental of `soft` and `hard` is above 0 dB although the output peaks at −1 dBFS: a wave squashed towards a square has a fundamental larger than its peak, 1.273 times it for a full square, as chapter 3 measured. Second, the curves bend the wave by different amounts at the same drive. The 7th harmonic is −40.6 dB after `tanh`, −35.1 dB after `hard` and −30.0 dB after `soft`, whose curve rises most steeply in the plot above and then turns flat at the same point as `hard`, with a rounder corner.
+Two things show. First, the even harmonics (2nd, 4th, 6th) are at −150 dB or below: absent. All three curves are *odd*: the bottom half is the top half turned upside down, so the positive and negative halves of the sine are bent the same way, and a wave with that symmetry has only odd harmonics, as the square of chapter 3. The fundamental of all three is above 0 dB although the output peaks at −1 dBFS: a wave squashed towards a square has a fundamental larger than its peak, 1.273 times it for a full square, as chapter 3 measured. Second, the curves bend the wave by different amounts at the same drive. The 7th harmonic is −40.6 dB after `tanh`, −35.1 dB after `hard` and −30.0 dB after `soft`, whose curve rises most steeply in the plot above and then turns flat at the same point as `hard`, with a rounder corner.
 
 More drive pushes more of the wave into the bend. Here is the same sine at drive 1, 4 and 16, through `tanh`:
 
@@ -354,15 +363,33 @@ show(fig, "Level of the stepped saw before and after Compressor(threshold=-30, r
 
 At the jump to the loud step, at 1 s, the output overshoots for about 40 ms before the gain comes down: that is the attack. Two delays add up there. The detector's 10 ms average needs time to see the new level, and the gain then follows what it sees with its own 10 ms attack, so the level settles over a few times 10 ms. At 2 s, when the level drops, the gain is still low, so the output dips to −36 dB and climbs back over about 0.2 s: that is the release. A slower attack lets more of the start of each note through, which keeps the click of a drum or a plucked string. A faster release makes the gain spring back sooner after a loud note, and on a fast release the quiet tail of each note swells as the gain recovers. Producers call the sound *pumping*, and some music uses it on purpose.
 
-A compressor is easiest to hear on a note that starts loud and decays, such as a pluck. The second version, compressed hard and lifted with makeup gain, keeps its attack but its tail stays loud for much longer. It is scaled by 0.3 instead of 0.5: the first 5 ms of the pluck pass before the gain has come down, and the makeup lifts that first peak by 10 dB too, which at 0.5 would reach full scale.
+A compressor is easiest to hear on a note that starts loud and decays, such as a pluck. The second version goes through a compressor with a very low threshold, −55 dB, ratio 8 and 30 dB of makeup gain. The first 5 ms of the pluck pass before the gain has come down, and the makeup would lift that first peak far above full scale, so a `Limiter`, the next section's unit, catches it:
 
 ```python {run}
 from euterpe.book import listen
-from euterpe.sound import Compressor, Pluck
+from euterpe.sound import Compressor, Limiter, Pluck
 
-listen(Pluck(196.0, damping=0.99) * 0.5, 3.0, "A pluck at 196 Hz, dry")
-listen(Compressor(Pluck(196.0, damping=0.99), threshold=-30.0, ratio=8.0, attack=0.005, release=0.2, makeup=10.0) * 0.3, 3.0, "The same pluck compressed: ratio 8, makeup 10 dB")
+dry = lambda: Pluck(196.0, damping=0.99) * 0.5
+held = lambda: Limiter(Compressor(Pluck(196.0, damping=0.99), threshold=-55.0, ratio=8.0, attack=0.005, release=0.2, makeup=30.0) * 0.5, ceiling=-1.5)
+listen(dry(), 4.5, "A pluck at 196 Hz, dry")
+listen(held(), 4.5, "The same pluck compressed: threshold -55 dB, ratio 8, makeup 30 dB")
 ```
+
+The block measures the level of 0.1 s of each, every half second, from the units of the block above:
+
+```python {run continue output=code}
+import numpy as np
+
+from euterpe.sound import render
+
+db = lambda x: 20 * np.log10(np.sqrt(np.mean(x ** 2)))
+print("second:    ", "  ".join(f"{i * 0.5:6.1f}" for i in range(6)))
+for name, unit in (("dry", dry()), ("compressed", held())):
+    x = render(unit, 3.0)
+    print(f"{name:>10}:", "  ".join(f"{db(x[i * 24000 : i * 24000 + 4800]):6.1f}" for i in range(6)))
+```
+
+The dry note falls about 19 dB a second, from −31.0 dB at 0.5 s to −59.4 dB at 2 s. While the note is above the threshold, the compressor divides that fall by the ratio: 19 / 8 is about 2.4 dB a second, and the compressed note goes from −30.9 dB to −34.1 dB over the same 1.5 s. It holds its tail like a note that is still being played. Its start is quieter than the dry one, −25.8 dB against −19.6 dB: that first tenth of a second is what the compressor squeezes hardest. After 2.5 s the note nears the threshold and the compressor lets it fall at its own rate again.
 
 ### Limiter
 
