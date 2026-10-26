@@ -51,10 +51,14 @@ def lint_audio(samples: np.ndarray, rate: int = 48_000, *, loop: bool = False) -
     runs = hot[2:] & hot[1:-1] & hot[:-2]    # three consecutive samples at full scale
     if runs.any():
         first = int(np.argmax(runs))
+        clipped = np.zeros_like(hot)          # the samples inside runs of three or more
+        for k in range(3):
+            clipped[k : len(hot) - 2 + k] |= runs
+        count = int(clipped.sum())
         findings.append(Finding(
             "A-CLIP", "error",
-            f"clipped: {int(hot.sum())} samples at full scale, the first at {first / rate:.3f} s",
-            float(hot.sum()), round(first / rate, 4),
+            f"clipped: {count} samples in runs at full scale, the first at {first / rate:.3f} s",
+            float(count), round(first / rate, 4),
         ))
 
     if len(x) >= 0.4 * rate:
@@ -77,9 +81,9 @@ def lint_audio(samples: np.ndarray, rate: int = 48_000, *, loop: bool = False) -
 
     findings += _silences(level, rate)
 
-    energy = np.abs(np.fft.rfft(mono)) ** 2
+    energy = (np.abs(np.fft.rfft(chans, axis=0)) ** 2).sum(axis=1) if len(x) else np.zeros(0)
     if energy.sum() > 0:
-        freqs = np.fft.rfftfreq(len(mono), 1 / rate)
+        freqs = np.fft.rfftfreq(len(x), 1 / rate)
         for lo, hi, name in BANDS:
             share = float(energy[(freqs >= lo) & (freqs < hi)].sum() / energy.sum())
             span = f"below {hi:.0f} Hz" if lo == 0 else f"above {lo:.0f} Hz" if hi == np.inf else f"{lo:.0f}-{hi:.0f} Hz"

@@ -136,3 +136,29 @@ def test_text_has_one_line_per_finding():
     report = Report([Finding("A-PEAK", "metric", "sample peak -6.0 dBFS", -6.02)])
     assert report.to_text() == "metric A-PEAK      sample peak -6.0 dBFS"
     assert len(lint_audio(sine()).to_text().splitlines()) == len(lint_audio(sine()).findings)
+
+
+def test_empty_audio_reports_only_its_peak():
+    report = lint_audio(np.zeros(0, np.float32))
+    assert [f.rule for f in report.findings] == ["A-PEAK"]
+
+
+def test_balance_of_antiphase_stereo_counts_both_channels():
+    x = sine(freq=100.0)
+    low, mid, high = found(lint_audio(np.stack([x, -x], axis=1)), "A-BALANCE")
+    assert low.value > 0.99
+
+
+def test_loudness_of_stereo_sums_the_channels():
+    x = sine()
+    (f,) = found(lint_audio(np.stack([x, x], axis=1)), "A-LUFS")
+    assert f.value == pytest.approx(-6.06, abs=0.1)
+
+
+def test_the_clip_count_leaves_out_isolated_full_scale_samples():
+    x = sine(amp=0.5)
+    x[100:103] = 1.0           # one run of three
+    x[1_000] = 1.0             # alone: not clipping
+    x[2_000:2_002] = 1.0       # two: not clipping
+    (f,) = found(lint_audio(x), "A-CLIP")
+    assert f.value == 3
