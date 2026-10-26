@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from euterpe.sound.core import Const, Unit, render
+from euterpe.sound.env import Segments
 from euterpe.sound.noise import WhiteNoise
 from euterpe.sound.osc import Sine
 from euterpe.sound.shape import BitCrush, Compressor, Gate, Limiter, Saturator, Shaper
@@ -48,9 +49,38 @@ def test_compressor_leaves_a_quiet_sine_alone_and_adds_makeup():
     assert abs(np.abs(x[24_000:]).max() - 0.01 * 10 ** (6 / 20)) < 1e-3
 
 
+def _step():
+    return Sine(1000.0) * Segments([(0.0, 0.05), (0.5, 0.05), (0.5, 1.0), (1.0, 1.0)])
+
+
+def _db_after_step(x, ms):
+    """RMS in dB over the 5 ms that start ms milliseconds after the step at 0.5 s."""
+    start = 24_000 + ms * 48
+    return 20 * np.log10(np.sqrt(np.mean(x[start : start + 240] ** 2)))
+
+
+def test_compressor_attack_sets_how_fast_the_gain_comes_down():
+    target = -20 + (-3 + 20) / 4
+    fast = render(Compressor(_step(), threshold=-20.0, ratio=4.0, attack=0.002), 1.0)
+    slow = render(Compressor(_step(), threshold=-20.0, ratio=4.0, attack=0.05), 1.0)
+    assert abs(_db_after_step(fast, 20) - target) < 1.0
+    assert _db_after_step(slow, 20) - target > 3.0
+
+
+def test_gate_opens_within_3_ms():
+    tone = Sine(1000.0) * Segments([(0.0, 0.0), (0.1, 0.0), (0.1, 0.5), (0.3, 0.5)])
+    x = render(Gate(tone, threshold=-40.0, release=0.2), 0.3)
+    assert np.abs(x[4_800 + 144 : 4_800 + 192]).max() > 0.9 * 0.5
+
+
 def test_limiter_never_passes_its_ceiling():
     x = render(Limiter(Sine(440.0) * 4.0, ceiling=-1.0), 1.0)
     assert 20 * np.log10(np.abs(x).max()) <= -1.0 + 0.01
+
+
+def test_limiter_ceiling_must_be_a_number():
+    with pytest.raises(TypeError):
+        Limiter(Sine(440.0), ceiling=Sine(2.0) * 20 - 20)
 
 
 def test_limiter_delays_by_its_lookahead():

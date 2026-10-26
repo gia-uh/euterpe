@@ -1,9 +1,12 @@
 import numpy as np
 import pytest
 
-from euterpe.sound.core import RATE, Unit, render
+from euterpe.sound.core import RATE, Const, Unit, render
 from euterpe.sound.space import ConvolutionReverb, Delay, FDNReverb, Pan
 from euterpe.sound.osc import Sine
+from euterpe.sound.noise import WhiteNoise
+from euterpe.sound.space import Chorus, Flanger, Phaser, Width
+from tests.helpers import band_db, peak_hz
 
 
 class Click(Unit):
@@ -47,9 +50,6 @@ def test_pan_is_constant_power():
 
 # Beyond the plan's tests.
 
-from euterpe.sound.space import Chorus, Flanger, Phaser, Width  # noqa: E402
-from tests.helpers import band_db  # noqa: E402
-
 
 def test_delay_feedback_repeats_each_echo_quieter():
     x = render(Delay(Click(), time=0.1, feedback=0.5, mix=1.0), 0.35)
@@ -63,16 +63,12 @@ def test_delay_mix_keeps_the_dry_signal():
 
 
 def test_flanger_puts_peaks_at_multiples_of_its_delay():
-    from euterpe.sound.noise import WhiteNoise
-
     # depth 0: a fixed delay of 0.5 ms, so peaks at multiples of 2000 Hz and dips halfway
     x = render(Flanger(WhiteNoise(seed=2) * 0.3, depth=0.0, feedback=0.5, mix=0.5), 2.0)
     assert band_db(x, 1_900, 2_100) > band_db(x, 900, 1_100) + 10
 
 
 def test_flanger_negative_feedback_moves_the_peaks_to_odd_multiples():
-    from euterpe.sound.noise import WhiteNoise
-
     # 0.5 ms with feedback -0.5: peaks at 1000, 3000 Hz, dips at 2000, 4000 Hz
     x = render(Flanger(WhiteNoise(seed=2) * 0.3, depth=0.0, feedback=-0.5, mix=0.5), 2.0)
     assert band_db(x, 900, 1_100) > band_db(x, 1_900, 2_100) + 10
@@ -83,8 +79,6 @@ def test_phaser_with_no_mix_is_its_source():
 
 
 def test_phaser_cuts_somewhere_and_keeps_level_elsewhere():
-    from euterpe.sound.noise import WhiteNoise
-
     # rate at its minimum: the notches barely move during the render
     x = render(Phaser(WhiteNoise(seed=4) * 0.3, rate=0.01, stages=4, mix=0.5), 2.0)
     dry = render(WhiteNoise(seed=4) * 0.3, 2.0)
@@ -149,8 +143,6 @@ def test_chorus_without_depth_is_a_20_ms_delay():
 
 
 def test_chorus_shifts_the_pitch_by_the_rate_of_change_of_its_delay():
-    from tests.helpers import peak_hz
-
     # delay 0.02 + 0.005 sin(2 pi t): it shrinks fastest at t = 0.5 s (pitch up) and grows
     # fastest at t = 1 s (pitch down), by 0.005 * 2 pi = 3.14 % of 1000 Hz
     x = render(Chorus(Sine(1000.0), rate=1.0, depth=0.005, mix=1.0), 1.1)
@@ -159,8 +151,6 @@ def test_chorus_shifts_the_pitch_by_the_rate_of_change_of_its_delay():
 
 
 def test_flanger_sweep_moves_its_comb():
-    from euterpe.sound.noise import WhiteNoise
-
     # rate 0.25: the delay is 2.5 ms at t = 1 s (a peak at 1200 Hz = 3 / 2.5 ms) and 0.5 ms at
     # t = 3 s (1200 Hz is near the dip at 1000 Hz)
     x = render(Flanger(WhiteNoise(seed=6) * 0.3, rate=0.25, depth=0.002, feedback=0.5, mix=0.5), 3.2)
@@ -182,8 +172,6 @@ def test_phaser_has_half_its_stages_as_notches_below_nyquist(stages, notches):
 
 
 def test_phaser_sweep_moves_its_notch():
-    from euterpe.sound.noise import WhiteNoise
-
     # rate 0.5, 2 stages: one notch at the turning frequency, 2000 Hz at t = 0.5 s, 200 Hz at 1.5 s
     x = render(Phaser(WhiteNoise(seed=8) * 0.3, rate=0.5, stages=2, mix=0.5), 1.6)
     high, low = x[21_600:26_400], x[69_600:74_400]
@@ -221,8 +209,6 @@ def test_width_two_doubles_the_side_and_keeps_the_mid():
     ],
 )
 def test_a_modulating_rate_is_clipped_to_20_hz(make):
-    from euterpe.sound.core import Const
-
     assert np.array_equal(render(make(Const(50.0)), 0.3), render(make(Const(20.0)), 0.3))
 
 
@@ -231,3 +217,9 @@ def test_fdn_response_has_energy_one_per_side(decay):
     x = render(FDNReverb(Click(), decay=decay, mix=1.0), decay * 1.1)
     energy_db = 10 * np.log10((x.astype(np.float64) ** 2).sum(axis=0))
     assert np.all(np.abs(energy_db) < 1.5), energy_db
+
+
+@pytest.mark.parametrize("decay", [0.5, 8.0])
+def test_fdn_without_damping_decays_in_its_setting(decay):
+    x = render(FDNReverb(Click(), decay=decay, damping=0.0, mix=1.0), decay * 1.3)
+    assert abs(rt60(x.mean(axis=1)) - decay) / decay < 0.1

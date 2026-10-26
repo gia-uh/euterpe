@@ -84,7 +84,9 @@ _CURVES = {"tanh": np.tanh, "soft": _cubic, "hard": lambda u: np.clip(u, -1.0, 1
 class Shaper(Unit):
     """A waveshaper: each sample becomes curve(drive * x / 2), scaled so a full-scale input
     comes out at -1 dBFS (0.891). At drive 2 a full-scale input reaches u = 1, where the soft
-    and hard curves stop rising; at drive 1 it bends only the top of the wave a little.
+    and hard curves stop rising; at drive 1, tanh and soft bend only the top of the wave a
+    little. hard is a straight line up to u = 1, so from drive 1 to 2 it only scales the wave by
+    0.891 and adds nothing to the spectrum; it starts to clip above drive 2.
 
     The curves are odd (the negative half mirrors the positive one), so they add odd harmonics
     only: 3, 5, 7 times each input frequency. tanh bends smoothly; soft is the cubic
@@ -240,11 +242,15 @@ class Limiter(Unit):
     ahead of each peak, so a peak is caught without a jump in the gain; it then returns to 1 with
     time constant release. Peaks are flattened and the rest is left alone, so a limiter changes
     the spectrum little unless it works hard; then it adds distortion as a shaper does.
+    ceiling is a number: the gain must start falling 5 ms before a sample leaves, so a ceiling
+    that moved in those 5 ms could not be kept.
     """
 
     params = (Param("ceiling", "dB", -40.0, 0.0, default=-1.0), Param("release", *_TIME, default=0.05))
 
-    def __init__(self, src: Unit, ceiling: float | Unit = -1.0, release: float | Unit = 0.05):
+    def __init__(self, src: Unit, ceiling: float = -1.0, release: float | Unit = 0.05):
+        if isinstance(ceiling, Unit):
+            raise TypeError("Limiter.ceiling must be a number, not a Unit")
         self.src = src
         self.channels = src.channels
         self._set_params(ceiling=ceiling, release=release)
@@ -262,7 +268,7 @@ class Limiter(Unit):
 
     def block(self, n: int) -> np.ndarray:
         x = np.concatenate([self._x, _frames(self.src.block(n))])
-        ceiling = 10 ** (self._param("ceiling", n).astype(np.float64) / 20)
+        ceiling = 10 ** (self._values["ceiling"] / 20)
         kr = np.exp(-1.0 / (self._param("release", n).astype(np.float64) * RATE)).tolist()
         peak = np.abs(x[_LOOKAHEAD:]).max(axis=1)
         need = np.concatenate([self._need, np.minimum(1.0, ceiling / np.maximum(peak, 1e-20))])
