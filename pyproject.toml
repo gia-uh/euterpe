@@ -16,8 +16,11 @@ dependencies = [
 [project.scripts]
 euterpe = "euterpe.cli:main"
 
+[project.optional-dependencies]
+view = ["matplotlib>=3.9"]
+
 [dependency-groups]
-dev = ["pytest>=8", "matplotlib>=3.9"]  # matplotlib: tests of euterpe.book.show
+dev = ["pytest>=8", "matplotlib>=3.9"]  # matplotlib: tests of euterpe.view
 book = [
     "scriptorium @ git+https://github.com/apiad/scriptorium",
     "matplotlib>=3.9",

@@ -39,6 +39,15 @@ class Clip:
     def __array__(self, dtype=None, copy=None):
         return self.samples if dtype is None else self.samples.astype(dtype)
 
+    def view(self):
+        """The default view: what display(clip) shows."""
+        from euterpe.view.base import listen
+
+        return listen(self)
+
+    def _repr_mimebundle_(self, include=None, exclude=None):
+        return self.view()._repr_mimebundle_(include, exclude)
+
     def __repr__(self) -> str:
         peak = float(np.abs(self.samples).max()) if len(self.samples) else 0.0
         db = 20 * np.log10(peak) if peak > 0 else float("-inf")

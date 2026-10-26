@@ -196,6 +196,11 @@ dependencies = [
     { name = "soundfile" },
 ]
 
+[package.optional-dependencies]
+view = [
+    { name = "matplotlib" },
+]
+
 [package.dev-dependencies]
 book = [
     { name = "matplotlib" },
@@ -208,11 +213,13 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "matplotlib", marker = "extra == 'view'", specifier = ">=3.9" },
     { name = "numpy", specifier = ">=2.0" },
     { name = "pyloudnorm", specifier = ">=0.1.1" },
     { name = "scipy", specifier = ">=1.13" },
     { name = "soundfile", specifier = ">=0.13" },
 ]
+provides-extras = ["view"]
 
 [package.metadata.requires-dev]
 book = [

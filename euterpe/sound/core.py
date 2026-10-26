@@ -99,6 +99,15 @@ class Unit(ABC):
             return Clip(render(self, 1.0), defaulted=True)
         return Clip(render(self, seconds))
 
+    def view(self):
+        """The default view: what display(unit) shows."""
+        from euterpe.view.base import listen
+
+        return listen(self)
+
+    def _repr_mimebundle_(self, include=None, exclude=None):
+        return self.view()._repr_mimebundle_(include, exclude)
+
     def __add__(self, other: Unit | float) -> Mix:
         return Mix(self, _unit(other))
 
