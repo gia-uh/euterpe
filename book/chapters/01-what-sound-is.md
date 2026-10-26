@@ -240,7 +240,7 @@ Each sample is a number, and a file stores it with a fixed number of bits. With 
 
 A 32-bit float is finite too, so the samples Euterpe computes are already quantised, though far more finely than any file stores them. When `render(..., to="tone.wav")` writes a WAV file, an uncompressed file of samples, it stores 24-bit integers: each sample is multiplied by 8 388 608 (`2 ** 23`), rounded to a whole number and stored in 3 bytes. 24-bit signed integers go from −8 388 608 to 8 388 607, so a sample of exactly 1 is stored as 8 388 607. The largest error is half the step, 1/16 777 216 of full scale, far below hearing.
 
-`BitCrush` rounds each sample to `2 ** bits - 1` levels spread evenly between −1 and 1. That is one level fewer than the bits allow, so that the levels are symmetric and 0 is one of them: silence stays silent. Here is the 440 Hz sine with 16, 6, 4 and 2 bits:
+`BitCrush` rounds each sample to `2 ** bits - 1` levels spread evenly between −1 and 1. That is one level fewer than the bits allow, so that the levels are symmetric and 0 is one of them: silence stays silent. With one level fewer there is one gap fewer, so its step is 2 / (2**bits − 2): 1 at 2 bits, where the levels are −1, 0 and 1. Here is the 440 Hz sine with 16, 6, 4 and 2 bits:
 
 ```python {run}
 from euterpe.book import listen
