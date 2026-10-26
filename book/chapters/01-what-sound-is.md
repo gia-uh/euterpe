@@ -293,21 +293,20 @@ Rounding changes the shape of the wave, so it adds frequencies that were not the
 3. The sine keeps its note: 440 Hz is below 3 000 Hz, so nothing folds, and the held steps add a faint high whine. 3 080 Hz lands at 2 920 Hz and 5 720 Hz at 280 Hz. Neither is a multiple of 440 Hz (2 920 / 440 is about 6.6), which is why the crushed saw sounds out of tune with itself.
 
 ```python {run echo=false}
-# Level check: every sound this chapter plays stays below full scale.
+# Level check: lint every sound in build/audio, this chapter's and any written before it.
+# It prints nothing unless one has an error.
+# A failure prints on the page as a block error; it stops the build only once scriptorium
+# can refuse block errors.
 from pathlib import Path
 
-import numpy as np
-
 from euterpe.io import read
+from euterpe.lint import lint_audio
 
-# Replaced by lint_audio from chapter 2 on. A failure prints on the page as a block error;
-# it stops the build only once scriptorium can refuse block errors.
-failures = []
-for path in sorted(Path("build/audio").glob("*.mp3")):
-    x, rate = read(path)
-    peak = float(np.abs(x).max())
-    if rate != 48_000 or peak >= 0.999:
-        failures.append(f"{path.name} has peak {peak:.3f} at {rate} Hz")
+failures = [
+    f"{path.name}: {finding.message}"
+    for path in sorted(Path("build/audio").glob("*.mp3"))
+    for finding in lint_audio(*read(path)).errors
+]
 if failures:
     raise SystemExit("level check failed: " + "; ".join(failures))
 ```
