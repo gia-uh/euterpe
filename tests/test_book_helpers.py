@@ -43,3 +43,12 @@ def test_show_takes_a_caption_and_saves_an_svg(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert re.match(r"^!\[A line\]\(build/img/a-line-[0-9a-f]{8}\.svg\)\n$", out)
     assert (tmp_path / out[out.index("(") + 1:out.index(")")]).read_text().lstrip().startswith("<?xml")
+
+
+def test_gain_db_measures_a_filter_and_never_prints_minus_zero():
+    from euterpe.book import gain_db
+    from euterpe.sound import Biquad, Gain
+
+    assert gain_db(lambda s: Biquad(s, "lowpass", cutoff=1_000.0), 1_000.0) == -3.0
+    assert gain_db(lambda s: Gain(s, 0.5), 300.0) == -6.0
+    assert str(gain_db(lambda s: Biquad(s, "lowpass", cutoff=1_000.0), 50.0)) == "0.0"

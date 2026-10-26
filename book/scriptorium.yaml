@@ -14,6 +14,7 @@ files:
   - chapters/02-pitch-and-loudness.md
   - chapters/03-timbre.md
   - chapters/04-envelopes.md
+  - chapters/05-filters.md
 
 outputs:
   site:
