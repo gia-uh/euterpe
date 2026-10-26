@@ -57,6 +57,16 @@ def test_lfsr_periods():
     assert np.array_equal(short[:50], short[127:177])
 
 
+@pytest.mark.parametrize("short, period", [(False, 32_767), (True, 127)])
+def test_lfsr_has_no_shorter_period(short, period):
+    # a maximal-length sequence of +1 and -1 matches itself at no shift but 0: its circular
+    # autocorrelation is -1 at every other shift, so it cannot repeat any sooner
+    x = render(LFSRNoise(rate=48_000.0, short=short), period / 48_000).astype(np.float64)
+    corr = np.rint(np.fft.irfft(np.abs(np.fft.rfft(x)) ** 2, n=period))
+    assert corr[0] == period
+    assert np.all(corr[1:] == -1)
+
+
 def test_lfsr_noise_is_two_levels_held_for_one_step():
     x = render(LFSRNoise(rate=4_800.0), 0.1)
     assert set(np.unique(x)) == {-1.0, 1.0}

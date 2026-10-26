@@ -144,9 +144,9 @@ def test_fm_sidebands_sit_at_the_carrier_plus_and_minus_the_modulator():
 
 
 def test_fm_with_feedback_adds_harmonics_and_is_the_same_in_any_block_size():
-    plain = render(FM(220.0, index=0.0), 0.5)
+    plain = render(FM(220.0, index=1.0, feedback=0.0), 0.5)
     fed = render(FM(220.0, index=1.0, feedback=1.0), 0.5)
-    assert band_db(fed, 650, 670) > band_db(plain, 650, 670) + 30
+    assert band_db(fed, 1_090, 1_110) > band_db(plain, 1_090, 1_110) + 10
     unit = FM(220.0, index=1.0, feedback=1.0)
     assert np.array_equal(render(unit, 0.2), render(unit, 0.2, block=37))
 
@@ -202,3 +202,12 @@ def test_modal_refuses_lists_of_different_lengths():
 def test_modal_refuses_a_decay_of_zero_or_below():
     with pytest.raises(ValueError, match="decay"):
         Modal([500.0], [0.0], [1.0])
+
+
+def test_brightness_and_position_do_not_change_the_energy_of_the_burst():
+    def energy(**kw):
+        x = render(Pluck(220.0, seed=1, **kw), 200 / 48_000)  # the burst, before its first trip
+        return 10 * np.log10((x.astype(np.float64) ** 2).mean())
+
+    levels = [energy(brightness=b) for b in (0.0, 0.5, 1.0)] + [energy(position=p) for p in (0.1, 0.5)]
+    assert max(levels) - min(levels) < 1.5

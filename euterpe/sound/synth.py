@@ -124,12 +124,16 @@ class FM(Unit):
 
 
 class Pluck(Unit):
-    """A plucked string by the Karplus–Strong method: a short burst of noise circulates in a
-    delay line one period long, and on each trip an averaging filter takes away some of its high
+    """A plucked string by the Karplus–Strong method: a short burst circulates in a delay line
+    one period long, and on each trip an averaging filter takes away some of its high
     frequencies and damping scales it down.
 
-    The spectrum is the harmonics of freq. They start as bright as the burst (brightness 0 is
-    dark, 1 is raw noise) and die away, the high ones sooner than the low ones, as in a real
+    The burst is one period of noise with set levels: every harmonic of freq at a random phase
+    drawn from seed, the k-th at 1 / (1 + (k / 2 ** (8 * brightness)) ** 2), at an RMS of 0.25.
+    Raw noise would give each harmonic a random level, so the note's tone and loudness would
+    change with the seed. The spectrum is the harmonics of freq. They start as bright as the
+    burst (brightness 0 falls about 1/k², like a string pulled into a triangle; 1 is flat up to
+    the 256th harmonic) and die away, the high ones sooner than the low ones, as in a real
     string. damping, the gain of one trip (0.9 to 0.9999), sets how long the note rings.
     position (0 to 0.5) is where the string is plucked, as a fraction of its length: it removes
     the harmonics with a node there, so 0.5, the middle, removes the even ones; 0 removes none.
@@ -177,7 +181,8 @@ class Pluck(Unit):
     def _excitation(self, freq: float, brightness: float, position: float, length: int) -> np.ndarray:
         """One period of noise: every harmonic of freq below 24 000 Hz at a random phase, the k-th
         at level 1 / (1 + (k * freq / cutoff) ** 2) with cutoff = freq * 2 ** (8 * brightness),
-        times the comb 2 * sin(pi * k * position) of the pluck position. A peak of 1."""
+        times the comb 2 * sin(pi * k * position) of the pluck position. An RMS of 0.25, so
+        brightness and position change the tone and not the level; its peak stays below 1."""
         k = np.arange(1, int((RATE / 2 - 1) // freq) + 1)
         level = 1 / (1 + (k * freq / (freq * 2 ** (8 * brightness))) ** 2)
         if position > 0:
@@ -186,7 +191,7 @@ class Pluck(Unit):
         t = np.arange(length) / RATE
         x = (level[:, None] * np.cos(2 * np.pi * freq * k[:, None] * t[None, :] + phase[:, None])).sum(axis=0)
         x -= x.mean()
-        return x / np.abs(x).max()
+        return x * (0.25 / np.sqrt((x**2).mean()))
 
     def reset(self) -> None:
         super().reset()
