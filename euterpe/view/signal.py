@@ -77,36 +77,66 @@ class _Many(View):
 
 
 class Waveform(_Many):
-    """Pressure over time in a window; samples=True marks each sample."""
+    """Pressure over time in a window. Several sources overlay, or with separate=True get a panel
+    each; reference is drawn in grey under every source; samples=True marks each sample; marks
+    are (time, label) pairs drawn as dotted rules."""
 
-    def __init__(self, *xs, span: tuple[float, float] | None = None, samples: bool = False, **kw):
+    def __init__(self, *xs, span: tuple[float, float] | None = None, samples: bool = False,
+                 separate: bool = False, reference: Unit | Clip | None = None,
+                 marks: list[tuple[float, str]] | None = None, **kw):
         super().__init__(*xs, **kw)
-        self.span, self.samples = span, samples
+        self.span, self.samples, self.separate, self.marks = span, samples, separate, marks or []
+        self.reference = sources(reference)[0] if reference is not None else None
+
+    def _plot(self, ax, c, color, lo, hi, scale, alpha=1.0, lw=1.0, dots=False):
+        a, b = round(lo * c.rate), round(hi * c.rate)
+        seg = c.samples[a:b]
+        t = (np.arange(a, a + len(seg)) / c.rate) * scale
+        chans = [seg] if c.channels == 1 else [seg[:, 0], seg[:, 1]]
+        first = None
+        for k, ch in enumerate(chans):
+            if dots:
+                ax.plot(t, ch, color=RULE, lw=0.6)
+                (line,) = ax.plot(t, ch, "o", color=color, ms=3)
+            else:
+                (line,) = ax.plot(t, ch, color=color, lw=lw, alpha=alpha if k == 0 else alpha * 0.5)
+            first = first or line
+        return first
 
     def draw(self):
         import matplotlib.pyplot as plt
 
-        fig, ax = plt.subplots(figsize=(7.0, 2.4))
         lo, hi = self.span or (0.0, max(c.seconds for c in self.clips))
         ms = hi - lo <= 0.1
         scale = 1000 if ms else 1
+        k = len(self.clips) if self.separate else 1
+        fig, axes = plt.subplots(k, 1, figsize=(7.0, 2.4 if k == 1 else 0.6 + 1.1 * k), sharex=True,
+                                 sharey=True, squeeze=False)
+        axes = axes[:, 0]
         lines = []
         for i, c in enumerate(self.clips):
-            a, b = round(lo * c.rate), round(hi * c.rate)
-            seg = c.samples[a:b]
-            t = (np.arange(a, a + len(seg)) / c.rate) * scale
-            color = SERIES[i % len(SERIES)]
-            chans = [seg] if c.channels == 1 else [seg[:, 0], seg[:, 1]]
-            for k, ch in enumerate(chans):
-                (line,) = ax.plot(t, ch, color=color, lw=1.0, alpha=1.0 if k == 0 else 0.5,
-                                  marker="o" if self.samples else None, ms=3)
-                if k == 0:
-                    lines.append(line)
-        ax.axhline(0, color=RULE, lw=0.4, zorder=0)
-        ax.set_xlim(lo * scale, hi * scale)
-        _name_lines(ax, lines, self.labels)
-        label_axis(ax, "time (ms)" if ms else "time (s)", "pressure")
-        _mark_default(self.clips, ax)
+            ax = axes[i if self.separate else 0]
+            if self.reference is not None and (self.separate or i == 0):
+                self._plot(ax, self.reference, RULE, lo, hi, scale, lw=0.8)
+            lines.append((ax, self._plot(ax, c, SERIES[i % len(SERIES)], lo, hi, scale, dots=self.samples)))
+        for ax in axes:
+            ax.axhline(0, color=RULE, lw=0.4, zorder=0)
+            for t, label in self.marks:
+                ax.axvline(t * scale, color=RULE, lw=0.6, ls=(0, (1, 2)))
+                ax.annotate(label, (t * scale, 1), xycoords=("data", "axes fraction"), xytext=(3, -2),
+                            textcoords="offset points", va="top", fontsize=8.5, fontstyle="italic", color=MADDER)
+            ax.spines["left"].set_position(("outward", 4))
+        ax0 = axes[0]
+        ax0.set_xlim(lo * scale, hi * scale)
+        if self.separate:
+            for (ax, line), label in zip(lines, self.labels or []):
+                ax.text(1.0, 0.85, label, transform=ax.transAxes, ha="right", va="top", fontstyle="italic",
+                        fontsize=9.5, color=line.get_color())
+        else:
+            _name_lines(ax0, [line for _, line in lines], self.labels)
+        label_axis(axes[-1], "time (ms)" if ms else "time (s)")
+        axes[len(axes) // 2].set_ylabel("pressure", fontstyle="italic")
+        _mark_default(self.clips, ax0)
         return fig
 
 

@@ -178,3 +178,19 @@ def test_row_panels_do_not_overlap():
     inner = [e for e in ET.fromstring(v.svg()) if e.tag.endswith("svg")]
     w0 = float(inner[0].get("width"))
     assert float(inner[1].get("x")) >= w0 and not inner[0].get("width").endswith("pt")
+
+
+def test_waveform_separate_draws_one_panel_per_source():
+    fig = waveform(Sine(220).take(0.01), Saw(220).take(0.01), separate=True, labels=["sine", "saw"]).figure()
+    assert len(fig.axes) == 2
+
+
+def test_waveform_reference_is_drawn_in_grey_under_each_panel():
+    from euterpe.view.style import RULE
+    fig = waveform(Sine(220).take(0.01), Sine(330).take(0.01), separate=True, reference=Saw(220).take(0.01)).figure()
+    assert all(any(l.get_color() == RULE and len(l.get_xdata()) > 2 for l in ax.lines) for ax in fig.axes)
+
+
+def test_waveform_marks_name_moments_in_time():
+    fig = waveform(Pluck(220).take(0.5), marks=[(0.2, "gate ends")]).figure()
+    assert any(t.get_text() == "gate ends" for t in fig.axes[0].texts)
