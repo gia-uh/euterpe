@@ -1,5 +1,6 @@
 """Layer 1: sound units and rendering."""
 
+from euterpe.sound.clip import Clip
 from euterpe.sound.core import BLOCK, RATE, Const, Gain, Mix, Param, Unit, render, rng
 from euterpe.sound.env import ADSR, EnvelopeFollower, Segments
 from euterpe.sound.filters import Allpass, Biquad, Comb, Formant, OnePole
@@ -26,6 +27,7 @@ __all__ = [
     "BitCrush",
     "BLOCK",
     "BrownNoise",
+    "Clip",
     "Chorus",
     "Comb",
     "Compressor",

@@ -79,6 +79,21 @@ class Unit(ABC):
     def block(self, n: int) -> np.ndarray:
         """The next n samples: shape (n,) when mono, (n, 2) when stereo, float32."""
 
+    @property
+    def duration(self) -> float | None:
+        """Seconds after which the output stays below -60 dBFS, or None if it never ends."""
+        return None
+
+    def take(self, seconds: float | None = None):
+        """Render into a Clip. Without seconds: duration, or 1 s (marked as the default)."""
+        from euterpe.sound.clip import Clip
+
+        if seconds is None and self.duration is not None:
+            seconds = self.duration
+        if seconds is None:
+            return Clip(render(self, 1.0), defaulted=True)
+        return Clip(render(self, seconds))
+
     def __add__(self, other: Unit | float) -> Mix:
         return Mix(self, _unit(other))
 
