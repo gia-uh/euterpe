@@ -36,4 +36,4 @@ Work lands through an issue, a branch and a pull request; CI must be green befor
 
 Print the menu with `grep -m1 -H '^when:' know-how/*.md` and read what matches.
 
-- Writing or revising a chapter → `know-how/writing-a-chapter.md`. Visible code is Euterpe code only; plots and arithmetic run hidden.
+- Writing or revising a chapter → `know-how/writing-a-chapter.md`. Visible code is Euterpe code and short maths that is the lesson; plots, formatting and checks run hidden.
