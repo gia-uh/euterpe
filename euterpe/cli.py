@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import soundfile as sf
 
 from euterpe.io import read, write
 from euterpe.lint import lint_audio
@@ -41,7 +42,10 @@ def _load(target: str, seed: int | None) -> Unit:
             if inspect.isfunction(v) and v.__module__ == module.__name__ and not n.startswith("_")
         )
         raise _TargetError(f"{path} has no function {name}; its functions are: {', '.join(names)}")
-    takes_seed = "seed" in inspect.signature(fn).parameters
+    param = inspect.signature(fn).parameters.get("seed")
+    takes_seed = param is not None
+    if takes_seed and seed is None and param.default is inspect.Parameter.empty:
+        raise _TargetError(f"{target} takes a seed: pass --seed N")
     unit = fn(seed=seed) if takes_seed and seed is not None else fn()
     if not isinstance(unit, Unit):
         raise _TargetError(f"{target} returned {type(unit).__name__}, not a Unit")
@@ -54,6 +58,8 @@ def _render(args) -> int:
     peak = float(np.abs(samples).max()) if samples.size else 0.0
     level = f"{20 * np.log10(peak):.1f} dBFS" if peak > 0 else "silent"
     print(f"{out}: {args.seconds:.1f} s, peak {level}")
+    if peak >= 1.0:
+        print(f"euterpe: warning: {out} is clipped: the samples peak at {level}, above full scale", file=sys.stderr)
     return 0
 
 
@@ -62,8 +68,15 @@ def _lint(args) -> int:
         if args.seconds is None:
             raise _TargetError(f"linting {args.input} needs --seconds: how long to render it")
         samples, rate = render(_load(args.input, args.seed), args.seconds), RATE
+    elif args.input.endswith(".py"):
+        raise _TargetError(f"{args.input} needs a function to call: {args.input}:function")
+    elif not Path(args.input).is_file():
+        raise _TargetError(f"cannot lint {args.input}: no such file")
     else:
-        samples, rate = read(args.input)
+        try:
+            samples, rate = read(args.input)
+        except sf.LibsndfileError as e:
+            raise _TargetError(f"cannot read {args.input} as audio: {e.error_string}") from None
     report = lint_audio(samples, rate, loop=args.loop)
     print(report.to_json() if args.json else report.to_text())
     return 1 if report.errors else 0

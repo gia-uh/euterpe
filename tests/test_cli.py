@@ -69,3 +69,21 @@ def test_a_missing_function_exits_2_naming_the_functions(piece, tmp_path, capsys
 def test_a_target_needs_seconds(piece, capsys):
     assert main(["lint", f"{piece}:tone"]) == 2
     assert "--seconds" in capsys.readouterr().err
+
+
+def test_render_warns_when_the_file_clips(piece, tmp_path, capsys):
+    assert main(["render", f"{piece}:loud", "-o", str(tmp_path / "l.wav"), "--seconds", "1"]) == 0
+    assert "clipped" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("args", [["nofile.wav"], ["notes.txt"], ["{piece}", "--seconds", "1"]])
+def test_lint_input_it_cannot_read_exits_2(piece, tmp_path, monkeypatch, capsys, args):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "notes.txt").write_text("not audio")
+    assert main(["lint", *(a.format(piece=piece) for a in args)]) == 2
+    assert capsys.readouterr().err.startswith("euterpe: ")
+
+
+def test_a_function_that_needs_a_seed_exits_2_without_one(piece, tmp_path, capsys):
+    assert main(["render", f"{piece}:seeded", "-o", str(tmp_path / "s.wav"), "--seconds", "1"]) == 2
+    assert "--seed" in capsys.readouterr().err
