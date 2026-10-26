@@ -9,10 +9,9 @@ As in chapter 1, a *unit* is anything that produces samples over time. Units com
 The sound below uses that to alternate between two sines, half a second each: 440 Hz, then 220 Hz. `Square(1.0)` is a unit that is +1 for half a second and −1 for the next half. So `Square(1.0) * 110 + 330` is 440 for half a second and 220 for the next, and as the frequency of a `Sine` it makes the sine jump between the two.
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import Sine, Square
 
-listen(Sine(Square(1.0) * 110 + 330) * 0.5, 4.0, "440 Hz and 220 Hz in turn")
+display((Sine(Square(1.0) * 110 + 330) * 0.5).take(4.0, "440 Hz and 220 Hz in turn"))
 ```
 
 The two tones sound like the same note, one higher than the other. The higher one has exactly twice the frequency. This distance, a ratio of 2, is called an *octave*, and it is the reason the same note name repeats: every note shares its name with the notes at twice and half its frequency.
@@ -20,10 +19,10 @@ The two tones sound like the same note, one higher than the other. The higher on
 Now keep the difference the same, 220 Hz, but move up: 1 980 Hz and 1 760 Hz. Then keep the ratio instead: 3 520 Hz and 1 760 Hz.
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import Sine, Square
+from euterpe.view import listen
 
-display(listen(Sine(Square(1.0) * 110 + 1_870) * 0.5, 4.0, "1 980 Hz and 1 760 Hz in turn: 220 Hz apart"))
+display((Sine(Square(1.0) * 110 + 1_870) * 0.5).take(4.0, "1 980 Hz and 1 760 Hz in turn: 220 Hz apart"))
 listen(Sine(Square(1.0) * 880 + 2_640) * 0.5, 4.0, "3 520 Hz and 1 760 Hz in turn: an octave")
 ```
 
@@ -37,7 +36,6 @@ import numpy as np
 
 from euterpe.view import figure
 
-
 def draw():
     key = np.arange(1, 89)
     freq = 440.0 * 2 ** ((key - 49) / 12)
@@ -50,7 +48,6 @@ def draw():
     axes[0].set_ylabel("frequency (Hz)", fontstyle="italic")
     return fig
 
-
 figure(draw, caption="The 88 piano keys: a doubling per octave, a straight line on a log axis")
 ```
 
@@ -61,8 +58,8 @@ Western music divides the octave into twelve steps. Each step is called a *semit
 The steps need a fixed point to start from. The modern standard is A4 = 440 Hz: the note called A in octave 4, the sine at the top of chapter 1. Here is A4 raised by 0, 1, 2 and 12 steps:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import Sine
+from euterpe.view import listen
 
 semitone = 2 ** (1 / 12)
 for steps in (0, 1, 2, 12):
@@ -116,8 +113,8 @@ for a in (1.0, 0.5, 0.25, 0.1, 0.01, 0.001):
 So −6 dB is half the amplitude, and a tenth is −20 dB. But −6 dB does not sound half as loud. A sound must drop by about 10 dB, to about a third of the amplitude, before most listeners hear it as half as loud. Here is the 440 Hz sine, halved three times:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import Sine
+from euterpe.view import listen
 
 for gain in (0.5, 0.25, 0.125, 0.0625):
     display(listen(Sine(440.0) * gain, 1.5, f"The 440 Hz sine at gain {gain}"))
@@ -148,11 +145,10 @@ Each line has a severity, a rule and a message. A `metric` is a measurement, a `
 Two sounds with the same peak do not always sound equally loud. Here are four sines, each at gain 0.5, so each peaks at −6 dBFS: 100 Hz, 1 000 Hz, 3 000 Hz and 12 000 Hz.
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import Sine
 
 for freq in (100.0, 1_000.0, 3_000.0, 12_000.0):
-    display(listen(Sine(freq) * 0.5, 1.5, f"A {freq:.0f} Hz sine at gain 0.5"))
+    display((Sine(freq) * 0.5).take(1.5, f"A {freq:.0f} Hz sine at gain 0.5"))
 ```
 
 On most loudspeakers and headphones the 3 000 Hz sine sounds the loudest and the 100 Hz sine much quieter, although their samples swing equally far. The ear is most sensitive between about 2 000 and 5 000 Hz, where the ear canal resonates, and grows less sensitive towards low frequencies, and again above about 10 000 Hz. (Small loudspeakers also play 100 Hz weakly, which adds to the effect.)
@@ -176,7 +172,6 @@ import matplotlib.pyplot as plt
 
 from euterpe.view import figure
 
-
 def draw():
     fig, ax = plt.subplots(figsize=(7, 2.8))
     ax.semilogx(freqs, lufs, "o-", markersize=3)
@@ -185,7 +180,6 @@ def draw():
     ax.set_xlabel("frequency (Hz)", fontstyle="italic")
     ax.set_ylabel("loudness (LUFS)", fontstyle="italic")
     return fig
-
 
 figure(draw, caption="The loudness of a sine at gain 0.5, by frequency, as A-LUFS measures it")
 ```
@@ -197,11 +191,10 @@ The measurement follows the ear at the bottom: a 100 Hz sine measures about 2 dB
 The shape of a wave changes its loudness too. Here are four basic waveforms, `Sine`, `Triangle`, `Square` and `Saw`, at 220 Hz, all at gain 0.5. A triangle rises and falls in straight lines. A saw rises in a straight line and drops back at once, as in chapter 1. A square jumps between its high and its low value and stays at each for half a cycle. Chapter 3 looks at their shapes and what they contain.
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import Saw, Sine, Square, Triangle
 
 for wave in (Sine, Triangle, Square, Saw):
-    display(listen(wave(220.0) * 0.5, 1.5, f"{wave.__name__} at 220 Hz, gain 0.5"))
+    display((wave(220.0) * 0.5).take(1.5, f"{wave.__name__} at 220 Hz, gain 0.5"))
 ```
 
 The square sounds the loudest. It spends almost all of its time at +0.5 or −0.5, so it carries more power than the others, which pass through the values in between. *RMS*, the root of the mean of the squared samples, is that average power expressed as an amplitude. This block measures the peak, the RMS and the loudness of each wave:
@@ -226,11 +219,10 @@ The loudness spans 5 dB, from the triangle to the square, although the peaks are
 To make the square as loud as the sine, lower it by the difference, 3.4 dB. That is a gain of 10^(−3.4/20) = 0.68 on top of the 0.5, so about 0.34:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import Sine, Square
 
-display(listen(Sine(220.0) * 0.5, 1.5, "Sine at 220 Hz, gain 0.5"))
-listen(Square(220.0) * 0.34, 1.5, "Square at 220 Hz, gain 0.34: as loud as the sine")
+display((Sine(220.0) * 0.5).take(1.5, "Sine at 220 Hz, gain 0.5"))
+display((Square(220.0) * 0.34).take(1.5, "Square at 220 Hz, gain 0.34: as loud as the sine"))
 ```
 
 ```python {run output=code}

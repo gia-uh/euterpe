@@ -7,11 +7,10 @@ Chapter 3 built tones by adding sines, one per partial. Chapter 5 started from a
 Chapter 4 moved the frequency of a sine with an envelope, to make a bass drum. A slow sine can move it too. Here a sine at 440 Hz has its frequency pushed 10 Hz up and down, 5 times a second:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, Sine
 
 vibrato = Sine(Sine(5.0) * 10 + 440)
-listen(vibrato * ADSR(gate=1.7, release=0.3) * 0.4, 2.2, "A sine at 440 Hz with 5 Hz vibrato")
+display((vibrato * ADSR(gate=1.7, release=0.3) * 0.4).take(2.2, "A sine at 440 Hz with 5 Hz vibrato"))
 ```
 
 This is *vibrato*: the pitch wobbles, as a singer's does on a held note. The inner `Sine(5.0)` is the *modulator*, the sine that does the moving. The outer one is the *carrier*, the sine that is heard. When the modulator is slow, the ear follows the pitch as it moves. When the modulator is itself at an audible frequency, a few hundred Hz, the pitch moves too fast to follow. The ear hears a single steady tone with a new timbre.
@@ -70,8 +69,8 @@ print("J_0(3) =", round(float(jv(0, 3.0)), 3), " J_2(3) =", round(float(jv(2, 3.
 J_0(3) is −0.260 and J_2(3) is 0.486, so J_0 − J_2 = −0.746, and its size, 0.746, is what the spectrum shows. Here the two pull the same way; at other indexes they have opposite signs and partly cancel, which is why a harmonic of an FM tone can grow and shrink as the index rises.
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, FM
+from euterpe.view import listen
 
 for index in (0.0, 1.0, 3.0, 8.0):
     display(listen(FM(220.0, ratio=1.0, index=index) * ADSR(gate=1.0, release=0.2) * 0.4, 1.3, f"FM at 220 Hz, ratio 1, index {index:g}"))
@@ -90,20 +89,18 @@ How many of those harmonics are present decides what the ear hears. With freq 20
 A struck bell is bright at first and mellows as it rings, because its high partials die sooner. In FM the index sets the brightness, so an envelope on the index gives the same effect. John Chowning, who discovered FM synthesis at Stanford in the late 1960s, made bells this way: a ratio of 1.4 and an index that falls from 10 to 0 together with the level.
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, FM
 
 def fading(seconds):
     return ADSR(attack=0.001, decay=seconds, sustain=0.0, gate=seconds, curve=0.8)
 
 bell = FM(200.0, ratio=1.4, index=fading(4.0) * 10) * fading(4.0) * 0.35
-listen(bell, 4.0, "An FM bell: ratio 1.4, the index falling from 10 to 0")
+display(bell.take(4.0, "An FM bell: ratio 1.4, the index falling from 10 to 0"))
 ```
 
 The same idea with ratio 1 and a quick fall of the index gives the electric-piano sound of many 1980s ballads. The index starts at 2.8, falls to 0.3 within half a second and stays there, so each note starts with a bright bark and settles into a nearly pure tone:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, FM
 
 def epiano(freq):
@@ -111,7 +108,7 @@ def epiano(freq):
     level = ADSR(attack=0.002, decay=1.6, sustain=0.0, gate=2.0, curve=0.7)
     return FM(freq, ratio=1.0, index=index) * level
 
-listen((epiano(220.0) + epiano(277.18) + epiano(329.63)) * 0.25, 2.0, "An FM electric piano: an A major chord")
+display(((epiano(220.0) + epiano(277.18) + epiano(329.63)) * 0.25).take(2.0, "An FM electric piano: an A major chord"))
 ```
 
 Several notes sounding together are a *chord*. These three are A3, C♯4 and E4: C♯4 is 4 equal steps (chapter 2) above A3 and E4 is 7 steps above it, and a chord built of a note with the notes 4 and 7 steps above it is called a *major* chord, here A major. Each `epiano` builds its own envelopes, because a unit can appear only once in a graph (chapter 4).
@@ -121,12 +118,11 @@ Several notes sounding together are a *chord*. These three are A3, C♯4 and E4:
 `FM` has a fourth parameter, `feedback`, in radians from 0 to 1.5. It feeds the modulator's own last output back into its phase. A sine that pushes its own phase spends longer on one side of its cycle than the other, and as feedback rises it turns into something close to a saw, with harmonics of its own. Those harmonics then modulate the carrier, so feedback makes the tone brighter and rougher than the index alone can:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, FM, OnePole
 
 for feedback in (0.0, 1.5):
     tone = OnePole(FM(110.0, ratio=1.0, index=1.5, feedback=feedback), 20.0, kind="highpass")
-    display(listen(tone * ADSR(gate=1.0, release=0.2) * 0.4, 1.3, f"FM at 110 Hz, index 1.5, feedback {feedback:g}"))
+    display((tone * ADSR(gate=1.0, release=0.2) * 0.4).take(1.3, f"FM at 110 Hz, index 1.5, feedback {feedback:g}"))
 ```
 
 A modulator that leans to one side also pushes the carrier off-centre, so feedback adds a DC offset (chapter 4). The `OnePole` high-pass at 20 Hz removes it, as chapter 5 showed.
@@ -157,13 +153,12 @@ for noise in (WhiteNoise(seed=1), PinkNoise(seed=1), BrownNoise(seed=1)):
 Each line is relative to its first band. White noise stays within a fraction of a dB: flat. Pink falls about 3 dB at each octave, to −15 at 8 000 Hz, five octaves above 250. Brown falls about 6 per octave, to −29.5.
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, BrownNoise, OnePole, PinkNoise, WhiteNoise
 
-display(listen(WhiteNoise(seed=1) * ADSR(gate=1.7, release=0.3) * 0.25, 2.2, "White noise"))
-display(listen(PinkNoise(seed=1) * ADSR(gate=1.7, release=0.3) * 1.0, 2.2, "Pink noise"))
+display((WhiteNoise(seed=1) * ADSR(gate=1.7, release=0.3) * 0.25).take(2.2, "White noise"))
+display((PinkNoise(seed=1) * ADSR(gate=1.7, release=0.3) * 1.0).take(2.2, "Pink noise"))
 brown = OnePole(BrownNoise(seed=1), 20.0, kind="highpass")
-listen(brown * ADSR(gate=1.7, release=0.3) * 1.0, 2.2, "Brown noise")
+display((brown * ADSR(gate=1.7, release=0.3) * 1.0).take(2.2, "Brown noise"))
 ```
 
 White noise hisses like a detuned radio. Pink sounds even from bottom to top, like steady rain; it is the noise engineers play through speakers to check them, because a meter that reads in octaves shows it flat. Brown is a deep roar, like surf heard from a distance. Brown noise has so much of its energy at the lowest frequencies that two seconds of it do not average 0, so a `OnePole` high-pass at 20 Hz (chapter 5) takes away what lies below hearing. White noise drawn evenly between −1 and 1 has an RMS level of 1 / √3 = 0.58. `PinkNoise` and `BrownNoise` are scaled to an RMS of 0.18, a level chosen so that their peaks stay below 1, which is why they need a gain of 1.0 where white noise needs 0.25.
@@ -198,14 +193,13 @@ for bits in (7, 15):
 A register of b bits has 2^b − 1 states other than all zeros, and with this feedback it visits every one: 127 for 7 bits, 32 767 for 15. `LFSRNoise(rate, short=False, seed=1)` is that register, stepped `rate` times a second, each value held until the next step. Stepping faster moves the noise up, as a higher frequency moves a tone up. With `short=True` the register has 7 bits, and a sequence that repeats every 127 steps is a pitch: 12 000 / 127 = 94.5 Hz with many harmonics, a metallic buzz.
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, LFSRNoise, OnePole
 
 for rate in (2_000.0, 12_000.0):
     noise = OnePole(LFSRNoise(rate=rate), 20.0, kind="highpass")
-    display(listen(noise * ADSR(gate=0.8, release=0.2) * 0.12, 1.2, f"LFSR noise stepped at {rate:.0f} Hz"))
+    display((noise * ADSR(gate=0.8, release=0.2) * 0.12).take(1.2, f"LFSR noise stepped at {rate:.0f} Hz"))
 short = OnePole(LFSRNoise(rate=12_000.0, short=True), 20.0, kind="highpass")
-listen(short * ADSR(gate=0.8, release=0.2) * 0.12, 1.2, "Short LFSR noise at 12000 Hz: a 127-step loop")
+display((short * ADSR(gate=0.8, release=0.2) * 0.12).take(1.2, "Short LFSR noise at 12000 Hz: a 127-step loop"))
 ```
 
 One second of noise stepped 2 000 times a second is only 2 000 values of +1 or −1, and like any short stretch of random values they do not average exactly 0. That small offset is a DC component, so each example ends in a 20 Hz high-pass, as in chapter 5.
@@ -217,21 +211,19 @@ Most of a drum's sound has no pitch. A cymbal is a thin plate that vibrates at t
 A hi-hat, the pair of small cymbals a drummer plays on most beats, has its energy above about 7 000 Hz. A high-pass at 7 000 Hz keeps that band. A closed hi-hat lasts about 50 ms, an open one about 0.4 s:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, Biquad, WhiteNoise
 
 def hat(decay):
     env = ADSR(attack=0.001, decay=decay, sustain=0.0, release=0.0, gate=1.0, curve=0.8)
     return Biquad(WhiteNoise(seed=1), "highpass", cutoff=7000.0) * env * 0.6
 
-display(listen(hat(0.05), 0.5, "A closed hi-hat: high-passed noise, 50 ms"))
-listen(hat(0.4), 1.0, "An open hi-hat: the same noise, 0.4 s")
+display(hat(0.05).take(0.5, "A closed hi-hat: high-passed noise, 50 ms"))
+display(hat(0.4).take(1.0, "An open hi-hat: the same noise, 0.4 s"))
 ```
 
 A snare drum has two parts: the skin, struck, gives a short tone near 180 Hz whose pitch drops a little, as the bass drum of chapter 4 did; the wires give a burst of noise above 1 000 Hz that lasts longer than the tone. The snare is the sum of the two:
 
 ```python {run}
-from euterpe.view import listen
 from euterpe.sound import ADSR, Biquad, Sine, WhiteNoise
 
 def snare():
@@ -240,7 +232,7 @@ def snare():
     wires = Biquad(WhiteNoise(seed=2), "highpass", cutoff=1000.0) * ADSR(attack=0.001, decay=0.22, sustain=0.0, release=0.0, gate=1.0, curve=0.8)
     return skin * 0.35 + wires * 0.3
 
-listen(snare(), 0.6, "A snare: a falling tone at 240 to 180 Hz and high-passed noise")
+display(snare().take(0.6, "A snare: a falling tone at 240 to 180 Hz and high-passed noise"))
 ```
 
 Remove `skin` and the snare loses its body: it becomes a hiss with no weight. Remove `wires` and it is a dull knock on a box.
@@ -254,13 +246,12 @@ The early sound chips that made LFSR noise stored very short tables: 32 values o
 ```python {run}
 import numpy as np
 
-from euterpe.view import listen
 from euterpe.sound import ADSR, Sine, Wavetable
 
 table = np.round((np.sin(2 * np.pi * np.arange(32) / 32) + 1) * 7.5) / 7.5 - 1
 table = table - table.mean()
-display(listen(Sine(220.0) * ADSR(gate=1.0, release=0.2) * 0.4, 1.3, "A sine at 220 Hz"))
-listen(Wavetable(table, 220.0) * ADSR(gate=1.0, release=0.2) * 0.4, 1.3, "A 32-step, 16-level sine at 220 Hz")
+display((Sine(220.0) * ADSR(gate=1.0, release=0.2) * 0.4).take(1.3, "A sine at 220 Hz"))
+display((Wavetable(table, 220.0) * ADSR(gate=1.0, release=0.2) * 0.4).take(1.3, "A 32-step, 16-level sine at 220 Hz"))
 ```
 
 The stepped sine has the same pitch and a thin buzz on top. The block lists its six loudest partials:
