@@ -13,35 +13,23 @@ The simplest sound repeats one shape forever. The shape is a sine wave, and the 
 Euterpe calls anything that produces sound a *unit*. `Sine(440.0)` is a unit. `Sine(440.0) * 0.5` builds a new unit that takes each value of the sine and multiplies it by 0.5; in the same way `a + b` builds a unit that adds two units value by value, and a plain number on either side counts as a constant. Building units computes nothing yet. `listen` computes two seconds of sound from the unit it is given and puts a player on this page.
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import Sine
 
 tone = Sine(440.0) * 0.5
 listen(tone, 2.0, "A sine wave at 440 Hz")
 ```
 
-`listen` is a helper for this book, so it lives in `euterpe.book` and not in the library proper, `euterpe.sound`. It writes an MP3 file under `build/audio/`: the book turns it into a player, and in your own terminal it leaves the file for you to open.
+`listen` lives in `euterpe.view`, with the drawings that show a sound, apart from the sounds themselves in `euterpe.sound`. It returns a player: the book and a notebook show the last line of a block, and `display(listen(...))` shows one anywhere else.
 
 A tone held at one steady frequency in a piece of music is a *note*. This one is the note musicians call A, the one orchestras tune to (chapter 2 explains note names). A sine is the plainest tone there is: it sounds like a tuning fork or a soft whistle. Every other sound in this book is built from sines, or analysed as a sum of them, so it is worth knowing well.
 
 One cycle at 440 Hz lasts 1/440 of a second, about 2.27 milliseconds. In that time the sound travels 343 / 440 = 0.78 metres, which is the length of one wave in the air. Here are the first 5 milliseconds as a plot:
 
 ```python {run echo=false}
-import matplotlib.pyplot as plt
-import numpy as np
+from euterpe.sound import Sine
 
-from euterpe.book import show
-from euterpe.sound import RATE, Sine, render
-
-x = render(Sine(440.0) * 0.5, 0.005)
-ms = np.arange(len(x)) / RATE * 1000
-
-fig, ax = plt.subplots(figsize=(7, 2.5))
-ax.plot(ms, x)
-ax.set_xlabel("time (ms)")
-ax.set_ylabel("pressure (full scale = 1)")
-ax.axhline(0, color="grey", linewidth=0.5)
-show(fig, "The first 5 ms of the 440 Hz sine: a little over two cycles")
+(Sine(440.0) * 0.5).take(0.005).waveform(caption="The first 5 ms of the 440 Hz sine: a little over two cycles")
 ```
 
 The vertical axis is not in pascals. Inside a computer a sound is a number between −1 and 1, and the loudspeaker and its volume knob decide how many pascals that becomes. That is why a value of 1 is called *full scale*: it means the most the file can hold, not a pressure. The largest value a wave reaches is its *amplitude*: the sine above has amplitude 0.5, half of full scale.
@@ -76,22 +64,9 @@ The last digit can differ, because a 32-bit float keeps only about 7 significant
 Between two samples there is nothing: the file does not say what the pressure was in between. Zoomed in to the first millisecond, the dots are all that is stored.
 
 ```python {run echo=false}
-import matplotlib.pyplot as plt
-import numpy as np
+from euterpe.sound import Sine
 
-from euterpe.book import show
-from euterpe.sound import RATE, Sine, render
-
-x = render(Sine(440.0) * 0.5, 0.001)
-ms = np.arange(len(x)) / RATE * 1000
-fine = np.linspace(0, 1, 1000)
-
-fig, ax = plt.subplots(figsize=(7, 2.5))
-ax.plot(fine, 0.5 * np.sin(2 * np.pi * 440 * fine / 1000), color="lightgrey", label="the pressure")
-ax.plot(ms, x, "o", markersize=3, label="the samples")
-ax.set_xlabel("time (ms)")
-ax.legend(loc="lower right")
-show(fig, "The first millisecond: 48 samples of the 440 Hz sine")
+(Sine(440.0) * 0.5).take(0.001).waveform(samples=True, caption="The first millisecond: 48 samples of the 440 Hz sine")
 ```
 
 At 440 Hz there are 48 000 / 440, about 109 samples per cycle. The minimum is a little more than 2 samples per cycle, and the next section shows why. Below that, the samples no longer pin down the wave.
@@ -125,18 +100,22 @@ The difference is rounding error in the last digits of the floats. In the plot, 
 import matplotlib.pyplot as plt
 import numpy as np
 
-from euterpe.book import show
+from euterpe.view import figure
 
-ms = np.linspace(0, 0.5, 4000)
-n = np.arange(25)
 
-fig, ax = plt.subplots(figsize=(7, 2.5))
-ax.plot(ms, np.sin(2 * np.pi * 44_000 * ms / 1000), color="lightgrey", linewidth=0.7, label="44 000 Hz")
-ax.plot(ms, -np.sin(2 * np.pi * 4_000 * ms / 1000), linewidth=2, label="4 000 Hz, upside down")
-ax.plot(n / 48, np.sin(2 * np.pi * 44_000 * n / 48_000), "o", markersize=4, label="the samples")
-ax.set_xlabel("time (ms)")
-ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.25), ncol=3, fontsize=8)
-show(fig, "Half a millisecond: a 44 000 Hz sine and a 4 000 Hz sine share their samples")
+def draw():
+    ms = np.linspace(0, 0.5, 4000)
+    n = np.arange(25)
+    fig, ax = plt.subplots(figsize=(7, 2.5))
+    ax.plot(ms, np.sin(2 * np.pi * 44_000 * ms / 1000), color="#9aa0a8", linewidth=0.7, label="44 000 Hz")
+    ax.plot(ms, -np.sin(2 * np.pi * 4_000 * ms / 1000), linewidth=2, label="4 000 Hz, upside down")
+    ax.plot(n / 48, np.sin(2 * np.pi * 44_000 * n / 48_000), "o", markersize=4, label="the samples")
+    ax.set_xlabel("time (ms)", fontstyle="italic")
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.25), ncol=3, fontsize=8, frameon=False)
+    return fig
+
+
+figure(draw, caption="Half a millisecond: a 44 000 Hz sine and a 4 000 Hz sine share their samples")
 ```
 
 Adding 48 000 Hz to a frequency adds exactly one cycle per sample, which also changes nothing at the moments the samples are taken. Together with the pairing of f and 48 000 − f, the samples of a sine at f are shared by infinitely many frequencies: f + 48 000, f + 96 000 and so on, and, upside down, 48 000 − f, 96 000 − f and so on. Exactly one of them lies between 0 and 24 000 Hz, and playback, as the next section shows, produces that one. That midpoint, half the sample rate, is the *Nyquist frequency*. A wave above it does not disappear: it *folds back* to the one frequency of its family below 24 000 Hz. This is called *aliasing*. The frequency it lands at is the distance from f to the nearest multiple of 48 000: 44 000 Hz lands at 4 000 Hz, 50 000 Hz at 2 000 Hz.
@@ -182,57 +161,60 @@ To hear the difference, Euterpe's `Saw` can be told to skip its correction. With
 import matplotlib.pyplot as plt
 import numpy as np
 
-from euterpe.book import show
 from euterpe.sound import Saw, render
+from euterpe.view import figure
 
-plain = render(Saw(1_100.0, antialias=False), 0.002)
-smooth = render(Saw(1_100.0), 0.002)
-drop = int(np.argmax(np.diff(plain) < 0)) + 1  # the first sample after the drop
-n = np.arange(drop - 4, drop + 4)
 
-fig, ax = plt.subplots(figsize=(7, 2.5))
-ax.plot(n - drop, plain[n], "o-", label="antialias=False")
-ax.plot(n - drop, smooth[n], "s--", label="Saw, with polyBLEP")
-ax.set_xlabel("sample number (0 = the first sample after the drop)")
-ax.legend(loc="lower left")
-show(fig, "Eight samples around one drop of a 1 100 Hz saw: polyBLEP moves the two samples next to the drop")
+def draw():
+    plain = render(Saw(1_100.0, antialias=False), 0.002)
+    smooth = render(Saw(1_100.0), 0.002)
+    drop = int(np.argmax(np.diff(plain) < 0)) + 1  # the first sample after the drop
+    n = np.arange(drop - 4, drop + 4)
+    fig, ax = plt.subplots(figsize=(7, 2.5))
+    ax.plot(n - drop, plain[n], "o-", label="antialias=False")
+    ax.plot(n - drop, smooth[n], "s--", label="Saw, with polyBLEP")
+    ax.set_xlabel("sample number (0 = the first sample after the drop)", fontstyle="italic")
+    ax.legend(loc="lower left", frameon=False)
+    return fig
+
+
+figure(draw, caption="Eight samples around one drop of a 1 100 Hz saw: polyBLEP moves the two samples next to the drop")
 ```
 
 Both saws below sweep from 1 000 Hz up to 23 000 Hz in four seconds (the captions write 1 000 Hz as 1 kHz, a kilohertz). Their frequency is not a number but a unit: a parameter may be either, and a saw given a unit reads its frequency from it again at every sample. The unit is half a cycle of a slow sine. `Sine(0.125)` completes one cycle every 8 seconds, so in 4 seconds it covers half a cycle. `phase`, from 0 to 1, sets where the sine starts: at phase 0 it starts at 0 and rises, and at phase 0.75 it starts three quarters through its cycle, at its lowest value, −1. Over the next half cycle it rises to 1. Times 11 000, that runs from −11 000 to 11 000; plus 12 000, from 1 000 to 23 000.
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import Saw, Sine
 
 sweep = Sine(0.125, phase=0.75) * 11_000 + 12_000      # 1 000 Hz to 23 000 Hz in 4 s
 
-listen(Saw(sweep) * 0.5, 4.0, "A saw sweeping from 1 to 23 kHz, band-limited")
+display(listen(Saw(sweep) * 0.5, 4.0, "A saw sweeping from 1 to 23 kHz, band-limited"))
 listen(Saw(sweep, antialias=False) * 0.5, 4.0, "The same sweep without the correction: aliasing")
 ```
 
 Listen to the first sweep: one tone rises until it is too high to hear. Most adults stop hearing somewhere between 15 000 and 20 000 Hz, so the end of it may sound like silence. In the second sweep, other tones move down while the note moves up, and they stay audible after the note itself is gone. Those are folded harmonics.
 
-A *spectrogram* shows the same thing as a picture. It cuts the sound into slices of 1 024 samples, about 21 ms each, measures how strong each frequency is in each slice, and draws one column per slice. Time runs left to right, frequency bottom to top, and brightness is the strength:
+A *spectrogram* shows the same thing as a picture. It cuts the sound into short overlapping slices, measures how strong each frequency is in each slice, and draws one column per slice. Time runs left to right, frequency bottom to top, with a keyboard along the edge so that each octave takes the same height, and darker ink is more strength:
 
 ```python {run echo=false}
-import matplotlib.pyplot as plt
+from euterpe.sound import Saw, Sine
+from euterpe.view import spectrogram
 
-from euterpe.book import show
-from euterpe.sound import RATE, Saw, Sine, render
 
 def sweep():
     return Sine(0.125, phase=0.75) * 11_000 + 12_000
 
-fig, axes = plt.subplots(1, 2, figsize=(8, 3), sharey=True, dpi=60)
-for ax, (title, unit) in zip(axes, [("Saw", Saw(sweep())), ("Saw, antialias=False", Saw(sweep(), antialias=False))]):
-    ax.specgram(render(unit * 0.5, 4.0), NFFT=1024, Fs=RATE, noverlap=0, vmin=-90, cmap="magma")
-    ax.set_title(title)
-    ax.set_xlabel("time (s)")
-axes[0].set_ylabel("frequency (Hz)")
-show(fig, "The two sweeps: harmonics fold back from 24 kHz without the correction")
+
+spectrogram(
+    (Saw(sweep()) * 0.5).take(4.0),
+    (Saw(sweep(), antialias=False) * 0.5).take(4.0),
+    labels=["Saw", "Saw, antialias=False"], lo=500, hi=24_000,
+    caption="The two sweeps: harmonics fold back from 24 kHz without the correction",
+)
 ```
 
-In the right panel each harmonic reaches the top edge, 24 000 Hz, and comes back down as a falling line. Those falling lines are the extra tones you heard. The left panel has them too, darker: polyBLEP reduces aliasing, it does not remove it. For most notes of real music that is enough: they sit far below 23 000 Hz, and the lower the note, the higher the number k of the first harmonic that folds, so its amplitude 1/k is smaller.
+In the right panel each harmonic reaches the top edge, 24 000 Hz, and comes back down as a falling line. Those falling lines are the extra tones you heard. The left panel has them too, fainter: polyBLEP reduces aliasing, it does not remove it. For most notes of real music that is enough: they sit far below 23 000 Hz, and the lower the note, the higher the number k of the first harmonic that folds, so its amplitude 1/k is smaller.
 
 ## How fine each sample is
 
@@ -243,11 +225,11 @@ A 32-bit float is finite too, so the samples Euterpe computes are already quanti
 `BitCrush` rounds each sample to `2 ** bits - 1` levels spread evenly between −1 and 1. That is one level fewer than the bits allow, so that the levels are symmetric and 0 is one of them: silence stays silent. With one level fewer there is one gap fewer, so its step is 2 / (2**bits − 2): 1 at 2 bits, where the levels are −1, 0 and 1. Here is the 440 Hz sine with 16, 6, 4 and 2 bits:
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import BitCrush, Sine
 
 for bits in (16, 6, 4, 2):
-    listen(BitCrush(Sine(440.0), bits=bits) * 0.5, 2.0, f"The 440 Hz sine with {bits} bits")
+    display(listen(BitCrush(Sine(440.0), bits=bits) * 0.5, 2.0, f"The 440 Hz sine with {bits} bits"))
 ```
 
 `BitCrush` acts on the full-scale sine, and `* 0.5` scales after. The order matters, because the levels stay between −1 and 1 whatever the input. At 2 bits they are −1, 0 and 1, and every sample of a half-scale sine is nearer to 0 than to either end: `BitCrush(Sine(440.0) * 0.5, bits=2)` rounds every sample to 0 and plays silence. Crushing first uses all the levels; scaling after turns them into −0.5, 0 and 0.5.
@@ -255,19 +237,14 @@ for bits in (16, 6, 4, 2):
 At 16 bits it sounds like the sine at the top of the chapter. At 6 bits a faint hiss sits under the tone. At 4 bits the tone is harsh. At 2 bits the wave has three levels, −0.5, 0 and 0.5, but it spends two thirds of each cycle at 0.5 or −0.5 and only a third at 0, so it sounds close to a *square wave*, a wave that jumps between two values and spends half of each cycle at each. The plot shows one cycle of each, before the scaling:
 
 ```python {run echo=false}
-import matplotlib.pyplot as plt
-import numpy as np
+from euterpe.sound import BitCrush, Sine
+from euterpe.view import waveform
 
-from euterpe.book import show
-from euterpe.sound import RATE, BitCrush, Sine, render
-
-fig, ax = plt.subplots(figsize=(7, 3))
-for bits in (16, 4, 2):
-    x = render(BitCrush(Sine(440.0), bits=bits), 1 / 440)
-    ax.plot(np.arange(len(x)) / RATE * 1000, x, label=f"{bits} bits")
-ax.set_xlabel("time (ms)")
-ax.legend(loc="lower left")
-show(fig, "One cycle of the 440 Hz sine with 16, 4 and 2 bits")
+waveform(
+    *[BitCrush(Sine(440.0), bits=bits).take(1 / 440) for bits in (16, 4, 2)],
+    labels=["16 bits", "4 bits", "2 bits"],
+    caption="One cycle of the 440 Hz sine with 16, 4 and 2 bits",
+)
 ```
 
 Rounding changes the shape of the wave, so it adds frequencies that were not there. At 440 Hz a cycle is 48 000 / 440 = 109.09 samples, so the samples land at different points of the wave in each cycle. At 6 bits the error is small and depends on where each sample lands, so it does not repeat in a short pattern: its energy spreads thinly over many frequencies, heard as *hiss*, like a radio between stations. At 2 bits the error is as large as the wave and follows its shape in every cycle. An error that repeats with every cycle is made of harmonics of 440 Hz, heard as a *buzz* at the note's own *pitch*: the perceived height of a sound, set by its frequency.

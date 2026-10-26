@@ -12,9 +12,9 @@ Most examples are complete programs. A few build on the block just before them, 
 git clone https://github.com/gia-uh/euterpe
 cd euterpe/book
 uv sync --group book
-uv run python example.py
+uv run --with jupyterlab jupyter lab
 ```
 
-where `example.py` holds a code block from a chapter. An example that calls `listen` writes an MP3 under `build/audio/`; one that calls `show` writes an SVG under `build/img/`. Open them with any player or browser.
+and paste a code block from a chapter into a notebook cell. `listen` gives a player and the views give drawings: the notebook shows the last line of a cell, and `display(...)` shows any other line, as the book does.
 
 Each chapter ends with three exercises. Each one changes a number in an example; run it again and listen to what changed.

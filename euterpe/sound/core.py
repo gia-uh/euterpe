@@ -79,6 +79,57 @@ class Unit(ABC):
     def block(self, n: int) -> np.ndarray:
         """The next n samples: shape (n,) when mono, (n, 2) when stereo, float32."""
 
+    @property
+    def duration(self) -> float | None:
+        """Seconds after which the output stays below -60 dBFS, or None if it never ends."""
+        return None
+
+    def _fixed(self, name: str, worst: float) -> float:
+        """A parameter's value, or worst (the end of its range with the longest tail) if it moves."""
+        v = self._values[name]
+        return worst if isinstance(v, Unit) else v
+
+    def take(self, seconds: float | None = None):
+        """Render into a Clip. Without seconds: duration, at most MAX_DEFAULT s, or 1 s if it never
+        ends; those two are marked as defaulted so a view says so."""
+        from euterpe.sound.clip import Clip
+
+        if seconds is not None:
+            return Clip(render(self, seconds))
+        d = self.duration
+        if d is None or d > MAX_DEFAULT:
+            return Clip(render(self, 1.0 if d is None else MAX_DEFAULT), defaulted=True)
+        return Clip(render(self, d))
+
+    def view(self):
+        """The default view: what display() shows."""
+        from euterpe.view import default
+
+        return default(self)
+
+    def waveform(self, **kw):
+        from euterpe.view import waveform
+
+        return waveform(self, **kw)
+
+    def spectrum(self, **kw):
+        from euterpe.view import spectrum
+
+        return spectrum(self, **kw)
+
+    def spectrogram(self, **kw):
+        from euterpe.view import spectrogram
+
+        return spectrogram(self, **kw)
+
+    def level(self, **kw):
+        from euterpe.view import level
+
+        return level(self, **kw)
+
+    def _repr_mimebundle_(self, include=None, exclude=None):
+        return self.view()._repr_mimebundle_(include, exclude)
+
     def __add__(self, other: Unit | float) -> Mix:
         return Mix(self, _unit(other))
 
@@ -98,6 +149,18 @@ class Unit(ABC):
         return Gain(self, gain)
 
     __rmul__ = __mul__
+
+
+def _after(d: float | None, tail: float) -> float | None:
+    """A source's duration plus a tail, or None if the source never ends."""
+    return None if d is None else d + tail
+
+
+# the longest a unit is rendered without being asked for seconds
+MAX_DEFAULT = 10.0
+
+# ln(1000): the number of time constants an exponential decay takes to fall 60 dB
+LN60 = float(np.log(1000.0))
 
 
 def _unit(x: Unit | float) -> Unit:
@@ -121,6 +184,12 @@ class Mix(Unit):
 
     Stereo when any input is stereo; a mono input is copied to both sides.
     """
+
+    @property
+    def duration(self) -> float | None:
+        """The longest input's; None if any input never ends."""
+        ds = [u.duration for u in self.units]
+        return None if any(d is None for d in ds) else max(ds, default=0.0)
 
     def __init__(self, *units: Unit, gains: Sequence[float] | None = None):
         if gains is not None and len(gains) != len(units):
@@ -148,6 +217,13 @@ class Gain(Unit):
     """
 
     params = (Param("gain", "", -1e6, 1e6, default=1.0),)  # also scales modulators, in Hz
+
+    @property
+    def duration(self) -> float | None:
+        """The shortest that ends of the source and a gain unit: either one silences the product."""
+        g = self._values["gain"]
+        ds = [d for d in (self.src.duration, g.duration if isinstance(g, Unit) else None) if d is not None]
+        return min(ds) if ds else None
 
     def __init__(self, src: Unit, gain: float | Unit):
         self.src = src
