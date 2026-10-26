@@ -13,6 +13,7 @@ files:
   - chapters/01-what-sound-is.md
   - chapters/02-pitch-and-loudness.md
   - chapters/03-timbre.md
+  - chapters/04-envelopes.md
 
 outputs:
   site:
