@@ -28,3 +28,13 @@ def test_stereo_clip_reports_channels():
 
 def test_clip_length_is_its_frames():
     assert len(Sine(440).take(0.5)) == 24000
+
+
+def test_take_caption_travels_to_the_default_view():
+    pytest.importorskip("matplotlib")
+    c = Sine(440).take(0.2, "A sine")
+    assert c.caption == "A sine"
+    data, meta = c._repr_mimebundle_()
+    assert meta["caption"] == "A sine"
+    assert "image/svg+xml" in data and "audio/mpeg" in data
+    assert Sine(440).take(caption="B").caption == "B"
