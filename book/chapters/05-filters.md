@@ -27,7 +27,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from euterpe.book import show
-from euterpe.sound import render
+from euterpe.sound import Biquad, WhiteNoise, render
 
 
 def smooth_db(x, width=40):
@@ -37,8 +37,6 @@ def smooth_db(x, width=40):
 
 
 fig, ax = plt.subplots(figsize=(7, 2.8))
-from euterpe.sound import Biquad, WhiteNoise
-
 for unit, name in ((WhiteNoise(seed=1), "white noise"), (Biquad(WhiteNoise(seed=1), "lowpass", cutoff=500.0), "low-pass at 500 Hz")):
     f, db = smooth_db(render(unit, 1.0))
     ax.semilogx(f[20:], db[20:], linewidth=0.9, label=name)
@@ -98,7 +96,7 @@ for cutoff in (2000.0, 600.0, 200.0):
     listen(tone, 1.5, f"The saw through a low-pass at {cutoff:.0f} Hz")
 ```
 
-The pitch never changes: the first harmonic, 110 Hz, is below every cutoff. The tone goes from buzzy, to warm, to a soft hum close to a sine. At 200 Hz the first harmonic passes almost unchanged and every harmonic above it is cut, more the higher it is, so what is left is close to a single sine. The plot shows each harmonic's level.
+The pitch never changes: the first harmonic, 110 Hz, is below every cutoff. The tone goes from buzzy, to warm, to a soft hum close to a sine. At 200 Hz the first harmonic passes almost unchanged and every harmonic above it is cut, more the higher it is: the second harmonic ends up 10 dB below the first and the third 18 dB below, where in the unfiltered saw they are 6 dB (1/2) and 9.5 dB (1/3) below. The plot shows each harmonic's level.
 
 ```python {run echo=false}
 import matplotlib.pyplot as plt
@@ -147,7 +145,7 @@ for kind, gain in (("lowpass", 0.5), ("highpass", 0.3), ("bandpass", 1.0), ("not
 
 The low-pass rumbles, the high-pass hisses, the band-pass is a noise with a vague pitch near 1 000 Hz, like breath through a tube. The notch sounds almost like the unfiltered noise: it removes only a narrow band, and the ear barely misses it. A notch is a repair tool more than a sound: it removes one bad frequency, such as a 50 Hz hum from the mains, and leaves the rest.
 
-A high-pass also fixes the problem chapter 4 ended on: a pulse whose duty moves has a DC offset, a component at 0 Hz. A `OnePole` high-pass at 20 Hz removes everything below the lowest note anyone can hear, 0 Hz included:
+A high-pass also fixes the side effect chapter 4 found: a pulse whose duty moves has a DC offset, a component at 0 Hz. 20 Hz is about the lowest frequency the ear hears. A `OnePole` high-pass at 20 Hz is 3 dB down at 20 Hz and 0.15 dB down at 110 Hz, so it barely touches anything audible, and it removes the 0 Hz component completely:
 
 ```python {run output=code}
 from euterpe.lint import lint_audio
@@ -189,26 +187,40 @@ On a saw, a resonant low-pass makes the harmonic nearest the cutoff stand out, a
 from euterpe.book import listen
 from euterpe.sound import ADSR, Biquad, Saw
 
-for q in (0.707, 4.0, 12.0):
-    tone = Biquad(Saw(110.0), "lowpass", cutoff=800.0, q=q) * ADSR(gate=1.2, release=0.2) * (0.3 / q ** 0.5)
-    listen(tone, 1.5, f"A saw through a low-pass at 800 Hz, q {q}")
+tones = {}
+for q, gain in ((0.707, 0.3), (4.0, 0.23), (12.0, 0.17)):
+    tones[q] = Biquad(Saw(110.0), "lowpass", cutoff=800.0, q=q) * ADSR(gate=1.2, release=0.2) * gain
+    listen(tones[q], 1.5, f"A saw through a low-pass at 800 Hz, q {q}")
 ```
 
-The gain `0.3 / q ** 0.5` keeps the three at a similar loudness: a stronger peak needs a lower gain to stay below full scale. At q = 12 the whistle is near 770 Hz, the seventh harmonic of 110 Hz, the one closest to the cutoff.
+The peak adds energy, so a larger q makes the note louder. The gains 0.3, 0.23 and 0.17 compensate, so that the three differ in tone and not in loudness. `lint_audio` measures their loudness in LUFS, as in chapter 2:
+
+```python {run continue output=code}
+from euterpe.lint import lint_audio
+from euterpe.sound import render
+
+for q, tone in tones.items():
+    print("q", q, ":", [f.message for f in lint_audio(render(tone, 1.5)).findings if f.rule == "A-LUFS"])
+```
+
+The three are within half a decibel of each other. At q = 12 the whistle is near 770 Hz, the seventh harmonic of 110 Hz, the one closest to the cutoff.
 
 ```python {run echo=false}
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.signal import freqz
 
 from euterpe.book import show
-from euterpe.sound.filters import _rbj
+from euterpe.sound import Biquad, Sine, render
 
+freqs = np.geomspace(50, 20_000, 90)
 fig, ax = plt.subplots(figsize=(7, 2.6))
 for q in (0.707, 4.0, 12.0):
-    b, a = _rbj("lowpass", 800.0, q)
-    f, h = freqz(b, a, worN=np.geomspace(20, 20_000, 600), fs=48_000)
-    ax.semilogx(f, 20 * np.log10(np.abs(h)), linewidth=1, label=f"q {q}")
+    gains = [
+        np.abs(render(Biquad(Sine(f), "lowpass", cutoff=800.0, q=q), 0.3)[4800:]).max()
+        / np.abs(render(Sine(f), 0.3)[4800:]).max()
+        for f in freqs
+    ]
+    ax.semilogx(freqs, 20 * np.log10(gains), linewidth=1, label=f"q {q}")
 ax.set_ylim(-48, 24)
 ax.set_xlabel("frequency (Hz)")
 ax.set_ylabel("gain (dB)")
@@ -299,17 +311,20 @@ for f in (200, 1000, 5000):
     print(f, "Hz:", round(float(20 * np.log10(np.abs(wet).max() / np.abs(dry).max())), 2), "dB")
 ```
 
-What an allpass changes is time: each frequency comes out delayed by a different amount, so a single click comes out as a short, dense ring of echoes 3 ms apart, each 0.7 times the one before. On a steady tone it is almost inaudible; on clicks and drums it smears the attack. The click below is a pulse 0.3 ms long, made with `Segments`. Chapter 7 chains allpasses to make reverb.
+What an allpass changes is time: each frequency comes out delayed by a different amount, so a single click comes out as a short, dense ring of echoes 3 ms apart, each 0.7 times the one before. On a steady tone it is almost inaudible; on clicks and drums it smears the attack. The example below is four clicks a quarter second apart, each made with `Segments`: 1 ms at +0.7, then 1 ms at −0.7, so that its average is 0 and it has no DC offset. Clicks this short sound quieter than the notes before them at the same peak level; turn the volume up a little to hear the difference. Chapter 7 chains allpasses to make reverb.
 
 ```python {run}
 from euterpe.book import listen
 from euterpe.sound import Allpass, Segments
 
-def click():
-    return Segments([(0.1, 0.0), (0.1, 0.5), (0.1003, 0.5), (0.1003, 0.0)])
+def clicks():
+    points = []
+    for t in (0.1, 0.35, 0.6, 0.85):
+        points += [(t, 0.0), (t, 0.7), (t + 0.001, 0.7), (t + 0.001, -0.7), (t + 0.002, -0.7), (t + 0.002, 0.0)]
+    return Segments(points)
 
-listen(click(), 0.5, "A click")
-listen(Allpass(click(), delay=0.003, gain=0.7), 0.5, "The click through an allpass")
+listen(clicks(), 1.2, "Four clicks")
+listen(Allpass(clicks(), delay=0.003, gain=0.7), 1.2, "The clicks through an allpass")
 ```
 
 ## Formants and vowels
@@ -362,7 +377,7 @@ Each line is one harmonic of 110 Hz. The harmonics are the same in both pictures
 
 ## A first subtractive voice
 
-All the parts are now in place for the classic voice of an analogue synthesizer: an oscillator rich in harmonics, a low-pass whose cutoff an envelope moves, and a second envelope for the level. Two saws slightly out of tune (110 and 110.6 Hz) make the source fuller: their harmonics beat against each other, as in chapter 2, and the tone seems to move. The filter envelope opens the low-pass quickly and lets it fall to a sustain level, so each note starts bright and settles into a darker tone; the amplitude envelope holds the note and releases it.
+All the parts are now in place for the classic voice of an analogue synthesizer: an oscillator rich in harmonics, a low-pass whose cutoff an envelope moves, and a second envelope for the level. Two saws slightly out of tune, 110 and 110.6 Hz, make the source fuller. Two sines 0.6 Hz apart drift in and out of step: in step they add, half a cycle apart they cancel, so their sum rises and falls 0.6 times a second. This slow rise and fall is called *beating*. The n-th harmonics of the two saws are n × 0.6 Hz apart, so the second harmonic beats 1.2 times a second, the tenth 6 times. With every harmonic beating at its own rate, the tone seems to move. The filter envelope opens the low-pass quickly and lets it fall to a sustain level, so each note starts bright and settles into a darker tone; the amplitude envelope holds the note and releases it.
 
 ```python {run}
 from euterpe.book import listen
