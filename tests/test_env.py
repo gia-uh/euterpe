@@ -23,6 +23,11 @@ def test_release_starts_from_the_current_level_when_the_gate_ends_early():
     assert abs(at(x, 0.1) - 0.5) < 0.02 and at(x, 0.25) == 0.0
 
 
+def test_release_starts_from_the_level_reached_not_from_the_sustain():
+    x = render(ADSR(attack=0.2, decay=0.1, sustain=0.8, release=0.1, gate=0.05), 0.2)
+    assert abs(at(x, 0.05) - 0.25) < 0.01 and abs(at(x, 0.1) - 0.125) < 0.01
+
+
 def test_segments_interpolate_and_hold():
     x = render(Segments([(0.0, 0.0), (0.5, 1.0)]), 1.0)
     assert abs(at(x, 0.25) - 0.5) < 0.01 and at(x, 0.9) == 1.0
