@@ -13,8 +13,13 @@ import io
 import re
 from pathlib import Path
 
+from collections.abc import Callable
+
+import numpy as np
+
 from euterpe.io import write
 from euterpe.sound.core import Unit, render
+from euterpe.sound.osc import Sine
 
 
 def _name(caption: str, data: bytes) -> str:
@@ -43,3 +48,11 @@ def show(fig, caption: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(buf.getvalue())
     print(f"![{caption}]({path.as_posix()})")
+
+
+def gain_db(filter: Callable[[Unit], Unit], freq: float) -> float:
+    """The gain, in dB rounded to 0.1, that filter (a function from a source to the filtered
+    source) gives a sine at freq Hz: peak out over peak in, after the first 0.1 s."""
+    dry = render(Sine(freq), 0.5)[4800:]
+    wet = render(filter(Sine(freq)), 0.5)[4800:]
+    return round(float(20 * np.log10(np.abs(wet).max() / np.abs(dry).max())), 1) + 0.0
