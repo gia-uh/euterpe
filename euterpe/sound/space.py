@@ -13,6 +13,8 @@ from scipy.fft import irfft, next_fast_len, rfft
 from scipy.signal import lfilter
 
 from euterpe.sound.core import RATE, Param, Unit, rng
+from euterpe.sound.filters import _as_frames as _frames
+from euterpe.sound.filters import _out
 from euterpe.sound.osc import Sine
 
 _RATE = ("Hz", 0.01, 20.0, "log")
@@ -20,18 +22,28 @@ _MIX = Param("mix", "", 0.0, 1.0, default=0.5)
 _GRID = 64  # a phaser's sweep is read once per this many samples, counted from the start
 
 
-def _frames(x: np.ndarray) -> np.ndarray:
-    return x.astype(np.float64).reshape(len(x), -1)
-
-
-def _out(y: np.ndarray, channels: int) -> np.ndarray:
-    return (y if channels == 2 else y[:, 0]).astype(np.float32)
-
-
 def _p64(unit: Unit, name: str, n: int) -> np.ndarray:
     """A parameter's next n values in float64; a constant keeps its exact value."""
     v = unit._values[name]
     return unit._param(name, n).astype(np.float64) if isinstance(v, Unit) else np.full(n, v)
+
+
+class _Clip(Unit):
+    """Its source clipped to [lo, hi]: how a modulating rate stays inside its range."""
+
+    def __init__(self, src: Unit, lo: float, hi: float):
+        self.src, self.lo, self.hi = src, lo, hi
+
+    def inputs(self) -> list[Unit]:
+        return [self.src]
+
+    def block(self, n: int) -> np.ndarray:
+        return np.clip(self.src.block(n), self.lo, self.hi).astype(np.float32)
+
+
+def _lfo(rate: float | Unit) -> Sine:
+    """The sine that sweeps a moving effect, rate times a second; a modulating rate is clipped."""
+    return Sine(_Clip(rate, *_RATE[1:3]) if isinstance(rate, Unit) else rate)
 
 
 def _numbers(unit: str, **values) -> None:
@@ -138,7 +150,7 @@ class Chorus(_Moving):
     params = (Param("rate", *_RATE, default=0.8), Param("depth", "s", 0.0, 0.01, default=0.003), _MIX)
 
     def __init__(self, src: Unit, rate: float | Unit = 0.8, depth: float | Unit = 0.003, mix: float | Unit = 0.5):
-        self._lfo = Sine(rate)
+        self._lfo = _lfo(rate)
         super().__init__(src, 0.03, rate=rate, depth=depth, mix=mix)
 
     def _delay(self, n: int) -> np.ndarray:
@@ -174,7 +186,7 @@ class Flanger(_Moving):
         feedback: float | Unit = 0.5,
         mix: float | Unit = 0.5,
     ):
-        self._lfo = Sine(rate)
+        self._lfo = _lfo(rate)
         super().__init__(src, 0.011, rate=rate, depth=depth, feedback=feedback, mix=mix)
 
     def _delay(self, n: int) -> np.ndarray:
@@ -190,9 +202,11 @@ class Phaser(Unit):
     turning frequency sweeps from 200 Hz to 2000 Hz and back rate times a second.
 
     Each allpass keeps every level and delays the phase, by 90 degrees at its turning frequency.
-    Where the chain's delay is 180 degrees (or 540, ...) the copy cancels the source: stages / 2
-    notches, which move with the sweep. Unlike a flanger's comb, the notches are few and not
-    evenly spaced. stages is a number (1 to 12) because it sets the chain.
+    The chain delays up to 180 degrees per stage, reached at 24 000 Hz. Where its delay is 180
+    degrees (or 540, ...) the copy cancels the source: floor(stages / 2) notches below 24 000 Hz,
+    which move with the sweep, and with an odd count one more at 24 000 Hz itself. Unlike a
+    flanger's comb, the notches are few and not evenly spaced. stages is a number (1 to 12)
+    because it sets the chain.
     """
 
     params = (Param("rate", *_RATE, default=0.5), Param("stages", "", 1.0, 12.0, default=4.0), _MIX)
@@ -202,7 +216,7 @@ class Phaser(Unit):
         self.src = src
         self.channels = src.channels
         self._set_params(rate=rate, stages=stages, mix=mix)
-        self._lfo = Sine(rate)
+        self._lfo = _lfo(rate)
         self._stages = round(self._values["stages"])
         self.reset()
 
@@ -333,8 +347,9 @@ class ConvolutionReverb(Unit):
     sound gets a dense, smooth tail with the same decay at every frequency: the spectrum of the
     source, spread in time. Each side of the response has an energy of 1, so a wide-band source
     keeps about its level. The first 512 samples of the response are convolved directly; the
-    rest in 512-sample partitions with FFTs, so FFT rounding makes the samples differ by about
-    1e-7 between block sizes. decay and seed are numbers, since they make the response.
+    rest in 512-sample partitions with FFTs, counted from the start of the render, so any block
+    size gives the same samples, to the bit. decay and seed are numbers, since they make the
+    response.
     """
 
     params = (Param("decay", "s", 0.1, 10.0, "log", default=2.0), Param("mix", "", 0.0, 1.0, default=0.25))

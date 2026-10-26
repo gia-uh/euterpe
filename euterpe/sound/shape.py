@@ -13,6 +13,8 @@ from numpy.lib.stride_tricks import sliding_window_view
 from scipy.signal import lfilter
 
 from euterpe.sound.core import RATE, Param, Unit
+from euterpe.sound.filters import _as_frames as _frames
+from euterpe.sound.filters import _out
 
 _CEILING = 10 ** (-1 / 20)  # where a shaper puts a full-scale input: -1 dBFS
 _DRIVE = ("", 1.0, 100.0, "log")
@@ -69,14 +71,6 @@ class BitCrush(Unit):
         out = np.where((last >= 0)[:, None] if q.ndim == 2 else last >= 0, q[np.maximum(last, 0)], self._held)
         self._held = out[-1].copy()
         return out.astype(np.float32)
-
-
-def _frames(x: np.ndarray) -> np.ndarray:
-    return x.astype(np.float64).reshape(len(x), -1)
-
-
-def _out(y: np.ndarray, channels: int) -> np.ndarray:
-    return (y if channels == 2 else y[:, 0]).astype(np.float32)
 
 
 def _cubic(u: np.ndarray) -> np.ndarray:
@@ -292,7 +286,8 @@ class Gate(_Dynamics):
     silence, with time constant release, once the level falls below.
 
     It opens in about 1 ms. The quiet noise between notes is removed and the notes are left as
-    they were; a fast release cuts the soft tail of a note, which shortens its decay.
+    they were: a steady sound above the threshold keeps its spectrum, and the closing fade only
+    shortens the tail. A fast release cuts the soft end of a note, which shortens its decay.
     """
 
     params = (Param("threshold", "dB", -100.0, 0.0, default=-50.0), Param("release", *_TIME, default=0.05))
