@@ -7,32 +7,25 @@ Near its end, chapter 2 played four waves at the same pitch, 220 Hz, and the sam
 Here are the four waves again, at 220 Hz and gain 0.5. 220 Hz is the note A3, one octave below A4.
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import Saw, Sine, Square, Triangle
 
 for wave in (Sine, Triangle, Square, Saw):
-    listen(wave(220.0) * 0.5, 1.5, f"{wave.__name__} at 220 Hz")
+    display(listen(wave(220.0) * 0.5, 1.5, f"{wave.__name__} at 220 Hz"))
 ```
 
 All four have the same pitch: you could sing along with any of them on the same note. The plot shows two cycles of each, about 9.1 ms; each period is 1/220 of a second, 4.5 ms.
 
 ```python {run echo=false}
-import matplotlib.pyplot as plt
-import numpy as np
+from euterpe.sound import Saw, Sine, Square, Triangle
+from euterpe.view import waveform
 
-from euterpe.book import show
-from euterpe.sound import RATE, Saw, Sine, Square, Triangle, render
-
-fig, axes = plt.subplots(1, 4, figsize=(8, 2.2), sharey=True)
-for ax, wave in zip(axes, (Sine, Triangle, Square, Saw)):
-    x = render(wave(220.0), 2 / 220)
-    ms = np.arange(len(x)) / RATE * 1000
-    ax.plot(ms, x, linewidth=1)
-    ax.axhline(0, color="grey", linewidth=0.5)
-    ax.set_title(wave.__name__)
-    ax.set_xlabel("time (ms)")
-axes[0].set_ylim(-1.2, 1.2)
-show(fig, "Two cycles of each wave at 220 Hz: the same period, 4.5 ms, and four shapes")
+waves = (Sine, Triangle, Square, Saw)
+waveform(
+    *[wave(220.0).take(2 / 220) for wave in waves],
+    separate=True, labels=[wave.__name__ for wave in waves],
+    caption="Two cycles of each wave at 220 Hz: the same period, 4.5 ms, and four shapes",
+)
 ```
 
 The period is the same, so the pitch is the same. The shape inside the period is different, and the shape is what you hear as timbre. To say what about a shape the ear hears, we need a way to take a wave apart.
@@ -69,24 +62,15 @@ The fundamentals are larger than 1 for the square and smaller for the saw and th
 The plot shows the same spectra up to 6 000 Hz, in decibels. Each harmonic is a line at its frequency, as tall as its level in dB, so equal steps down mean equal ratios, as in chapter 2.
 
 ```python {run echo=false}
-import matplotlib.pyplot as plt
-import numpy as np
+from euterpe.sound import Saw, Sine, Square, Triangle
+from euterpe.view import spectrum
 
-from euterpe.book import show
-from euterpe.sound import Saw, Sine, Square, Triangle, render
-
-fig, axes = plt.subplots(4, 1, figsize=(7, 5.5), sharex=True, sharey=True)
-k = np.arange(1, 28)
-for ax, wave in zip(axes, (Sine, Triangle, Square, Saw)):
-    x = render(wave(220.0), 1.0)
-    amp = np.abs(np.fft.rfft(x)) * 2 / len(x)
-    db = 20 * np.log10(np.maximum(amp[220 * k], 1e-6))
-    ax.vlines(220 * k, -80, db, linewidth=2)
-    ax.set_ylim(-80, 5)
-    ax.text(0.99, 0.8, wave.__name__, transform=ax.transAxes, ha="right")
-    ax.set_ylabel("dB")
-axes[-1].set_xlabel("frequency (Hz)")
-show(fig, "The spectra of the four waves at 220 Hz, up to 6 kHz: one line per harmonic")
+waves = (Sine, Triangle, Square, Saw)
+spectrum(
+    *[wave(220.0).take(1.0) for wave in waves],
+    f0=220.0, upto=6000, labels=[wave.__name__ for wave in waves],
+    caption="The spectra of the four waves at 220 Hz, up to 6 kHz: one line per harmonic",
+)
 ```
 
 This is what the ear hears. The inner ear splits a sound into frequencies, much as the Fourier transform does, and timbre is the pattern of levels it finds. A sound with strong high harmonics sounds *bright*: the saw, whose levels fall by 6 dB per doubling of k. A sound whose harmonics fade fast sounds *dark* or soft: the triangle, whose levels fall by 12 dB per doubling, so that its fifth harmonic is already 28 dB below the fundamental. The square sounds hollow because of the gaps, the missing even harmonics.
@@ -121,10 +105,10 @@ If a wave is a sum of sines, it can be built by adding sines. Euterpe's `Additiv
 Here is a 220 Hz tone built from its first three harmonics, at amplitudes 1, 1/2 and 1/3, then the same three harmonics with the second one turned up to 1:
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import Additive
 
-listen(Additive(220.0, [(1, 1.0), (2, 0.5), (3, 0.33)]) * 0.3, 2.0, "Harmonics 1, 2 and 3 at 1, 1/2 and 1/3")
+display(listen(Additive(220.0, [(1, 1.0), (2, 0.5), (3, 0.33)]) * 0.3, 2.0, "Harmonics 1, 2 and 3 at 1, 1/2 and 1/3"))
 listen(Additive(220.0, [(1, 1.0), (2, 1.0), (3, 0.33)]) * 0.3, 2.0, "The same, with harmonic 2 as strong as the fundamental")
 ```
 
@@ -133,11 +117,11 @@ Both tones have the pitch of 220 Hz, and both are a little richer than a sine. T
 That fusion depends on the ratios being whole numbers. A free metal bar, struck, vibrates at frequencies with ratios near 1, 2.76, 5.40 and 8.93 to its lowest one. Here are those four partials at 220 Hz, next to harmonics 1, 3, 5 and 9 with the same amplitudes:
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import Additive
 
 amps = [1.0, 0.6, 0.4, 0.25]
-listen(Additive(220.0, list(zip([1, 3, 5, 9], amps))) * 0.3, 2.0, "Harmonics 1, 3, 5 and 9")
+display(listen(Additive(220.0, list(zip([1, 3, 5, 9], amps))) * 0.3, 2.0, "Harmonics 1, 3, 5 and 9"))
 listen(Additive(220.0, list(zip([1, 2.76, 5.40, 8.93], amps))) * 0.3, 2.0, "Partials at 1, 2.76, 5.40 and 8.93: a metal bar")
 ```
 
@@ -161,14 +145,14 @@ The spectrum table measured the saw's harmonics at 2/π × 1/k. That gives the r
 ```python {run}
 import numpy as np
 
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import Additive, Saw
 
 def saw_partials(n):
     return [(k, -2 / (np.pi * k)) for k in range(1, n + 1)]
 
 for n in (1, 2, 4, 8, 16, 109):
-    listen(Additive(220.0, saw_partials(n)) * 0.5, 1.5, f"A saw built up to harmonic {n}")
+    display(listen(Additive(220.0, saw_partials(n)) * 0.5, 1.5, f"A saw built up to harmonic {n}"))
 listen(Saw(220.0) * 0.5, 1.5, "Saw at 220 Hz, for comparison")
 ```
 
@@ -177,21 +161,15 @@ One harmonic is a sine. Each doubling adds an octave of brighter harmonics, and 
 The plot shows one cycle of the sums with 1, 4, 16 and 109 harmonics, drawn over the saw:
 
 ```python {run continue echo=false}
-import matplotlib.pyplot as plt
+from euterpe.view import waveform
 
-from euterpe.book import show
-from euterpe.sound import RATE, render
-
-saw = render(Saw(220.0), 1 / 220)
-ms = np.arange(len(saw)) / RATE * 1000
-fig, axes = plt.subplots(1, 4, figsize=(8, 2.2), sharey=True)
-for ax, n in zip(axes, (1, 4, 16, 109)):
-    ax.plot(ms, saw, color="grey", linewidth=0.8)
-    ax.plot(ms, render(Additive(220.0, saw_partials(n)), 1 / 220), linewidth=1)
-    ax.set_title(f"{n} harmonic" + ("s" if n > 1 else ""))
-    ax.set_xlabel("time (ms)")
-axes[0].set_ylim(-1.3, 1.3)
-show(fig, "One cycle of a saw built from 1, 4, 16 and 109 harmonics, over Saw in grey")
+counts = (1, 4, 16, 109)
+waveform(
+    *[Additive(220.0, saw_partials(n)).take(1 / 220) for n in counts],
+    separate=True, reference=Saw(220.0).take(1 / 220),
+    labels=[f"{n} harmonic" + ("s" if n > 1 else "") for n in counts],
+    caption="One cycle of a saw built from 1, 4, 16 and 109 harmonics, over Saw in grey",
+)
 ```
 
 Each harmonic added makes the ramp straighter and the drop steeper. Next to the drop the sum overshoots: it goes above 1, where the saw stops. This block prints the highest sample in one second of each sum, and of `Saw` and `Square`:
@@ -251,11 +229,11 @@ The argument also runs the other way: a sum of odd harmonics alone always mirror
 ```python {run}
 import numpy as np
 
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import Additive, Square
 
 partials = [(k, 4 / (np.pi * k)) for k in range(1, 110, 2)]   # k = 1, 3, 5, ..., 109
-listen(Additive(220.0, partials) * 0.35, 1.5, "A square from its odd harmonics")
+display(listen(Additive(220.0, partials) * 0.35, 1.5, "A square from its odd harmonics"))
 listen(Square(220.0) * 0.35, 1.5, "Square at 220 Hz, for comparison")
 ```
 
@@ -268,41 +246,35 @@ The triangle's odd harmonics have amplitude 8/(π²k²), and their signs alterna
 ```python {run}
 import numpy as np
 
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import Additive, Triangle
 
 odd = range(1, 110, 2)
 triangle = [(k, (-1) ** (k // 2) * 8 / (np.pi ** 2 * k ** 2)) for k in odd]
 same_sizes = [(k, 8 / (np.pi ** 2 * k ** 2)) for k in odd]
 
-listen(Additive(220.0, triangle) * 0.5, 1.5, "A triangle from its odd harmonics, signs alternating")
-listen(Additive(220.0, same_sizes) * 0.5, 1.5, "The same harmonics, every sign positive")
+display(listen(Additive(220.0, triangle) * 0.5, 1.5, "A triangle from its odd harmonics, signs alternating"))
+display(listen(Additive(220.0, same_sizes) * 0.5, 1.5, "The same harmonics, every sign positive"))
 listen(Triangle(220.0) * 0.5, 1.5, "Triangle at 220 Hz, for comparison")
 ```
 
 The three players sound the same. The plot shows why that is remarkable: the second wave has a different shape.
 
 ```python {run continue echo=false}
-import matplotlib.pyplot as plt
+from euterpe.view import waveform
 
-from euterpe.book import show
-from euterpe.sound import RATE, render
-
-fig, axes = plt.subplots(1, 2, figsize=(8, 2.2), sharey=True)
-for ax, (title, partials) in zip(axes, [("signs alternating", triangle), ("every sign positive", same_sizes)]):
-    x = render(Additive(220.0, partials), 2 / 220)
-    ax.plot(np.arange(len(x)) / RATE * 1000, x, linewidth=1)
-    ax.axhline(0, color="grey", linewidth=0.5)
-    ax.set_title(title)
-    ax.set_xlabel("time (ms)")
-axes[0].set_ylim(-1.1, 1.1)
-show(fig, "Two cycles of the same odd harmonics at 220 Hz with two sets of signs: two shapes, one sound")
+waveform(
+    Additive(220.0, triangle).take(2 / 220), Additive(220.0, same_sizes).take(2 / 220),
+    separate=True, labels=["signs alternating", "every sign positive"],
+    caption="Two cycles of the same odd harmonics at 220 Hz with two sets of signs: two shapes, one sound",
+)
 ```
 
 The block below measures what changed and what did not: the amplitudes of the first four odd harmonics, the loudness of the sum at gain 0.5, and its peak.
 
 ```python {run continue output=code}
 from euterpe.lint import lint_audio
+from euterpe.sound import render
 
 for partials in (triangle, same_sizes):
     x = render(Additive(220.0, partials), 1.0)

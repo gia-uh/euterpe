@@ -11,7 +11,7 @@ This chapter covers five families. Delays add copies of the sound later in time.
 Here a plucked string at 330 Hz goes through a delay of 0.3 s with feedback 0.45:
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import Delay, Pluck
 
 note = Pluck(330.0, damping=0.99)
@@ -48,12 +48,12 @@ A delay is only heard as an echo when the copy arrives late enough. Below about 
 The same noise burst, with a copy at 1 ms, 10 ms, 40 ms and 150 ms, one after the other:
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import ADSR, Delay, WhiteNoise
 
 for ms in (1, 10, 40, 150):
     burst = WhiteNoise(seed=7) * ADSR(attack=0.001, decay=0.08, sustain=0.0, gate=0.1) * 0.5
-    listen(Delay(burst, time=ms / 1000, feedback=0.0, mix=0.5), 0.6, f"A noise burst plus a copy {ms} ms later")
+    display(listen(Delay(burst, time=ms / 1000, feedback=0.0, mix=0.5), 0.6, f"A noise burst plus a copy {ms} ms later"))
 ```
 
 At 1 ms the burst sounds like a hollow tube: peaks every 1 000 Hz. At 10 ms the peaks are 100 Hz apart and the burst has a faint pitch, 100 Hz. At 40 ms the copy is just far enough apart to hear as two hits, a rough double hit. At 150 ms it is a clear echo.
@@ -79,18 +79,18 @@ print(f"the copy's pitch moves by up to {100 * r:.2f} %, {1200 * np.log2(1 + r):
 A *cent* is a hundredth of one of chapter 2's equal steps, so 26 cents is about a quarter of a step. Two singers on the same note are never exactly in tune: they drift apart by a few cents and back. The chorus copies that drift, which is where its name comes from. Here is a saw at 220 Hz, alone and then with a chorus:
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import ADSR, Biquad, Chorus, Saw
 
 saw = lambda: Biquad(Saw(220.0), "lowpass", cutoff=2500.0) * ADSR(gate=2.6, release=0.3) * 0.5
-listen(saw(), 3.0, "A filtered saw at 220 Hz, dry")
+display(listen(saw(), 3.0, "A filtered saw at 220 Hz, dry"))
 listen(Chorus(saw(), rate=0.8, depth=0.003, mix=0.5), 3.0, "The same saw through a chorus")
 ```
 
 `saw` is a function that builds a fresh saw each time it is called, because a unit keeps its own state and cannot be played in two places at once. The `ADSR` fades it out at the end. The chorused saw sounds thicker, as if two players were playing it, and it slowly shimmers. The shimmer is *beating*. Two tones close in frequency, added, drift in and out of step: when their peaks line up they add, and 1 / (2 × the difference) seconds later one is at its peak where the other is at its trough, and they cancel. So the sum gets louder and softer as many times a second as the difference of their frequencies. A copy 1.5 % higher than 220 Hz is at 223.3 Hz, and the pair beats 3.3 times a second:
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import ADSR, Sine
 
 listen((Sine(220.0) + Sine(223.3)) * ADSR(gate=2.6, release=0.3) * 0.3, 3.0, "Sines at 220 and 223.3 Hz added: 3.3 beats a second")
@@ -105,7 +105,7 @@ In the chorus every harmonic of the saw beats with its moving copy, each at its 
 A comb is easiest to hear on a sound that has every frequency, so here is white noise through a flanger sweeping once every 4 seconds:
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import ADSR, Flanger, WhiteNoise
 
 noise = WhiteNoise(seed=3) * ADSR(attack=0.5, gate=7.2, release=0.6) * 0.15
@@ -138,7 +138,7 @@ show(fig, "Spectrogram of white noise through the flanger: the comb's peaks swee
 Mixed with the source, the chained copy cancels wherever its total delay is an odd number of half periods: 180°, 540°, 900° and so on. Four stages delay 4 × 90° = 360° at the turning frequency, so they pass 180° at one frequency below it and 540° at one above it, two notches; they never reach 900°, since four stages give at most 720°. In general n stages reach at most n × 180°, so they have n / 2 notches, rounded down. A flanger's comb has peaks at 1, 2, 3, 4 ... times one frequency, evenly spaced all the way up. A phaser has only these few notches, and they are not at multiples of one frequency, so its sweep sounds softer:
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import ADSR, Biquad, Phaser, Saw
 
 saw = Biquad(Saw(110.0), "lowpass", cutoff=4000.0) * ADSR(gate=5.4, release=0.5) * 0.5
@@ -201,11 +201,11 @@ Two things show. First, the even harmonics (2nd, 4th, 6th) are at −150 dB or b
 More drive pushes more of the wave into the bend. Here is the same sine at drive 1, 4 and 16, through `tanh`:
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import ADSR, Shaper, Sine
 
 for drive in (1.0, 4.0, 16.0):
-    listen(Shaper(Sine(220.0), "tanh", drive=drive) * ADSR(gate=1.2, release=0.2) * 0.5, 1.5, f"A sine at 220 Hz through tanh at drive {drive:g}")
+    display(listen(Shaper(Sine(220.0), "tanh", drive=drive) * ADSR(gate=1.2, release=0.2) * 0.5, 1.5, f"A sine at 220 Hz through tanh at drive {drive:g}"))
 ```
 
 At drive 1 you hear a sine with a slight buzz; at 16 the wave is nearly a square, and sounds like one.
@@ -257,11 +257,11 @@ show(fig, "Spectra of a 220 Hz sine through the three curves and the saturator: 
 Listen to the two side by side, a shaper and a saturator at the same drive on a bass note at 110 Hz:
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import ADSR, Saturator, Shaper, Sine
 
 note = lambda: Sine(110.0) * ADSR(attack=0.005, decay=0.4, sustain=0.6, gate=1.2, release=0.3)
-listen(Shaper(note(), "tanh", drive=4.0) * 0.6, 1.6, "A 110 Hz note through tanh, drive 4: odd harmonics")
+display(listen(Shaper(note(), "tanh", drive=4.0) * 0.6, 1.6, "A 110 Hz note through tanh, drive 4: odd harmonics"))
 listen(Saturator(note(), drive=4.0, bias=0.2) * 0.6, 1.6, "The same note through a saturator, drive 4, bias 0.2: odd and even")
 ```
 
@@ -286,12 +286,12 @@ for top in (330.0, 311.1):
 The block renders 10 s so that the spectrum has a bin every 0.1 Hz and 311.1 Hz falls exactly on one; over 1 s the bins are 1 Hz apart and its energy would spill into the bins at 311 and 312 Hz. The fifth gives 110, 220, 330, 440 Hz and on, all multiples of 110: 110 Hz itself is 2 × 220 − 330. The tritone gives 128.9 Hz (2 × 220 − 311.1), 37.8 Hz (3 × 220 − 2 × 311.1), 402.2 Hz (2 × 311.1 − 220) and more, on no common series, a cluster that sounds rough:
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import ADSR, Shaper, Sine
 
 for top, name in ((330.0, "a fifth"), (311.1, "a tritone")):
     chord = Shaper(Sine(220.0) * 0.5 + Sine(top) * 0.5, "hard", drive=8.0)
-    listen(chord * ADSR(gate=1.7, release=0.2) * 0.5, 2.0, f"220 and {top:g} Hz, {name}, through a hard clip")
+    display(listen(chord * ADSR(gate=1.7, release=0.2) * 0.5, 2.0, f"220 and {top:g} Hz, {name}, through a hard clip"))
 ```
 
 This is why rock guitarists play only two notes a fifth apart through heavy distortion, the *power chord*.
@@ -383,11 +383,11 @@ print(f"lowest after 2 s: {out[low]:.1f} dB at {low / 100:.2f} s; within 1 dB of
 A compressor is easiest to hear on a note that starts loud and decays, such as a pluck. The second version goes through a compressor with a very low threshold, −55 dB, ratio 8, release 0.2 s and 30 dB of makeup gain, then is scaled by 0.5 and passes a `Limiter`, the next section's unit, for a reason the measurement shows:
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import Compressor, Limiter, Pluck
 
 held = Compressor(Pluck(196.0, damping=0.99), threshold=-55.0, ratio=8.0, attack=0.005, release=0.2, makeup=30.0)
-listen(Pluck(196.0, damping=0.99) * 0.5, 4.5, "A pluck at 196 Hz, dry")
+display(listen(Pluck(196.0, damping=0.99) * 0.5, 4.5, "A pluck at 196 Hz, dry"))
 listen(Limiter(held * 0.5, ceiling=-1.5), 4.5, "The same pluck compressed: threshold -55 dB, ratio 8, makeup 30 dB")
 ```
 
@@ -469,11 +469,11 @@ A *gate* is the opposite of a compressor: it turns the quiet parts down, to sile
 Here a pluck sits on a background of quiet hiss with an RMS of −59 dB (white noise at 0.002: its samples are spread evenly between −1 and 1, so its RMS is 1/√3 = 0.577 of its peak). A gate at −45 dB lets the note through and closes once the note falls below it:
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import Gate, Pluck, WhiteNoise
 
 noisy = lambda: Pluck(262.0, damping=0.99) * 0.6 + WhiteNoise(seed=2) * 0.002
-listen(noisy(), 3.0, "A pluck over quiet hiss")
+display(listen(noisy(), 3.0, "A pluck over quiet hiss"))
 listen(Gate(noisy(), threshold=-45.0, release=0.1), 3.0, "The same through a gate at -45 dB")
 ```
 
@@ -527,11 +527,11 @@ show(fig, "A click through FDNReverb and ConvolutionReverb, both decay 1.5 s: th
 The convolution reverb's line falls 60 dB from its start to the dashed line at 1.5 s. The network's falls a little faster: its damping removes the high frequencies sooner, and `decay` holds for the low ones. Its first echo arrives after 21.6 ms, marked on the plot: the shortest line, 30 ms × 0.7 = 21 ms, moved a little by the seed. Here is a short pluck, dry, in a small room and in a large hall:
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import FDNReverb, Pluck
 
-listen(Pluck(392.0, damping=0.98) * 0.6, 3.0, "A short pluck at 392 Hz, dry")
-listen(FDNReverb(Pluck(392.0, damping=0.98), decay=0.5, size=0.3, mix=0.3) * 0.6, 3.0, "In a small room: decay 0.5 s, size 0.3")
+display(listen(Pluck(392.0, damping=0.98) * 0.6, 3.0, "A short pluck at 392 Hz, dry"))
+display(listen(FDNReverb(Pluck(392.0, damping=0.98), decay=0.5, size=0.3, mix=0.3) * 0.6, 3.0, "In a small room: decay 0.5 s, size 0.3"))
 listen(FDNReverb(Pluck(392.0, damping=0.98), decay=3.0, size=1.0, damping=0.5, mix=0.4) * 0.6, 5.0, "In a large hall: decay 3 s, size 1, damping 0.5")
 ```
 
@@ -546,10 +546,10 @@ The other way to make reverb starts from a recording of a click in a real room: 
 `ConvolutionReverb(src, decay, mix, seed)` has no recording to use. It synthesizes the impulse response: white noise, a different one on each side, whose level falls 60 dB in `decay` seconds. The plot above shows it next to the network: dense from the very first millisecond, with no separate early echoes. Listen to both on the same pluck, both with a decay of 2 s:
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import ConvolutionReverb, FDNReverb, Pluck
 
-listen(FDNReverb(Pluck(392.0, damping=0.98), decay=2.0, mix=0.35) * 0.6, 4.0, "A pluck through FDNReverb, decay 2 s")
+display(listen(FDNReverb(Pluck(392.0, damping=0.98), decay=2.0, mix=0.35) * 0.6, 4.0, "A pluck through FDNReverb, decay 2 s"))
 listen(ConvolutionReverb(Pluck(392.0, damping=0.98), decay=2.0, mix=0.35) * 0.6, 4.0, "The same pluck through ConvolutionReverb, decay 2 s")
 ```
 
@@ -575,7 +575,7 @@ for pos in (-1.0, -0.5, 0.0, 0.5, 1.0):
 In the middle each side gets 0.707, −3 dB. `pos` can be a unit, so a slow sine moves the sound from side to side, an *auto-pan*. Listen to this one through headphones:
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import ADSR, Biquad, Pan, Saw, Sine
 
 tone = Biquad(Saw(220.0), "lowpass", cutoff=1500.0) * ADSR(gate=7.4, release=0.5) * 0.5
@@ -589,12 +589,12 @@ listen(Pan(tone, pos=Sine(0.25)), 8.0, "A saw moving from side to side, once eve
 The reverb's tail is a good thing to try it on, because its two sides differ:
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import FDNReverb, Pluck, Width
 
 for width in (0.0, 1.0, 2.0):
     wet = FDNReverb(Pluck(330.0, damping=0.98), decay=2.0, mix=0.5) * 0.5
-    listen(Width(wet, width=width), 3.0, f"A reverberant pluck at width {width:g}")
+    display(listen(Width(wet, width=width), 3.0, f"A reverberant pluck at width {width:g}"))
 ```
 
 At width 0 the tail sits in the middle of your head; at 2 it spreads around it. The dry pluck itself is the same on both sides, all mid, so its position does not change.
@@ -604,7 +604,7 @@ At width 0 the tail sits in the middle of your head; at 2 it spreads around it. 
 Effects are usually chained in a fixed order, the order a guitarist puts pedals on the floor: first what shapes the tone (distortion), then what moves it (chorus), then what places it in time and space (delay, reverb), and last a limiter that guards the output. Every unit in this chain is one met in this chapter:
 
 ```python {run}
-from euterpe.book import listen
+from euterpe.view import listen
 from euterpe.sound import Chorus, Delay, FDNReverb, Limiter, Pan, Pluck, Saturator
 
 note = Pluck(147.0, damping=0.995, brightness=0.7)
