@@ -39,4 +39,4 @@ class Report:
 
     def to_text(self) -> str:
         """One line per finding: severity, rule, message."""
-        return "\n".join(f"{f.severity:<6} {f.rule:<11} {f.message}" for f in self.findings)
+        return "\n".join(f"{f.severity:<6} {f.rule:<14} {f.message}" for f in self.findings)

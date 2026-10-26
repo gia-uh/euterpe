@@ -138,7 +138,7 @@ def test_report_json_round_trips():
 
 def test_text_has_one_line_per_finding():
     report = Report([Finding("A-PEAK", "metric", "sample peak -6.0 dBFS", -6.02)])
-    assert report.to_text() == "metric A-PEAK      sample peak -6.0 dBFS"
+    assert report.to_text() == "metric A-PEAK         sample peak -6.0 dBFS"
     assert len(lint_audio(sine()).to_text().splitlines()) == len(lint_audio(sine()).findings)
 
 
