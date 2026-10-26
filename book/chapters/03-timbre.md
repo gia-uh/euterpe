@@ -146,7 +146,7 @@ from euterpe.sound import Additive, Saw
 
 for n in (1, 2, 4, 8, 16, 109):
     partials = [(k, -2 / (np.pi * k)) for k in range(1, n + 1)]
-    listen(Additive(220.0, partials) * 0.5, 1.5, f"A saw from {n} harmonics")
+    listen(Additive(220.0, partials) * 0.5, 1.5, f"A saw built up to harmonic {n}")
 listen(Saw(220.0) * 0.5, 1.5, "Saw at 220 Hz, for comparison")
 ```
 
