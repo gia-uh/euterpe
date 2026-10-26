@@ -1,4 +1,4 @@
-# Preface
+# Preface {.unnumbered}
 
 This book is for a programmer who knows no music. It starts from what a sound is, a pressure that changes over time, and builds up to pieces of music. On the way it introduces Euterpe, a Python library in which every sound is made by code.
 
