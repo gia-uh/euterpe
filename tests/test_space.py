@@ -70,6 +70,14 @@ def test_flanger_puts_peaks_at_multiples_of_its_delay():
     assert band_db(x, 1_900, 2_100) > band_db(x, 900, 1_100) + 10
 
 
+def test_flanger_negative_feedback_moves_the_peaks_to_odd_multiples():
+    from euterpe.sound.noise import WhiteNoise
+
+    # 0.5 ms with feedback -0.5: peaks at 1000, 3000 Hz, dips at 2000, 4000 Hz
+    x = render(Flanger(WhiteNoise(seed=2) * 0.3, depth=0.0, feedback=-0.5, mix=0.5), 2.0)
+    assert band_db(x, 900, 1_100) > band_db(x, 1_900, 2_100) + 10
+
+
 def test_phaser_with_no_mix_is_its_source():
     assert np.array_equal(render(Phaser(Sine(440.0), mix=0.0), 0.1), render(Sine(440.0), 0.1))
 

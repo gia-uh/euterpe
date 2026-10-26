@@ -49,6 +49,7 @@ class _Moving(Unit):
     """
 
     _lfo: Unit | None = None
+    _invert = False  # mix the delayed copy in upside down while feedback is negative
 
     def __init__(self, src: Unit, longest: float, **values):
         self.src = src
@@ -92,6 +93,8 @@ class _Moving(Unit):
             self._ring[now % self._cap] = x[i : i + size] + fb[i : i + size] * w
             i += size
         self._done += n
+        if self._invert:
+            wet = np.where(fb < 0, -wet, wet)
         return _out((1 - mix) * x + mix * wet, self.channels)
 
 
@@ -149,9 +152,12 @@ class Flanger(_Moving):
 
     A delay of T seconds puts peaks at multiples of 1 / T Hz: at 0.5 ms every 2000 Hz, at
     2.5 ms every 400 Hz. Sweeping T slides the whole comb up and down the spectrum, the
-    "jet plane" sweep. feedback deepens the peaks; a negative one moves them to the odd
-    multiples of 1 / (2T).
+    "jet plane" sweep. feedback deepens the peaks. With a negative feedback the copy is also
+    mixed in upside down, so the peaks move to the odd multiples of 1 / (2T), as deep as with a
+    positive one; a feedback modulated across 0 flips the copy there, with a click.
     """
+
+    _invert = True
 
     params = (
         Param("rate", *_RATE, default=0.3),
