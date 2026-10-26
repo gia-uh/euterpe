@@ -215,7 +215,7 @@ class Default(View):
         a.set_ylim(-top, top)
         label_axis(a, "time (s)", "pressure")
         z0 = max(0.05, 0.2 * c.seconds)
-        quiet = env[min(len(env) - 1, int(z0 * c.rate / hop))] < 0.3 * env.max()
+        quiet = env[min(len(env) - 1, int(z0 * c.rate / hop))] < 0.1 * env.max()
         if quiet:  # the sound has died or not begun there: start just before its loud part
             z0 = max(0.0, float(te[np.argmax(env >= 0.5 * env.max())]) - 0.002)
         z0 = min(z0, c.seconds - 0.01)
