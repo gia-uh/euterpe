@@ -124,7 +124,7 @@ show(fig, "Spectrogram of white noise through the flanger: the comb's peaks swee
 
 `Phaser(src, rate, stages, mix)` sounds close to a flanger but works differently. It passes the source through a chain of `stages` *allpass* filters, which chapter 5 met: an allpass keeps the level of every frequency and only delays it, by a different amount at each frequency. The phaser's allpasses each delay a frequency by a quarter of its period, 90°, at a *turning frequency* that sweeps from 200 Hz to 2 000 Hz and back, `rate` times a second. Below that frequency they delay less, above it more, up to half a period.
 
-Mixed with the source, the chained copy cancels wherever its total delay is half a period, 180°. Four stages reach 180° at one frequency and 540° at a higher one, so they make two notches. Unlike the comb of a flanger, whose peaks are evenly spaced all the way up, a phaser has only stages / 2 notches, unevenly spaced, so its sweep sounds softer:
+Mixed with the source, the chained copy cancels wherever its total delay is half a period, 180°. Four stages reach 180° at one frequency and 540° at a higher one, so they make two notches. A chain of n stages delays up to n × 180°, reached at 24 000 Hz, so it has n / 2 notches below that, rounded down. Unlike the comb of a flanger, whose peaks are evenly spaced all the way up, a phaser has only these few notches, unevenly spaced, so its sweep sounds softer:
 
 ```python {run}
 from euterpe.book import listen
@@ -138,7 +138,7 @@ Eight stages give four notches that move together. Try `stages=2`: a single notc
 
 ## Distortion
 
-The effects so far are linear: a sine in gives a sine out, at the same frequency. *Distortion* is not. A *waveshaper* passes each sample through a fixed curve, and a curve that bends the wave adds new frequencies to it. Chapter 1's `BitCrush` was one: its curve was a staircase.
+The effects so far add copies of the sound, and a delay that does not move adds no new frequencies: a sine in gives a sine out, at the same frequency. *Distortion* does add new ones. A *waveshaper* passes each sample through a fixed curve, and a curve that bends the wave adds new frequencies to it. Chapter 1's `BitCrush` was one: its curve was a staircase.
 
 `Shaper(src, kind, drive)` has three curves. Each multiplies the sample by `drive` / 2 first and then bends it:
 
@@ -185,7 +185,7 @@ for kind in ("tanh", "soft", "hard"):
     print(f"{kind:>4}:", "  ".join(f"{v:6.1f}" for v in levels))
 ```
 
-Two things show. First, the even harmonics (2nd, 4th, 6th) are at −150 dB or below: absent. All three curves are *odd*: the bottom half is the top half turned upside down, so the positive and negative halves of the sine are bent the same way, and a wave with that symmetry has only odd harmonics, as the square of chapter 3. Second, the curves bend the wave by different amounts at the same drive. The 7th harmonic is −40.6 dB after `tanh`, −35.1 dB after `hard` and −30.0 dB after `soft`, whose curve rises most steeply in the plot above and then turns flat at the same point as `hard`, with a rounder corner.
+Two things show. First, the even harmonics (2nd, 4th, 6th) are at −150 dB or below: absent. All three curves are *odd*: the bottom half is the top half turned upside down, so the positive and negative halves of the sine are bent the same way, and a wave with that symmetry has only odd harmonics, as the square of chapter 3. The fundamental of `soft` and `hard` is above 0 dB although the output peaks at −1 dBFS: a wave squashed towards a square has a fundamental larger than its peak, 1.273 times it for a full square, as chapter 3 measured. Second, the curves bend the wave by different amounts at the same drive. The 7th harmonic is −40.6 dB after `tanh`, −35.1 dB after `hard` and −30.0 dB after `soft`, whose curve rises most steeply in the plot above and then turns flat at the same point as `hard`, with a rounder corner.
 
 More drive pushes more of the wave into the bend. Here is the same sine at drive 1, 4 and 16, through `tanh`:
 
@@ -213,7 +213,37 @@ amp = np.abs(np.fft.rfft(x)) * 2 / len(x)
 print("  ".join(f"{20 * np.log10(amp[220 * k]):6.1f}" for k in range(1, 8)))
 ```
 
-The 2nd harmonic is now at −18.3 dB, nearly as loud as the 3rd at −16.7 dB, and the 4th and 6th are there too. Listen to the two side by side, a shaper and a saturator at the same drive on a bass note at 110 Hz:
+The 2nd harmonic is now at −18.3 dB, nearly as loud as the 3rd at −16.7 dB, and the 4th and 6th are there too. The plot puts the four spectra side by side, the first ten harmonics of 220 Hz marked, odd ones in blue and even ones in orange:
+
+```python {run echo=false}
+import matplotlib.pyplot as plt
+import numpy as np
+
+from euterpe.book import show
+from euterpe.sound import Saturator, Shaper, Sine, render
+
+units = {
+    "Shaper tanh, drive 4": Shaper(Sine(220.0), "tanh", drive=4.0),
+    "Shaper soft, drive 4": Shaper(Sine(220.0), "soft", drive=4.0),
+    "Shaper hard, drive 4": Shaper(Sine(220.0), "hard", drive=4.0),
+    "Saturator, drive 4, bias 0.2": Saturator(Sine(220.0), drive=4.0, bias=0.2),
+}
+fig, axes = plt.subplots(4, 1, figsize=(7, 5.6), sharex=True)
+k = np.arange(1, 11)
+for ax, (name, unit) in zip(axes, units.items()):
+    amp = np.abs(np.fft.rfft(render(unit, 1.0))) * 2 / 48000
+    level = np.maximum(20 * np.log10(amp[220 * k] + 1e-12), -80)
+    ax.vlines(220 * k, -80, level, linewidth=3, colors=["C0" if i % 2 else "C1" for i in k])
+    ax.set_ylim(-80, 5)
+    ax.set_ylabel("dB")
+    ax.set_title(name, fontsize=9, loc="left")
+axes[-1].set_xticks(220 * k)
+axes[-1].set_xlabel("frequency (Hz)")
+fig.tight_layout()
+show(fig, "Spectra of a 220 Hz sine through the three curves and the saturator: harmonics 1 to 10")
+```
+
+Listen to the two side by side, a shaper and a saturator at the same drive on a bass note at 110 Hz:
 
 ```python {run}
 from euterpe.book import listen
@@ -236,12 +266,13 @@ import numpy as np
 from euterpe.sound import Shaper, Sine, render
 
 for top in (330.0, 311.1):
-    x = render(Shaper(Sine(220.0) * 0.5 + Sine(top) * 0.5, "hard", drive=8.0), 1.0)
-    amp = np.abs(np.fft.rfft(x))
-    print(f"220 + {top} Hz, the ten loudest frequencies:", sorted(np.argsort(amp)[-10:].tolist()))
+    x = render(Shaper(Sine(220.0) * 0.5 + Sine(top) * 0.5, "hard", drive=8.0), 10.0)
+    amp = np.abs(np.fft.rfft(x))                # 10 s: one bin every 0.1 Hz
+    loudest = sorted(np.argsort(amp)[-10:] / 10)
+    print(f"220 + {top} Hz, the ten loudest (Hz):", ", ".join(f"{f:g}" for f in loudest))
 ```
 
-The fifth gives 110, 220, 330, 440 Hz and on, all multiples of 110. The tritone gives 38, 129, 402 and 493 Hz among others, a cluster that sounds rough:
+The block renders 10 s so that the spectrum has a bin every 0.1 Hz and 311.1 Hz falls exactly on one; over 1 s the bins are 1 Hz apart and its energy would spill into the bins at 311 and 312 Hz. The fifth gives 110, 220, 330, 440 Hz and on, all multiples of 110. The tritone gives 128.9 Hz (2 × 220 − 311.1), 37.8 Hz (3 × 220 − 2 × 311.1), 402.2 Hz (2 × 311.1 − 220) and more, on no common series, a cluster that sounds rough:
 
 ```python {run}
 from euterpe.book import listen
@@ -321,7 +352,7 @@ fig.tight_layout()
 show(fig, "Level of the stepped saw before and after Compressor(threshold=-30, ratio=4), every 10 ms")
 ```
 
-At the jump to the loud step, at 1 s, the output overshoots for a few milliseconds before the gain comes down: that is the attack. At 2 s, when the level drops, the gain is still low, so the output dips to −36 dB and climbs back over about 0.2 s: that is the release. A slower attack lets more of the start of each note through, which keeps the click of a drum or a plucked string. A faster release makes the gain spring back sooner after a loud note, and on a fast release the quiet tail of each note swells as the gain recovers. Producers call the sound *pumping*, and some music uses it on purpose.
+At the jump to the loud step, at 1 s, the output overshoots for about 40 ms before the gain comes down: that is the attack. Two delays add up there. The detector's 10 ms average needs time to see the new level, and the gain then follows what it sees with its own 10 ms attack, so the level settles over a few times 10 ms. At 2 s, when the level drops, the gain is still low, so the output dips to −36 dB and climbs back over about 0.2 s: that is the release. A slower attack lets more of the start of each note through, which keeps the click of a drum or a plucked string. A faster release makes the gain spring back sooner after a loud note, and on a fast release the quiet tail of each note swells as the gain recovers. Producers call the sound *pumping*, and some music uses it on purpose.
 
 A compressor is easiest to hear on a note that starts loud and decays, such as a pluck. The second version, compressed hard and lifted with makeup gain, keeps its attack but its tail stays loud for much longer. It is scaled by 0.3 instead of 0.5: the first 5 ms of the pluck pass before the gain has come down, and the makeup lifts that first peak by 10 dB too, which at 0.5 would reach full scale.
 
@@ -351,7 +382,40 @@ print(f"after:  peak {20 * np.log10(np.abs(safe).max()):.2f} dBFS")
 print("delay:", np.argmax(safe != 0) - np.argmax(loud != 0), "samples")
 ```
 
-The peak sits at the ceiling, and the output starts 240 samples, 5 ms, late. A limiter that works this hard flattens the top of every cycle, which is distortion: on a steady loud sine it is a shaper. Its job is to catch rare peaks, not to make a quiet sound loud.
+The peak sits at the ceiling, and the output starts 240 samples, 5 ms, late. The plot shows what the lookahead is for. A sine at 0.3 jumps to 3.0 at 40 ms. The input is drawn shifted 5 ms later, lined up with the output, and the gain is the output divided by it. The gain starts to fall 5 ms before the jump, while the sound is still quiet, so it reaches 0.891 / 3.0 = 0.30 exactly as the loud part arrives, and no sample crosses the dashed ceiling:
+
+```python {run echo=false}
+import matplotlib.pyplot as plt
+import numpy as np
+
+from euterpe.book import show
+from euterpe.sound import Limiter, Segments, Sine, render
+
+level = lambda: Segments([(0.0, 0.3), (0.04, 0.3), (0.04, 3.0), (0.1, 3.0)])
+dry = render(Sine(220.0) * level(), 0.1)
+out = render(Limiter(Sine(220.0) * level(), ceiling=-1.0, release=0.05), 0.1)
+late = np.concatenate([np.zeros(240), dry[:-240]])        # the input, 5 ms later
+t = np.arange(len(out)) / 48 + 0.0                          # milliseconds
+gain = np.where(np.abs(late) > 0.05, out / np.where(late == 0, 1, late), np.nan)
+fig, (top, bottom) = plt.subplots(2, 1, figsize=(7, 4.4), sharex=True)
+top.plot(t, late, color="0.75", linewidth=0.8, label="input, 5 ms later")
+top.plot(t, out, linewidth=0.9, label="output")
+for c in (0.891, -0.891):
+    top.axhline(c, color="C3", linestyle="--", linewidth=1)
+top.set_ylim(-3.2, 3.2)
+top.legend(fontsize=8, loc="upper left")
+bottom.plot(t, gain, linewidth=1)
+bottom.axvline(45, color="0.6", linestyle=":", linewidth=1)
+bottom.axvline(40, color="0.6", linestyle=":", linewidth=1)
+bottom.set_ylabel("gain")
+bottom.set_ylim(0, 1.1)
+bottom.set_xlim(20, 100)
+bottom.set_xlabel("time at the output (ms)")
+fig.tight_layout()
+show(fig, "A sine jumping from 0.3 to 3.0 through Limiter(ceiling=-1): the gain ramps down over the 5 ms before the jump")
+```
+
+A limiter that works this hard flattens the top of every cycle, which is distortion: on a steady loud sine it is a shaper. Its job is to catch rare peaks, not to make a quiet sound loud.
 
 ### Gate
 
@@ -450,7 +514,7 @@ A stereo file has two channels, one for each speaker. A sound placed only in the
 
 ### Pan
 
-`Pan(src, pos)` places a mono sound: `pos` −1 is fully left, 0 the middle, 1 fully right. The obvious rule, left gain 1 − p and right gain p, makes the sound quieter in the middle: two speakers at half level carry half the power of one at full level, 2 × 0.5² = 0.5, which is −3 dB. So `Pan` uses a *constant-power* rule. It turns `pos` into an angle θ = (pos + 1) × π / 4, from 0 to π / 2, and uses cos θ for the left and sin θ for the right. Since cos² θ + sin² θ = 1, the total power never changes:
+`Pan(src, pos)` places a mono sound: `pos` −1 is fully left, 0 the middle, 1 fully right. The obvious rule, with p = (pos + 1) / 2 running from 0 to 1, left gain 1 − p and right gain p, makes the sound quieter in the middle: two speakers at half level carry half the power of one at full level, 2 × 0.5² = 0.5, which is −3 dB. So `Pan` uses a *constant-power* rule. It turns `pos` into an angle θ = (pos + 1) × π / 4, from 0 to π / 2, and uses cos θ for the left and sin θ for the right. Since cos² θ + sin² θ = 1, the total power never changes:
 
 ```python {run output=code}
 import numpy as np
@@ -502,13 +566,13 @@ space = FDNReverb(Pan(Delay(tone, time=0.375, feedback=0.4, mix=0.3), pos=-0.3),
 listen(Limiter(space * 0.9, ceiling=-1.0), 6.0, "A pluck at 147 Hz: saturator, chorus, delay, pan, reverb and limiter")
 ```
 
-Change the order and the sound changes. Distortion after the reverb would distort every echo of the tail together, and each echo would intermodulate with the others; a delay before the chorus would give every echo the same shimmer instead of one.
+Change the order and the sound changes. Distortion after the reverb would distort every echo of the tail together, and each echo would intermodulate with the others; in the chain above, the chorus comes before the delay, so every echo repeats the shimmer of the note. With the delay first, each echo would pass through the chorus at a different moment of its sweep and shimmer differently.
 
 ## Summary
 
 - An effect is a unit whose source is another unit, so effects chain.
 - `Delay(src, time, feedback, mix)` adds the source again after `time` seconds; `feedback` repeats it, each echo `feedback` times the last. Below about 30 to 50 ms the copy is not heard as an echo but as a comb filter, with peaks every 1 / time Hz.
-- A delay that changes while it plays shifts the pitch of the copy by the rate of change. `Chorus` uses a 20 ms delay that swings a few cents of pitch, which thickens a sound; `Flanger` sweeps a delay of 0.5 to 2.5 ms, which slides a whole comb of peaks up and down; `Phaser` sweeps a chain of allpasses, which slides stages / 2 notches.
+- A delay that changes while it plays shifts the pitch of the copy by the rate of change. `Chorus` uses a 20 ms delay that swings a few cents of pitch, which thickens a sound; `Flanger` sweeps a delay of 0.5 to 2.5 ms, which slides a whole comb of peaks up and down; `Phaser` sweeps a chain of allpasses, which slides a few notches, half as many as stages, rounded down.
 - `Shaper(src, kind, drive)` bends each sample through tanh, a soft cubic or a hard clip. An odd curve adds odd harmonics only; more drive and a harsher curve make them louder. `Saturator` shifts the wave before the curve, which adds even harmonics too. Two notes through a curve also produce sums and differences of their frequencies, intermodulation.
 - `Compressor(src, threshold, ratio, attack, release, makeup)` divides by `ratio` how far the level goes above `threshold`: it shrinks the range between loud and soft. `Limiter(src, ceiling, release)` looks 5 ms ahead and keeps every sample under `ceiling`. `Gate(src, threshold, release)` silences what is quieter than `threshold`.
 - Reverb is the dense tail of echoes a room adds; RT60 is the time it takes to fall 60 dB. `FDNReverb(src, decay, size, damping, mix)` makes it with eight delay lines feeding each other; `ConvolutionReverb(src, decay, mix, seed)` convolves the source with a synthesized impulse response of decaying noise.
