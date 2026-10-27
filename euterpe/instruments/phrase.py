@@ -18,7 +18,8 @@ class Phrase(Unit):
     Allocation is decided once, in time order. A note on a resource that is still sounding
     stops the voice there; then, while polyphony voices or more still sound, the oldest one
     stops. A stopped voice fades over 5 ms. A monophonic instrument (polyphony 1) slurs a note
-    that starts before the previous one ends, or carries Legato, into one voice.
+    that starts before the previous one ends, or carries Legato, into one voice, unless its
+    slurs attribute is False, as on a drum.
     """
 
     def __init__(self, notes: list[Note], instrument):
@@ -26,7 +27,7 @@ class Phrase(Unit):
         self.notes = notes
         polyphony = instrument.polyphony
         resource = getattr(instrument, "resource", None) or (lambda note: note.resource)
-        played = _slurred(notes) if polyphony == 1 else notes
+        played = _slurred(notes) if polyphony == 1 and getattr(instrument, "slurs", True) else notes
         self.voices = [instrument.voice(n) for n in played]
         self.channels = 2 if any(v.channels == 2 for v in self.voices) else 1
         self.starts = [round(n.time * RATE) for n in played]

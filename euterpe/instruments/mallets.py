@@ -57,9 +57,9 @@ class Barred(Struck):
         return (float(a * tol.cents), float(b * tol.level), float(c * tol.decay))
 
     def voice(self, note: Note) -> Unit:
-        force, bright, tuning = self.vary(note)
+        force, bright, _ = self.vary(note)  # a bar keeps its pitch from stroke to stroke
         cents, level, decay = self.traits(self.resource(note))
-        f0 = float(note.freq) * tuning * 2 ** (cents / 1200)
+        f0 = float(note.freq) * 2 ** (cents / 1200)
         d = self.decay * (1 + decay) * (C4.freq / f0) ** 0.5
         amps = [a * (bright if i else 1.0) for i, a in enumerate(self.bar.amps)]
         decays = [d * k for k in self.bar.decays]

@@ -35,12 +35,14 @@ class Struck(Instrument):
 
     tune: the drum's pitch in Hz; a note's pitch retunes one hit.
     level: the gain of one hit at full velocity.
-    variation: how far each hit's force and brightness move, as a fraction; its tuning moves a
-    tenth as far. Two hits are never quite the same.
+    variation: how far each hit's force and brightness move, as a fraction; on an untuned drum
+    its tuning moves a tenth as far, while a tuned bar or kettle keeps its pitch. Two hits are
+    never quite the same.
     seed: which instrument of its make this is.
     """
 
     polyphony = 8
+    slurs = False  # a stroke never joins the one before, even on one voice
     tune: float = 100.0
     level: float = 0.5
     variation: float = 0.08
@@ -127,6 +129,10 @@ class Stomp(Kick):
             raise ValueError(f"Stomp needs at least one person, got {people}")
         self.people, self.spread, self.room = people, spread, room
 
+    def resource(self, note: Note) -> Hashable | None:
+        """None: many feet are not one drum head, and the hall keeps ringing under the next stamp."""
+        return None
+
     def voice(self, note: Note) -> Unit:
         times = np.sort(note.rng.uniform(0.0, self.spread, self.people))
         feet = sum((self.thump(note, float(t)) for t in times[1:]), self.thump(note, float(times[0])))
@@ -145,7 +151,7 @@ class Snare(Struck):
     """
 
     def __init__(self, tune: float = 185.0, decay: float = 0.18, snappy: float = 0.7, wires: float = 0.22,
-                 level: float = 0.35, variation: float = 0.08, seed: int = 0):
+                 level: float = 0.3, variation: float = 0.08, seed: int = 0):
         self.tune, self.decay, self.snappy, self.wires = tune, decay, snappy, wires
         self.level, self.variation, self.seed = level, variation, seed
 
@@ -304,8 +310,8 @@ class Kit(Instrument):
     name a drum that is not part of the kit, such as a Clap().
 
     toms: from the highest to the lowest.
-    level: the gain on every drum, so that the whole kit struck at once stays under full scale
-    while each drum alone keeps its own level.
+    level: the gain on every drum, so that four drums struck at once at full velocity (a
+    drummer's four limbs) stay under full scale while each drum alone keeps its own level.
 
     Limit: each drum sounds alone; the snare's wires do not buzz when the toms ring, and the
     drums share no room.
@@ -372,10 +378,10 @@ TIMPANI = (1.0, 1.50, 1.98, 2.44, 2.90)  # the kettle's modes over the principal
 
 
 class Timpani(Struck):
-    """Timpani: a membrane over a copper kettle, whose air pulls its modes close to the
-    harmonics 1, 1.5, 2, 2.5 and 3 of a note an octave below the principal, so a timpano has a
-    pitch where a tom has none; plus the head's lowest mode, a short thud below it. A felt
-    mallet strikes it.
+    """Timpani: a membrane over a copper kettle, whose air pulls its modes close to 1, 1.5, 2,
+    2.5 and 3 times the principal one: harmonics 2 to 6 of a note an octave below it, which the
+    ear hears as a clear pitch where a tom's is vague. Plus the head's lowest mode, a short
+    thud below the principal. A felt mallet strikes it.
 
     kettles: how many drums, so how many pitches ring at once. decay: the principal mode's
     seconds to fall 60 dB.
@@ -389,6 +395,8 @@ class Timpani(Struck):
 
     def __init__(self, mallet: Mallet | None = None, kettles: int = 4, decay: float = 2.5, level: float = 0.3,
                  variation: float = 0.08, seed: int = 0):
+        if kettles < 1:
+            raise ValueError(f"Timpani needs at least one kettle, got {kettles}")
         self.mallet = mallet or Mallet(0.3)
         self.polyphony, self.decay, self.tune = kettles, decay, G2.freq
         self.level, self.variation, self.seed = level, variation, seed
@@ -398,8 +406,8 @@ class Timpani(Struck):
         return round(69 + 12 * np.log2(float(note.freq) / 440.0))
 
     def voice(self, note: Note) -> Unit:
-        force, bright, tuning = self.vary(note)
-        f0 = float(note.freq) * tuning
+        force, bright, _ = self.vary(note)  # a tuned kettle keeps its pitch from stroke to stroke
+        f0 = float(note.freq)
         d = self.decay
         head = Modal([f0 * r for r in TIMPANI] + [0.82 * f0], [d, 0.8 * d, 0.6 * d, 0.5 * d, 0.4 * d, 0.2],
                      [1.0, 0.8 * bright, 0.5 * bright, 0.35 * bright, 0.25 * bright, 0.6],
