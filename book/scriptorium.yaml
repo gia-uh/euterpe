@@ -18,6 +18,7 @@ files:
   - chapters/06-fm-noise-wavetables.md
   - chapters/07-physical-models.md
   - chapters/08-effects.md
+  - chapters/09-anatomy-of-an-instrument.md
 
 outputs:
   site:
