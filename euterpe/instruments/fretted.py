@@ -51,8 +51,8 @@ class Fretted(Plucked):
 
     def __init__(self, tuning: Sequence[Pitch] | None = None, capo: int = 0, exciter: Exciter = Finger(),
                  string: String = Steel(), body: Soundboard | None = GuitarBody(), let_ring: bool = True,
-                 mute: float = 0.08, level: float = 0.25):
-        super().__init__(exciter, string, body, let_ring, mute, level)
+                 mute: float = 0.08, level: float = 0.25, variation: float = 0.0):
+        super().__init__(exciter, string, body, let_ring, mute, level, variation)
         if not 0 <= capo < self.frets:
             raise ValueError(f"capo {capo} is not a fret of {type(self).__name__} (0 to {self.frets - 1})")
         self.tuning = tuple(tuning) if tuning is not None else type(self).tuning
@@ -218,7 +218,8 @@ class Guitar(Fretted):
 
 class BassGuitar(Fretted):
     """An acoustic bass guitar: four strings tuned E1 A1 D2 G2, 20 frets, played with the
-    fingers, through a bass body.
+    fingers, through a bass body. As a bass player does, it damps each note when the next one
+    is due (let_ring=False), and no two plucks are the same (variation=0.15).
 
     Limit: the low strings' stiffness is not modelled, so the upper partials sit exactly in
     tune, and the body's three modes give less boom than a real box.
@@ -230,6 +231,6 @@ class BassGuitar(Fretted):
 
     def __init__(self, tuning: Sequence[Pitch] | None = None, capo: int = 0,
                  exciter: Exciter = Finger(position=0.15), string: String = Steel(damping=0.998),
-                 body: Soundboard | None = BassBody(), let_ring: bool = True, mute: float = 0.08,
-                 level: float = 0.7):
-        super().__init__(tuning, capo, exciter, string, body, let_ring, mute, level)
+                 body: Soundboard | None = BassBody(), let_ring: bool = False, mute: float = 0.06,
+                 level: float = 1.1, variation: float = 0.15):
+        super().__init__(tuning, capo, exciter, string, body, let_ring, mute, level, variation)

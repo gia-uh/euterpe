@@ -64,3 +64,21 @@ def test_a_section_needs_a_player():
     import pytest
     with pytest.raises(ValueError, match="players"):
         PizzicatoStrings(players=0)
+
+
+def test_variation_spreads_identical_notes_but_repeats_with_the_seed():
+    from euterpe.instruments import BassGuitar
+    from euterpe.pitch import E2
+    def spread(bass):
+        x = np.asarray(bass.play([(1.0 * k, E2, 0.5) for k in range(8)], seed=3).take(8.0))
+        rms = [np.sqrt(np.mean(x[k * RATE: k * RATE + RATE // 2] ** 2)) for k in range(8)]
+        return np.std(rms) / np.mean(rms)
+    assert spread(BassGuitar()) > 2 * spread(BassGuitar(variation=0.0))
+    a, b = (np.asarray(BassGuitar().play([(0.0, E2, 0.5)], seed=3).take(0.5)) for _ in range(2))
+    assert np.array_equal(a, b)
+
+
+def test_a_bass_player_damps_each_note():
+    from euterpe.instruments import BassGuitar
+    from euterpe.pitch import E2
+    assert BassGuitar().note(E2, 0.5).duration < 1.0

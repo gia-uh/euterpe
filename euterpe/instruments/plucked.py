@@ -65,7 +65,7 @@ class Plectrum(Exciter):
     """A hard pick: bright, close to the bridge."""
 
     position: float = 0.1
-    brightness: float = 0.8
+    brightness: float = 0.6
 
 
 @dataclass(frozen=True)
@@ -161,32 +161,42 @@ class Plucked(Instrument):
     let_ring: False to have the finger mute each string at its note's end, as Staccato does.
     mute: how long the finger takes to stop the string, in seconds.
     level: the gain of one string at full velocity.
+    variation: how much each pluck differs from the last, as a player's never repeat exactly:
+    position, brightness and force each move by up to this fraction, drawn per note from the seed.
     """
 
     polyphony = 6
 
     def __init__(self, exciter: Exciter = Finger(), string: String = Steel(),
                  body: Soundboard | None = GuitarBody(), let_ring: bool = True, mute: float = 0.08,
-                 level: float = 0.25):
+                 level: float = 0.25, variation: float = 0.0):
         self.exciter, self.string, self.body = exciter, string, body
-        self.let_ring, self.mute, self.level = let_ring, mute, level
+        self.let_ring, self.mute, self.level, self.variation = let_ring, mute, level, variation
 
-    def pluck(self, note: Note, freq: float) -> Unit:
+    def vary(self, note: Note) -> tuple[float, float, float]:
+        """Factors for this pluck's position, brightness and force; all 1 without variation."""
+        if not self.variation:
+            return (1.0, 1.0, 1.0)
+        a, b, c = 1 + self.variation * note.rng.uniform(-1.0, 1.0, 3)
+        return (float(a), float(b), float(c))
+
+    def pluck(self, note: Note, freq: float, vary: tuple[float, float, float] = (1.0, 1.0, 1.0)) -> Unit:
         """The bare string for note at freq, before the finger and the body."""
         return Pluck(freq, damping=self.string.damping,
-                     brightness=self.exciter.brightness * (0.5 + 0.5 * note.velocity),
-                     position=self.exciter.position, seed=int(note.rng.integers(2**31)))
+                     brightness=min(1.0, self.exciter.brightness * (0.5 + 0.5 * note.velocity) * vary[1]),
+                     position=min(0.5, self.exciter.position * vary[0]), seed=int(note.rng.integers(2**31)))
 
     def voice(self, note: Note) -> Unit:
-        return self.finish(note, self.pluck(note, note.freq))
+        vary = self.vary(note)
+        return self.finish(note, self.pluck(note, note.freq, vary), vary[2])
 
-    def finish(self, note: Note, string: Unit) -> Unit:
+    def finish(self, note: Note, string: Unit, force: float = 1.0) -> Unit:
         """The finger's mute when asked, then the body, then the note's gain."""
         if not self.let_ring or isinstance(note.articulation, Staccato):
             string = string * ADSR(attack=0.0, decay=0.0, sustain=1.0, release=self.mute, gate=note.duration)
         if self.body is not None:
             string = self.body(string)
-        return string * note.velocity * self.level
+        return string * note.velocity * force * self.level
 
 
 class Harp(Plucked):
