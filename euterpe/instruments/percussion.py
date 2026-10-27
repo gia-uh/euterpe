@@ -304,6 +304,8 @@ class Kit(Instrument):
     name a drum that is not part of the kit, such as a Clap().
 
     toms: from the highest to the lowest.
+    level: the gain on every drum, so that the whole kit struck at once stays under full scale
+    while each drum alone keeps its own level.
 
     Limit: each drum sounds alone; the snare's wires do not buzz when the toms ring, and the
     drums share no room.
@@ -312,10 +314,11 @@ class Kit(Instrument):
     polyphony = 24
 
     def __init__(self, kick: Struck | None = None, snare: Struck | None = None, hihat: Struck | None = None,
-                 toms: tuple[Struck, ...] | None = None, crash: Struck | None = None, ride: Struck | None = None):
+                 toms: tuple[Struck, ...] | None = None, crash: Struck | None = None, ride: Struck | None = None,
+                 level: float = 0.35):
         self.kick, self.snare, self.hihat = kick or Kick(), snare or Snare(), hihat or HiHat()
         self.toms = toms if toms is not None else (Tom(196.0), Tom(147.0), Tom(98.0, decay=0.7))
-        self.crash, self.ride = crash or Crash(), ride or Ride()
+        self.crash, self.ride, self.level = crash or Crash(), ride or Ride(), level
 
     @staticmethod
     def _drum(note: Note) -> Struck:
@@ -324,7 +327,7 @@ class Kit(Instrument):
         return note.resource
 
     def voice(self, note: Note) -> Unit:
-        return self._drum(note).voice(note)
+        return self._drum(note).voice(note) * self.level
 
     def resource(self, note: Note) -> Hashable | None:
         return self._drum(note).resource(note)
