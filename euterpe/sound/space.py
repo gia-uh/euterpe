@@ -12,38 +12,23 @@ from scipy.linalg import hadamard
 from scipy.fft import irfft, next_fast_len, rfft
 from scipy.signal import lfilter
 
-from euterpe.sound.core import LN60, RATE, Param, Unit, _after, rng
+from euterpe.sound.core import LN60, RATE, Unit, _after, _arg, _fixed, _signal, rng
 from euterpe.sound.filters import _as_frames as _frames
 from euterpe.sound.filters import _out
 from euterpe.sound.osc import Sine
 
-_RATE = ("Hz", 0.01, 20.0, "log")
-_MIX = Param("mix", "", 0.0, 1.0, default=0.5)
+_FEEDBACK = 0.999  # a moving delay's feedback is clipped to this size: at 1 the echoes never fade
 _GRID = 64  # a phaser's sweep is read once per this many samples, counted from the start
 
 
-def _p64(unit: Unit, name: str, n: int) -> np.ndarray:
+def _p64(x: Unit | float, n: int) -> np.ndarray:
     """A parameter's next n values in float64; a constant keeps its exact value."""
-    v = unit._values[name]
-    return unit._param(name, n).astype(np.float64) if isinstance(v, Unit) else np.full(n, v)
-
-
-class _Clip(Unit):
-    """Its source clipped to [lo, hi]: how a modulating rate stays inside its range."""
-
-    def __init__(self, src: Unit, lo: float, hi: float):
-        self.src, self.lo, self.hi = src, lo, hi
-
-    def inputs(self) -> list[Unit]:
-        return [self.src]
-
-    def block(self, n: int) -> np.ndarray:
-        return np.clip(self.src.block(n), self.lo, self.hi).astype(np.float32)
+    return _signal(x, n).astype(np.float64) if isinstance(x, Unit) else np.full(n, x)
 
 
 def _lfo(rate: float | Unit) -> Sine:
-    """The sine that sweeps a moving effect, rate times a second; a modulating rate is clipped."""
-    return Sine(_Clip(rate, *_RATE[1:3]) if isinstance(rate, Unit) else rate)
+    """The sine that sweeps a moving effect, rate times a second."""
+    return Sine(rate)
 
 
 def _numbers(unit: str, **values) -> None:
@@ -57,7 +42,8 @@ class _Moving(Unit):
 
     Each written sample is the input plus feedback times the delayed one, and the output is
     (1 - mix) * input + mix * delayed. It runs in chunks shorter than the shortest delay in
-    them, so every read comes from samples already written.
+    them, so every read comes from samples already written. The delay is clipped to between
+    one sample and the longest the line holds, and feedback to +-0.999.
     """
 
     _lfo: Unit | None = None
@@ -66,20 +52,17 @@ class _Moving(Unit):
     @property
     def duration(self) -> float | None:
         """The source's plus the longest delay, repeated until a feedback has fallen 60 dB."""
-        fb = abs(self._fixed("feedback", 0.99)) if "feedback" in self._values else 0.0
+        fb = min(abs(_fixed(getattr(self, "feedback", 0.0), _FEEDBACK)), _FEEDBACK)
         trips = LN60 / -np.log(fb) if 0 < fb < 1 else 1.0
         return _after(self.src.duration, float((self._cap / RATE) * (trips + 1)))
 
     def __init__(self, src: Unit, longest: float, **values):
         self.src = src
         self.channels = src.channels
-        self._set_params(**values)
+        for name, v in values.items():
+            setattr(self, name, _arg(v))
         self._cap = int(np.ceil(longest * RATE)) + 2
         self.reset()
-
-    def inputs(self) -> list[Unit]:
-        own = [v for k, v in self._values.items() if isinstance(v, Unit) and k != "rate"]
-        return [self.src, *([self._lfo] if self._lfo else []), *own]
 
     def reset(self) -> None:
         super().reset()
@@ -95,9 +78,9 @@ class _Moving(Unit):
 
     def block(self, n: int) -> np.ndarray:
         x = _frames(self.src.block(n))
-        d = self._delay(n)
-        fb = self._feedback(n)[:, None]
-        mix = _p64(self, "mix", n)[:, None]
+        d = np.clip(self._delay(n), 1.0, self._cap - 2)
+        fb = np.clip(self._feedback(n), -_FEEDBACK, _FEEDBACK)[:, None]
+        mix = _p64(self.mix, n)[:, None]
         wet = np.empty_like(x)
         i = 0
         while i < n:
@@ -123,26 +106,31 @@ class Delay(_Moving):
 
     Adding a copy delayed by T seconds makes a comb in the spectrum: peaks at multiples of 1 / T
     Hz and dips between them. With T above about 50 ms the ear hears a separate echo instead of
-    a change of tone. A moving time bends the pitch of the echoes, like a tape machine.
+    a change of tone. A moving time bends the pitch of the echoes, like a tape machine; it needs
+    max_time, the longest it reaches, which sets the length of the line and of the tail.
     """
 
-    params = (
-        Param("time", "s", 0.001, 4.0, "log", default=0.25),
-        Param("feedback", "", -0.99, 0.99, default=0.3),
-        Param("mix", "", 0.0, 1.0, default=0.3),
-    )
-
     def __init__(
-        self, src: Unit, time: float | Unit = 0.25, feedback: float | Unit = 0.3, mix: float | Unit = 0.3
+        self,
+        src: Unit,
+        time: float | Unit = 0.25,
+        feedback: float | Unit = 0.3,
+        mix: float | Unit = 0.3,
+        max_time: float | None = None,
     ):
-        longest = self.params[0].hi if isinstance(time, Unit) else float(time)
-        super().__init__(src, longest, time=time, feedback=feedback, mix=mix)
+        """time and max_time in seconds."""
+        if max_time is None:
+            if isinstance(time, Unit):
+                raise TypeError("Delay with a moving time needs max_time, the longest it reaches, in seconds")
+            max_time = time
+        self.max_time = float(max_time)
+        super().__init__(src, self.max_time, time=time, feedback=feedback, mix=mix)
 
     def _delay(self, n: int) -> np.ndarray:
-        return _p64(self, "time", n) * RATE
+        return _p64(self.time, n) * RATE
 
     def _feedback(self, n: int) -> np.ndarray:
-        return _p64(self, "feedback", n)
+        return _p64(self.feedback, n)
 
 
 class Chorus(_Moving):
@@ -151,18 +139,17 @@ class Chorus(_Moving):
 
     The moving delay raises and lowers the copy's pitch a little, so the two sound like two
     players slightly out of tune: the comb of a 20 ms delay (peaks every 50 Hz) moves, and the
-    tone thickens without a heard echo.
+    tone thickens without a heard echo. The delay stays within 1 sample and 30 ms, so a depth
+    beyond 10 ms flattens the swing at its ends.
     """
-
-    params = (Param("rate", *_RATE, default=0.8), Param("depth", "s", 0.0, 0.01, default=0.003), _MIX)
 
     def __init__(self, src: Unit, rate: float | Unit = 0.8, depth: float | Unit = 0.003, mix: float | Unit = 0.5):
         self._lfo = _lfo(rate)
-        super().__init__(src, 0.03, rate=rate, depth=depth, mix=mix)
+        super().__init__(src, 0.03, depth=depth, mix=mix)
 
     def _delay(self, n: int) -> np.ndarray:
         lfo = self._lfo.block(n).astype(np.float64)
-        return (0.02 + _p64(self, "depth", n) * lfo) * RATE
+        return (0.02 + _p64(self.depth, n) * lfo) * RATE
 
 
 class Flanger(_Moving):
@@ -178,13 +165,6 @@ class Flanger(_Moving):
 
     _invert = True
 
-    params = (
-        Param("rate", *_RATE, default=0.3),
-        Param("depth", "s", 0.0, 0.01, default=0.002),
-        Param("feedback", "", -0.95, 0.95, default=0.5),
-        _MIX,
-    )
-
     def __init__(
         self,
         src: Unit,
@@ -194,14 +174,14 @@ class Flanger(_Moving):
         mix: float | Unit = 0.5,
     ):
         self._lfo = _lfo(rate)
-        super().__init__(src, 0.011, rate=rate, depth=depth, feedback=feedback, mix=mix)
+        super().__init__(src, 0.011, depth=depth, feedback=feedback, mix=mix)
 
     def _delay(self, n: int) -> np.ndarray:
         lfo = self._lfo.block(n).astype(np.float64)
-        return (0.0005 + _p64(self, "depth", n) * (lfo + 1) / 2) * RATE
+        return (0.0005 + _p64(self.depth, n) * (lfo + 1) / 2) * RATE
 
     def _feedback(self, n: int) -> np.ndarray:
-        return _p64(self, "feedback", n)
+        return _p64(self.feedback, n)
 
 
 class Phaser(Unit):
@@ -212,23 +192,18 @@ class Phaser(Unit):
     The chain delays up to 180 degrees per stage, reached at 24 000 Hz. Where its delay is 180
     degrees (or 540, ...) the copy cancels the source: floor(stages / 2) notches below 24 000 Hz,
     which move with the sweep, and with an odd count one more at 24 000 Hz itself. Unlike a
-    flanger's comb, the notches are few and not evenly spaced. stages is a number (1 to 12)
-    because it sets the chain.
+    flanger's comb, the notches are few and not evenly spaced. stages is a number because it
+    sets the chain.
     """
-
-    params = (Param("rate", *_RATE, default=0.5), Param("stages", "", 1.0, 12.0, default=4.0), _MIX)
 
     def __init__(self, src: Unit, rate: float | Unit = 0.5, stages: int = 4, mix: float | Unit = 0.5):
         _numbers("Phaser", stages=stages)
         self.src = src
         self.channels = src.channels
-        self._set_params(rate=rate, stages=stages, mix=mix)
+        self.mix = _arg(mix)
         self._lfo = _lfo(rate)
-        self._stages = round(self._values["stages"])
+        self._stages = round(stages)
         self.reset()
-
-    def inputs(self) -> list[Unit]:
-        return [self.src, self._lfo, *([self._values["mix"]] if isinstance(self._values["mix"], Unit) else [])]
 
     def reset(self) -> None:
         super().reset()
@@ -241,7 +216,7 @@ class Phaser(Unit):
         f = 200.0 * 10 ** ((self._lfo.block(n).astype(np.float64) + 1) / 2)
         t = np.tan(np.pi * f / RATE)
         coeff = (t - 1) / (t + 1)
-        mix = _p64(self, "mix", n)[:, None]
+        mix = _p64(self.mix, n)[:, None]
         first = (-self._done) % _GRID
         cuts = [0, *range(first, n, _GRID), n]
         y = np.empty_like(x)
@@ -284,20 +259,15 @@ class FDNReverb(Unit):
     frequencies die faster than low ones, as in a room with soft walls; decay holds for the low
     frequencies. The output is scaled so the response to a click has an energy of 1 on each
     side, as in ConvolutionReverb, so a wide-band source keeps about its level at any decay. decay, size, damping and seed are numbers, since they set the lines.
+    The model needs decay > 0, a size that leaves every line at least one sample long, and
+    |damping| < 1.
     """
-
-    params = (
-        Param("decay", "s", 0.1, 20.0, "log", default=2.0),
-        Param("size", "", 0.1, 1.0, default=0.7),
-        Param("damping", "", 0.0, 0.95, default=0.3),
-        Param("mix", "", 0.0, 1.0, default=0.25),
-    )
     channels = 2
 
     @property
     def duration(self) -> float | None:
         """The source's plus the RT60 and the longest line, since the tail starts at a level near 1."""
-        return _after(self.src.duration, self._values["decay"] * 1.3 + self._cap / RATE)
+        return _after(self.src.duration, self.decay * 1.3 + self._cap / RATE)
 
     def __init__(
         self,
@@ -310,10 +280,16 @@ class FDNReverb(Unit):
     ):
         _numbers("FDNReverb", decay=decay, size=size, damping=damping)
         self.src = src
-        self._set_params(decay=decay, size=size, damping=damping, mix=mix)
+        self.decay, self.size, self.damping, self.mix = float(decay), float(size), float(damping), _arg(mix)
+        if not self.decay > 0:
+            raise ValueError(f"FDNReverb.decay={decay} must be > 0 s")
+        if not abs(self.damping) < 1:
+            raise ValueError(f"FDNReverb.damping={damping} makes the lines' lowpass unstable; it needs |damping| < 1")
         jitter = 1 + 0.1 * rng(seed).uniform(-1.0, 1.0, 8)
-        self._len = np.round(_FDN_TIMES * jitter * self._values["size"] * RATE).astype(np.int64)
-        self._gain = 10 ** (-3 * self._len / (RATE * self._values["decay"]))
+        self._len = np.round(_FDN_TIMES * jitter * self.size * RATE).astype(np.int64)
+        if self._len.min() < 1:
+            raise ValueError(f"FDNReverb.size={size} leaves a delay line shorter than one sample")
+        self._gain = 10 ** (-3 * self._len / (RATE * self.decay))
         self._h = hadamard(8) / np.sqrt(8)
         self._sign = self._h[1] * np.sqrt(8)  # +1 and -1, so the input reaches every line
         self._taps = self._h[[2, 4]].T  # two orthogonal mixes of the lines, left and right
@@ -326,7 +302,7 @@ class FDNReverb(Unit):
         """The energy of the wet response to a click, averaged over the two sides. The network
         runs for min(1.5 decay, 1) s; the rest of the tail is added from its decay rate, the low
         frequencies' 60 dB per decay seconds, which is what is left once damping has acted."""
-        decay = self._values["decay"]
+        decay = self.decay
         total = round(min(1.5 * decay, 1.0) * RATE)
         x = np.zeros(total)
         x[0] = 1.0
@@ -334,9 +310,6 @@ class FDNReverb(Unit):
         energy = (y**2).sum(axis=0).mean()
         last = (y[-4_800:] ** 2).sum(axis=0).mean() / 4_800  # energy per sample at the end
         return energy + last * decay * RATE / (6 * np.log(10))
-
-    def inputs(self) -> list[Unit]:
-        return [self.src, *super().inputs()]
 
     def reset(self) -> None:
         super().reset()
@@ -346,12 +319,12 @@ class FDNReverb(Unit):
 
     def block(self, n: int) -> np.ndarray:
         dry = self.src.block(n)
-        return _wet(dry, self._network(_mono(dry)), self._param("mix", n))
+        return _wet(dry, self._network(_mono(dry)), _signal(self.mix, n))
 
     def _network(self, x: np.ndarray) -> np.ndarray:
         """Run the mono input x through the lines, carrying their state; the wet stereo out."""
         n = len(x)
-        d = self._values["damping"]
+        d = self.damping
         wet = np.empty((n, 2))
         lines = np.arange(8)
         i = 0
@@ -381,23 +354,23 @@ class ConvolutionReverb(Unit):
     keeps about its level. The first 512 samples of the response are convolved directly; the
     rest in 512-sample partitions with FFTs, counted from the start of the render, so any block
     size gives the same samples, to the bit. decay and seed are numbers, since they make the
-    response.
+    response; decay must be > 0.
     """
-
-    params = (Param("decay", "s", 0.1, 10.0, "log", default=2.0), Param("mix", "", 0.0, 1.0, default=0.25))
     channels = 2
 
     @property
     def duration(self) -> float | None:
         """The source's plus the impulse response, which lasts 1.5 times decay."""
-        return _after(self.src.duration, 1.5 * self._values["decay"])
+        return _after(self.src.duration, 1.5 * self.decay)
 
     def __init__(self, src: Unit, decay: float = 2.0, mix: float | Unit = 0.25, seed: int = 0):
         _numbers("ConvolutionReverb", decay=decay)
         self.src = src
-        self._set_params(decay=decay, mix=mix)
-        t = np.arange(round(1.5 * self._values["decay"] * RATE)) / RATE
-        h = rng(seed).standard_normal((len(t), 2)) * np.exp(-3 * np.log(10) * t / self._values["decay"])[:, None]
+        self.decay, self.mix = float(decay), _arg(mix)
+        if not self.decay > 0:
+            raise ValueError(f"ConvolutionReverb.decay={decay} must be > 0 s")
+        t = np.arange(round(1.5 * self.decay * RATE)) / RATE
+        h = rng(seed).standard_normal((len(t), 2)) * np.exp(-3 * np.log(10) * t / self.decay)[:, None]
         h /= np.sqrt((h**2).sum(axis=0))
         parts = -(-len(h) // _PART)
         h = np.concatenate([h, np.zeros((parts * _PART - len(h), 2))])
@@ -406,9 +379,6 @@ class ConvolutionReverb(Unit):
         rest = h[_PART:].reshape(parts - 1, _PART, 2)
         self._parts = np.ascontiguousarray(rfft(rest, 2 * _PART, axis=1).transpose(1, 0, 2))  # (f, j, side)
         self.reset()
-
-    def inputs(self) -> list[Unit]:
-        return [self.src, *super().inputs()]
 
     def reset(self) -> None:
         super().reset()
@@ -443,7 +413,7 @@ class ConvolutionReverb(Unit):
                 spectrum = np.matmul(self._fdl[:, None, p : p + parts], self._parts)[:, 0]
                 self._rest = irfft(spectrum, 2 * _PART, axis=0)[_PART:]
                 self._seg[:_PART] = self._seg[_PART:]
-        return _wet(dry, head + rest, self._param("mix", n))
+        return _wet(dry, head + rest, _signal(self.mix, n))
 
 
 class Pan(Unit):
@@ -453,10 +423,8 @@ class Pan(Unit):
     left² + right² = 1 and the sound keeps its loudness as it moves; in the middle each side is
     at 0.707 (-3 dB). The spectrum of each side is the source's, scaled. A stereo source is
     balanced instead: each side scaled by √2 times its gain, at most 1, so pos 0 leaves it
-    unchanged.
+    unchanged. Beyond -1 or 1 the angle keeps turning and a side changes sign.
     """
-
-    params = (Param("pos", "", -1.0, 1.0, default=0.0),)
     channels = 2
 
     @property
@@ -466,14 +434,11 @@ class Pan(Unit):
 
     def __init__(self, src: Unit, pos: float | Unit = 0.0):
         self.src = src
-        self._set_params(pos=pos)
-
-    def inputs(self) -> list[Unit]:
-        return [self.src, *super().inputs()]
+        self.pos = _arg(pos)
 
     def block(self, n: int) -> np.ndarray:
         x = self.src.block(n).astype(np.float64)
-        theta = (_p64(self, "pos", n) + 1) * np.pi / 4
+        theta = (_p64(self.pos, n) + 1) * np.pi / 4
         g = np.stack([np.cos(theta), np.sin(theta)], axis=1)
         if x.ndim == 2:
             return (x * np.minimum(np.sqrt(2) * g, 1.0)).astype(np.float32)
@@ -489,7 +454,6 @@ class Width(Unit):
     comes out the same on both sides at any width.
     """
 
-    params = (Param("width", "", 0.0, 2.0, default=1.0),)
     channels = 2
 
     @property
@@ -499,15 +463,12 @@ class Width(Unit):
 
     def __init__(self, src: Unit, width: float | Unit = 1.0):
         self.src = src
-        self._set_params(width=width)
-
-    def inputs(self) -> list[Unit]:
-        return [self.src, *super().inputs()]
+        self.width = _arg(width)
 
     def block(self, n: int) -> np.ndarray:
         x = _frames(self.src.block(n))
         if x.shape[1] == 1:
             return np.repeat(x, 2, axis=1).astype(np.float32)
         mid = (x[:, 0] + x[:, 1]) / 2
-        side = (x[:, 0] - x[:, 1]) / 2 * _p64(self, "width", n)
+        side = (x[:, 0] - x[:, 1]) / 2 * _p64(self.width, n)
         return np.stack([mid + side, mid - side], axis=1).astype(np.float32)

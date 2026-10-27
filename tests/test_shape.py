@@ -5,28 +5,29 @@ from euterpe.sound.core import Const, Unit, render
 from euterpe.sound.env import Segments
 from euterpe.sound.noise import WhiteNoise
 from euterpe.sound.osc import Sine
-from euterpe.sound.shape import BitCrush, Compressor, Gate, Limiter, Saturator, Shaper
+from euterpe.sound.shape import BitCrush, Compressor, Gate, HardClip, Limiter, Saturator, SoftClip, Tanh
 from tests.helpers import band_db
 
 
 def test_more_drive_more_harmonics():
-    soft = render(Shaper(Sine(200.0), "tanh", drive=1.5), 1.0)
-    hard = render(Shaper(Sine(200.0), "tanh", drive=20.0), 1.0)
+    soft = render(Tanh(Sine(200.0), drive=1.5), 1.0)
+    hard = render(Tanh(Sine(200.0), drive=20.0), 1.0)
     assert band_db(hard, 590, 610) > band_db(soft, 590, 610) + 10
     assert np.abs(hard).max() < 1.0
 
 
-@pytest.mark.parametrize("kind", ["tanh", "soft", "hard"])
-def test_shaper_is_odd_and_below_full_scale(kind):
-    x = render(Shaper(Sine(200.0), kind, drive=8.0), 1.0)
+@pytest.mark.parametrize("shaper", [Tanh, SoftClip, HardClip])
+def test_shaper_is_odd_and_below_full_scale(shaper):
+    x = render(shaper(Sine(200.0), drive=8.0), 1.0)
     assert np.abs(x).max() < 1.0
     assert band_db(x, 390, 410) < -80   # a symmetric curve adds odd harmonics only
     assert band_db(x, 590, 610) > -40
 
 
-def test_shaper_refuses_an_unknown_kind():
-    with pytest.raises(ValueError, match="tanh"):
-        Shaper(Sine(200.0), "fold")
+@pytest.mark.parametrize("shaper", [Tanh, SoftClip, HardClip, Saturator])
+def test_a_drive_of_zero_or_below_stays_finite(shaper):
+    x = render(shaper(Sine(200.0), drive=Sine(1.0) * 2.0), 1.0)
+    assert np.all(np.isfinite(x)) and np.abs(x).max() < 1.0
 
 
 def test_saturator_adds_even_harmonics():
@@ -109,7 +110,7 @@ def test_gate_silences_quiet_noise_and_passes_a_tone():
 @pytest.mark.parametrize(
     "make",
     [
-        lambda: Shaper(Sine(200.0), "soft", drive=Sine(1.0) * 4 + 5),
+        lambda: SoftClip(Sine(200.0), drive=Sine(1.0) * 4 + 5),
         lambda: Saturator(Sine(200.0), drive=Sine(1.0) + 3),
         lambda: Compressor(Sine(110.0) * (Sine(2.0) * 0.5 + 0.5), threshold=-24.0, attack=0.003),
         lambda: Limiter(Sine(110.0) * (Sine(2.0) * 2 + 2.5), release=0.02),
@@ -137,7 +138,7 @@ class Stereo(Unit):
 
 @pytest.mark.parametrize(
     "make",
-    [lambda s: Shaper(s, "tanh", drive=4.0), Saturator, Compressor, Limiter, Gate],
+    [lambda s: Tanh(s, drive=4.0), Saturator, Compressor, Limiter, Gate],
 )
 def test_stereo_in_stereo_out(make):
     x = render(make(Stereo()), 0.2)

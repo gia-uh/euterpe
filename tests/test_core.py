@@ -1,23 +1,22 @@
 import numpy as np
 import pytest
 
-from euterpe.sound.core import BLOCK, RATE, Const, Mix, Param, Unit, render
+from euterpe.sound.core import BLOCK, RATE, Const, Mix, Unit, _signal, render
 
 
 class Ramp(Unit):
     """Test unit: 0, 1, 2, … so block boundaries are visible."""
-    params = (Param("step", "", 0.0, 10.0, default=1.0),)
     channels = 1
 
     def __init__(self, step=1.0):
-        self._set_params(step=step)
+        self.step = step
         self.reset()
 
     def reset(self):
         self.i = 0
 
     def block(self, n):
-        out = (np.arange(self.i, self.i + n) * self._param("step", n)).astype(np.float32)
+        out = (np.arange(self.i, self.i + n) * _signal(self.step, n)).astype(np.float32)
         self.i += n
         return out
 
@@ -37,13 +36,11 @@ def test_zero_seconds_is_empty_and_negative_is_refused():
         render(Ramp(), -1)
 
 
-def test_a_constant_out_of_range_is_refused_with_its_name():
-    with pytest.raises(ValueError, match=r"Ramp\.step=11\.0 outside \[0\.0, 10\.0\]"):
-        Ramp(step=11.0)
-
-
-def test_modulation_is_clipped_to_the_range():
-    assert render(Ramp(step=Const(50.0)), 10 / RATE)[1] == 10.0
+def test_a_parameter_may_be_a_unit_and_is_an_input():
+    step = Const(50.0)
+    r = Ramp(step=step)
+    assert r.inputs() == [step]
+    assert render(r, 10 / RATE)[1] == 50.0
 
 
 def test_mono_plus_stereo_is_stereo():

@@ -6,19 +6,16 @@ measures its source's level and changes its gain with it: compressor, limiter an
 
 from __future__ import annotations
 
-from typing import Literal
-
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 from scipy.signal import lfilter
 
-from euterpe.sound.core import LN60, RATE, Param, Unit, _after
+from euterpe.sound.core import RATE, Unit, _after, _arg, _fixed, _signal
 from euterpe.sound.filters import _as_frames as _frames
 from euterpe.sound.filters import _out
 
 _CEILING = 10 ** (-1 / 20)  # where a shaper puts a full-scale input: -1 dBFS
-_DRIVE = ("", 1.0, 100.0, "log")
-_TIME = ("s", 0.0001, 5.0, "log")
+_MIN_DRIVE = 1e-6  # a shaper divides by curve(drive / 2), which is 0 at drive 0
 _HOLD_ONE = 1 << 16  # one held sample in the downsampling accumulator
 
 
@@ -31,13 +28,10 @@ class BitCrush(Unit):
     spreads over the whole spectrum, about 6 dB quieter per bit.
     downsample holds each sample for that many samples, which lowers the effective
     sample rate to RATE / downsample: components above half of it fold back as
-    aliasing, and images of the signal appear around multiples of it.
+    aliasing, and images of the signal appear around multiples of it. bits is clipped to at
+    most 32, beyond which 2 ** bits overflows the rounding; downsample to at least 1, since a
+    sample cannot be held for less than itself.
     """
-
-    params = (
-        Param("bits", "bits", 1.0, 16.0, default=8.0),
-        Param("downsample", "samples", 1.0, 64.0, default=1.0),
-    )
 
     @property
     def duration(self) -> float | None:
@@ -47,11 +41,8 @@ class BitCrush(Unit):
     def __init__(self, src: Unit, bits: float | Unit = 8, downsample: float | Unit = 1):
         self.src = src
         self.channels = src.channels
-        self._set_params(bits=bits, downsample=downsample)
+        self.bits, self.downsample = _arg(bits), _arg(downsample)
         self.reset()
-
-    def inputs(self) -> list[Unit]:
-        return [self.src, *super().inputs()]
 
     def reset(self) -> None:
         super().reset()
@@ -61,13 +52,14 @@ class BitCrush(Unit):
     def block(self, n: int) -> np.ndarray:
         x = self.src.block(n)
         # levels -half/half .. half/half: an odd count, so 0 is one of them
-        half = np.maximum(np.round(2.0 ** (self._param("bits", n) - 1.0)) - 1.0, 1.0)
+        half = np.maximum(np.round(2.0 ** (np.minimum(_signal(self.bits, n), 32.0) - 1.0)) - 1.0, 1.0)
         if x.ndim == 2:
             half = half[:, None]
         q = (np.round(np.clip(x, -1.0, 1.0) * half) / half).astype(np.float32)
         if n == 0:
             return q
-        inc = np.round(_HOLD_ONE / self._param("downsample", n).astype(np.float64)).astype(np.int64)
+        hold = np.maximum(_signal(self.downsample, n).astype(np.float64), 1.0)
+        inc = np.round(_HOLD_ONE / hold).astype(np.int64)
         acc = self._acc + np.cumsum(inc)
         prev = np.concatenate(([self._acc], acc[:-1]))
         take = acc // _HOLD_ONE > prev // _HOLD_ONE
@@ -83,24 +75,16 @@ def _cubic(u: np.ndarray) -> np.ndarray:
     return u - u**3 / 3
 
 
-_CURVES = {"tanh": np.tanh, "soft": _cubic, "hard": lambda u: np.clip(u, -1.0, 1.0)}
-
-
-class Shaper(Unit):
+class _Shaper(Unit):
     """A waveshaper: each sample becomes curve(drive * x / 2), scaled so a full-scale input
-    comes out at -1 dBFS (0.891). At drive 2 a full-scale input reaches u = 1, where the soft
-    and hard curves stop rising; at drive 1, tanh and soft bend only the top of the wave a
-    little. hard is a straight line up to u = 1, so from drive 1 to 2 it only scales the wave by
-    0.891 and adds nothing to the spectrum; it starts to clip above drive 2.
+    comes out at -1 dBFS (0.891). At drive 2 a full-scale input reaches u = 1.
 
     The curves are odd (the negative half mirrors the positive one), so they add odd harmonics
-    only: 3, 5, 7 times each input frequency. tanh bends smoothly; soft is the cubic
-    u - u^3 / 3, flat beyond |u| = 1; hard clips at |u| = 1, the harshest, with harmonics that
-    fall slowest. More drive pushes more of the wave into the bend, so the harmonics get louder.
-    A sum of frequencies also gives sums and differences of them (intermodulation).
+    only: 3, 5, 7 times each input frequency. More drive pushes more of the wave into the bend,
+    so the harmonics get louder. A sum of frequencies also gives sums and differences of them
+    (intermodulation). The scaling divides by curve(drive / 2), so drive is taken as at least
+    1e-6.
     """
-
-    params = (Param("drive", *_DRIVE, default=1.0),)
 
     @property
     def duration(self) -> float | None:
@@ -113,21 +97,43 @@ class Shaper(Unit):
 
         return curve(self, **kw)
 
-    def __init__(self, src: Unit, kind: Literal["tanh", "soft", "hard"], drive: float | Unit = 1.0):
-        if kind not in _CURVES:
-            raise ValueError(f"Shaper kind must be one of {', '.join(_CURVES)}, got {kind!r}")
-        self.src, self.kind = src, kind
+    def __init__(self, src: Unit, drive: float | Unit = 1.0):
+        self.src = src
         self.channels = src.channels
-        self._set_params(drive=drive)
+        self.drive = _arg(drive)
 
-    def inputs(self) -> list[Unit]:
-        return [self.src, *super().inputs()]
+    @staticmethod
+    def _f(u: np.ndarray) -> np.ndarray:
+        raise NotImplementedError
 
     def block(self, n: int) -> np.ndarray:
         x = _frames(self.src.block(n))
-        d = self._param("drive", n).astype(np.float64)[:, None] / 2
-        f = _CURVES[self.kind]
-        return _out(_CEILING * f(d * x) / f(d), self.channels)
+        d = np.maximum(_signal(self.drive, n).astype(np.float64), _MIN_DRIVE)[:, None] / 2
+        return _out(_CEILING * self._f(d * x) / self._f(d), self.channels)
+
+
+class Tanh(_Shaper):
+    """A waveshaper through tanh, which bends smoothly and never flattens: at drive 1 it bends
+    only the top of the wave a little. Odd harmonics only, louder with more drive."""
+
+    _f = staticmethod(np.tanh)
+
+
+class SoftClip(_Shaper):
+    """A waveshaper through the cubic u - u^3 / 3, flat beyond |u| = 1: a full-scale input
+    reaches the flat part at drive 2. Odd harmonics only, louder with more drive."""
+
+    _f = staticmethod(_cubic)
+
+
+class HardClip(_Shaper):
+    """A waveshaper that clips at |u| = 1, the harshest, with harmonics that fall slowest. It is
+    a straight line up to u = 1, so from drive 1 to 2 it only scales the wave by 0.891 and adds
+    nothing to the spectrum; it starts to clip above drive 2."""
+
+    @staticmethod
+    def _f(u: np.ndarray) -> np.ndarray:
+        return np.clip(u, -1.0, 1.0)
 
 
 class Saturator(Unit):
@@ -139,10 +145,10 @@ class Saturator(Unit):
     no longer odd, and even harmonics (2, 4, 6 times each frequency) join the odd ones, the
     warmer sound of tube amplifiers. The lopsided wave also has a component at 0 Hz, which a
     highpass at 10 Hz removes. The output is scaled so a full-scale sine, once that offset is
-    gone, peaks at -1 dBFS (0.891).
+    gone, peaks at -1 dBFS (0.891). That scale is 0 at drive 0 and collapses once the bias puts
+    the whole wave on one flat side of the curve, so drive is taken as at least 1e-6 and bias is
+    clipped to [-1, 1].
     """
-
-    params = (Param("drive", *_DRIVE, default=2.0), Param("bias", "", 0.0, 1.0, default=0.1))
 
     @property
     def duration(self) -> float | None:
@@ -158,12 +164,9 @@ class Saturator(Unit):
     def __init__(self, src: Unit, drive: float | Unit = 2.0, bias: float | Unit = 0.1):
         self.src = src
         self.channels = src.channels
-        self._set_params(drive=drive, bias=bias)
+        self.drive, self.bias = _arg(drive), _arg(bias)
         self._p = np.exp(-2 * np.pi * 10.0 / RATE)
         self.reset()
-
-    def inputs(self) -> list[Unit]:
-        return [self.src, *super().inputs()]
 
     def reset(self) -> None:
         super().reset()
@@ -171,8 +174,8 @@ class Saturator(Unit):
 
     def block(self, n: int) -> np.ndarray:
         x = _frames(self.src.block(n))
-        d = self._param("drive", n).astype(np.float64)[:, None] / 2
-        b = self._param("bias", n).astype(np.float64)[:, None]
+        d = np.maximum(_signal(self.drive, n).astype(np.float64), _MIN_DRIVE)[:, None] / 2
+        b = np.clip(_signal(self.bias, n).astype(np.float64), -1.0, 1.0)[:, None]
         rest = np.tanh(d * b)
         # a full-scale sine through the curve: its offset (its mean over a cycle), which the
         # highpass removes, and its peak on either side of that offset
@@ -197,17 +200,15 @@ class _Dynamics(Unit):
     @property
     def duration(self) -> float | None:
         """The source's plus the release."""
-        return _after(self.src.duration, self._fixed("release", 2.0))
+        return _after(self.src.duration, _fixed(self.release, 2.0))
 
     def __init__(self, src: Unit, **values):
         self.src = src
         self.channels = src.channels
-        self._set_params(**values)
+        for name, v in values.items():
+            setattr(self, name, _arg(v))
         self._k = np.exp(-1.0 / (_RMS_TIME * RATE))
         self.reset()
-
-    def inputs(self) -> list[Unit]:
-        return [self.src, *super().inputs()]
 
     def reset(self) -> None:
         super().reset()
@@ -242,16 +243,9 @@ class Compressor(_Dynamics):
     (when it goes back up), so loud passages come down and the sound's range of levels shrinks.
     A steady sound keeps its spectrum. The gain moves with the level, so a fast attack or
     release on a low note adds a little distortion, and a fast release makes the tail of each
-    note swell (pumping).
+    note swell (pumping). ratio is taken as at least 1: below it the gain would rise with the
+    level, an expander, and at 0 it divides by zero.
     """
-
-    params = (
-        Param("threshold", "dB", -80.0, 0.0, default=-18.0),
-        Param("ratio", "", 1.0, 100.0, "log", default=4.0),
-        Param("attack", *_TIME, default=0.01),
-        Param("release", *_TIME, default=0.1),
-        Param("makeup", "dB", 0.0, 40.0, default=0.0),
-    )
     _rest = 0.0  # gain reduction in dB before the first sample
 
     def __init__(
@@ -267,7 +261,11 @@ class Compressor(_Dynamics):
 
     def block(self, n: int) -> np.ndarray:
         x = _frames(self.src.block(n))
-        thr, ratio, attack, release, makeup = (self._param(p.name, n).astype(np.float64) for p in self.params)
+        thr, ratio, attack, release, makeup = (
+            _signal(v, n).astype(np.float64)
+            for v in (self.threshold, self.ratio, self.attack, self.release, self.makeup)
+        )
+        ratio = np.maximum(ratio, 1.0)
         over = np.maximum(self._level_db(x) - thr, 0.0)
         cut = self._smooth(-over * (1 - 1 / ratio), attack, release, falling_is_attack=True)
         return _out(x * (10 ** ((cut + makeup) / 20))[:, None], self.channels)
@@ -284,21 +282,16 @@ class Limiter(Unit):
     time constant release. Peaks are flattened and the rest is left alone, so a limiter changes
     the spectrum little unless it works hard; then it adds distortion as a shaper does.
     ceiling is a number: the gain must start falling 5 ms before a sample leaves, so a ceiling
-    that moved in those 5 ms could not be kept.
+    that moved in those 5 ms could not be kept. A release at or below 0 returns at once.
     """
-
-    params = (Param("ceiling", "dB", -40.0, 0.0, default=-1.0), Param("release", *_TIME, default=0.05))
 
     def __init__(self, src: Unit, ceiling: float = -1.0, release: float | Unit = 0.05):
         if isinstance(ceiling, Unit):
             raise TypeError("Limiter.ceiling must be a number, not a Unit")
         self.src = src
         self.channels = src.channels
-        self._set_params(ceiling=ceiling, release=release)
+        self.ceiling, self.release = float(ceiling), _arg(release)
         self.reset()
-
-    def inputs(self) -> list[Unit]:
-        return [self.src, *super().inputs()]
 
     def reset(self) -> None:
         super().reset()
@@ -309,8 +302,8 @@ class Limiter(Unit):
 
     def block(self, n: int) -> np.ndarray:
         x = np.concatenate([self._x, _frames(self.src.block(n))])
-        ceiling = 10 ** (self._values["ceiling"] / 20)
-        kr = np.exp(-1.0 / (self._param("release", n).astype(np.float64) * RATE)).tolist()
+        ceiling = 10 ** (self.ceiling / 20)
+        kr = np.exp(-1.0 / np.maximum(_signal(self.release, n).astype(np.float64) * RATE, 1e-12)).tolist()
         peak = np.abs(x[_LOOKAHEAD:]).max(axis=1)
         need = np.concatenate([self._need, np.minimum(1.0, ceiling / np.maximum(peak, 1e-20))])
         # the lowest gain needed by any sample within 240 of the one now leaving the delay
@@ -337,7 +330,6 @@ class Gate(_Dynamics):
     shortens the tail. A fast release cuts the soft end of a note, which shortens its decay.
     """
 
-    params = (Param("threshold", "dB", -100.0, 0.0, default=-50.0), Param("release", *_TIME, default=0.05))
     _rest = 0.0  # closed before the first sample
 
     def __init__(self, src: Unit, threshold: float | Unit = -50.0, release: float | Unit = 0.05):
@@ -345,7 +337,7 @@ class Gate(_Dynamics):
 
     def block(self, n: int) -> np.ndarray:
         x = _frames(self.src.block(n))
-        open_ = (self._level_db(x) > self._param("threshold", n)).astype(np.float64)
+        open_ = (self._level_db(x) > _signal(self.threshold, n)).astype(np.float64)
         attack = np.full(n, 0.001)
-        g = self._smooth(open_, attack, self._param("release", n).astype(np.float64), falling_is_attack=False)
+        g = self._smooth(open_, attack, _signal(self.release, n).astype(np.float64), falling_is_attack=False)
         return _out(x * g[:, None], self.channels)

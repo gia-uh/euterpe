@@ -8,7 +8,7 @@ import numpy as np
 
 from scipy.signal import lfilter
 
-from euterpe.sound.core import LN60, RATE, Param, Unit, _after, rng
+from euterpe.sound.core import LN60, RATE, Unit, _after, _arg, _signal, rng
 
 _ONE = 1 << 32  # one cycle of phase in the fixed-point accumulators
 
@@ -19,13 +19,12 @@ class Additive(Unit):
 
     Integer ratios give harmonics, and the sound has the pitch of freq; other ratios give
     inharmonic partials, as in bells. A negative amplitude turns that sine upside down. A partial
-    at or above RATE / 2 is silent for the samples where it is there, so nothing folds back.
+    at or above RATE / 2 (either sign) is silent for the samples where it is there, so nothing
+    folds back.
 
     The sum is not normalised: its peak can pass 1 (a saw built from its harmonics reaches 1.17),
     so the caller sets the gain.
     """
-
-    params = (Param("freq", "Hz", 0.01, 24_000.0, "log", 440.0),)
 
     def __init__(self, freq: float | Unit, partials: Sequence[tuple[float, float]]):
         ratios = np.array([float(r) for r, _ in partials], np.float64)
@@ -36,7 +35,7 @@ class Additive(Unit):
         if not np.all(np.isfinite(amps)):
             raise ValueError(f"Additive partial amplitude must be finite, got {amps[~np.isfinite(amps)][0]}")
         self.ratios, self.amps = ratios, amps
-        self._set_params(freq=freq)
+        self.freq = _arg(freq)
         self.reset()
 
     def reset(self) -> None:
@@ -44,14 +43,14 @@ class Additive(Unit):
         self._acc = np.zeros(len(self.ratios), np.int64)
 
     def block(self, n: int) -> np.ndarray:
-        freq = self._param("freq", n).astype(np.float64)
+        freq = _signal(self.freq, n).astype(np.float64)
         partial_hz = freq[:, None] * self.ratios[None, :]  # (n, partials)
         inc = np.round(partial_hz / RATE * _ONE).astype(np.int64)
         acc = self._acc + np.cumsum(inc, axis=0)
         if n:
             self._acc = acc[-1] % _ONE
         t = ((acc - inc) % _ONE) / _ONE
-        waves = np.sin(2 * np.pi * t) * np.where(partial_hz < RATE / 2, self.amps, 0.0)
+        waves = np.sin(2 * np.pi * t) * np.where(np.abs(partial_hz) < RATE / 2, self.amps, 0.0)
         return waves.sum(axis=1).astype(np.float32)
 
 
@@ -73,15 +72,9 @@ class FM(Unit):
     partials. feedback feeds the modulator's own output back into its phase, which turns it from
     a sine towards a saw and adds harmonics of the modulator. Sidebands are not band-limited: one
     that would pass 24 000 Hz folds back. The carrier is silent at or above 24 000 Hz; while the
-    modulator is there it outputs 0, so the carrier plays as a plain sine.
+    modulator is there it outputs 0, so the carrier plays as a plain sine. Either frequency may
+    be negative, which runs that sine backwards.
     """
-
-    params = (
-        Param("freq", "Hz", 0.01, 24_000.0, "log", 440.0),
-        Param("ratio", "", 0.01, 32.0, "log", 1.0),
-        Param("index", "rad", 0.0, 20.0, default=1.0),
-        Param("feedback", "rad", 0.0, 1.5, default=0.0),
-    )
 
     def __init__(
         self,
@@ -90,7 +83,8 @@ class FM(Unit):
         index: float | Unit = 1.0,
         feedback: float | Unit = 0.0,
     ):
-        self._set_params(freq=freq, ratio=ratio, index=index, feedback=feedback)
+        """freq in Hz; ratio of the modulator to freq; index and feedback in radians."""
+        self.freq, self.ratio, self.index, self.feedback = _arg(freq), _arg(ratio), _arg(index), _arg(feedback)
         self.reset()
 
     def reset(self) -> None:
@@ -99,14 +93,14 @@ class FM(Unit):
         self._last = (0.0, 0.0)  # the modulator's last two outputs, for feedback
 
     def block(self, n: int) -> np.ndarray:
-        freq = self._param("freq", n).astype(np.float64)
-        mod_hz = freq * self._param("ratio", n)
-        index = self._param("index", n).astype(np.float64)
-        feedback = self._param("feedback", n).astype(np.float64)
+        freq = _signal(self.freq, n).astype(np.float64)
+        mod_hz = freq * _signal(self.ratio, n)
+        index = _signal(self.index, n).astype(np.float64)
+        feedback = _signal(self.feedback, n).astype(np.float64)
         tc, self._acc_c = _phases(self._acc_c, freq)
         tm, self._acc_m = _phases(self._acc_m, mod_hz)
         phase = 2 * np.pi * tm
-        alive = mod_hz < RATE / 2
+        alive = np.abs(mod_hz) < RATE / 2
         if not feedback.any():
             mod = np.where(alive, np.sin(phase), 0.0)
             if n:
@@ -119,7 +113,7 @@ class FM(Unit):
                 mod[i], a, b = m, m, a
             self._last = (a, b)
         out = np.sin(2 * np.pi * tc + index * mod)
-        out[freq >= RATE / 2] = 0.0
+        out[np.abs(freq) >= RATE / 2] = 0.0
         return out.astype(np.float32)
 
 
@@ -135,25 +129,19 @@ class Pluck(Unit):
     change with the seed. The spectrum is the harmonics of freq. They start as bright as the
     burst (brightness 0 falls about 1/k², like a string pulled into a triangle; 1 is flat up to
     the 256th harmonic) and die away, the high ones sooner than the low ones, as in a real
-    string. damping, the gain of one trip (0.9 to 0.9999), sets how long the note rings.
+    string. damping, the gain of one trip (0.9 to 0.9999 are useful), sets how long the note rings.
     position (0 to 0.5) is where the string is plucked, as a fraction of its length: it removes
     the harmonics with a node there, so 0.5, the middle, removes the even ones; 0 removes none.
     A first-order allpass in the loop adds the fraction of a sample the delay line cannot, so
     the pitch is exact. All parameters are numbers: a string's length is set when it is plucked.
+    The loop needs at least one sample of delay line, so freq is at most 30 000 Hz, and it rings
+    forever unless 0 < damping < 1.
     """
-
-    params = (
-        Param("freq", "Hz", 20.0, 6_000.0, "log"),
-        Param("damping", "", 0.9, 0.9999, default=0.996),
-        Param("brightness", "", 0.0, 1.0, default=0.5),
-        Param("position", "", 0.0, 0.5, default=0.0),
-    )
 
     @property
     def duration(self) -> float | None:
         """Until the fundamental, which damping alone shrinks on each trip, falls from 0.9 to -60 dBFS."""
-        v = self._values
-        return float(np.log(1e-3 / 0.9) / (v["freq"] * np.log(v["damping"])))
+        return float(np.log(1e-3 / 0.9) / (self.freq * np.log(self.damping)))
 
     def __init__(
         self,
@@ -166,23 +154,28 @@ class Pluck(Unit):
         for name, v in (("freq", freq), ("damping", damping), ("brightness", brightness), ("position", position)):
             if isinstance(v, Unit):
                 raise TypeError(f"Pluck.{name} must be a number, not a Unit")
-        self._set_params(freq=freq, damping=damping, brightness=brightness, position=position)
+        freq, damping = float(freq), float(damping)
+        if not 0 < freq <= RATE / 1.6:
+            raise ValueError(f"Pluck.freq={freq} leaves no delay line; it needs 0 < freq <= {RATE / 1.6:g} Hz")
+        if not 0 < damping < 1:
+            raise ValueError(f"Pluck.damping={damping} never dies away; it needs 0 < damping < 1")
+        self.freq, self.damping = freq, damping
+        self.brightness, self.position = float(brightness), float(position)
         self.seed = int(seed)
-        v = self._values
-        period = RATE / v["freq"]  # the loop's delay, in samples
+        period = RATE / self.freq  # the loop's delay, in samples
         # delay line N + averaging filter (half a sample) + allpass d, with d in [0.1, 1.1)
         rest = period - 0.5
         self.n = int(np.floor(rest - 0.1))
         d = rest - self.n
         c = (1 - d) / (1 + d)  # allpass coefficient for a delay of d at low frequencies
-        g = v["damping"] / 2
+        g = self.damping / 2
         self._b = np.array([1.0, c])
         self._a = np.zeros(self.n + 3)
         self._a[0], self._a[1] = 1.0, c
         self._a[self.n] -= g * c
         self._a[self.n + 1] -= g * (1 + c)
         self._a[self.n + 2] -= g
-        self._burst = self._excitation(v["freq"], v["brightness"], v["position"], round(period))
+        self._burst = self._excitation(self.freq, self.brightness, self.position, round(period))
         self.reset()
 
     def _excitation(self, freq: float, brightness: float, position: float, length: int) -> np.ndarray:

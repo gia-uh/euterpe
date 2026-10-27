@@ -1,12 +1,22 @@
 """Layer 1: sound units and rendering."""
 
 from euterpe.sound.clip import Clip
-from euterpe.sound.core import BLOCK, RATE, Const, Gain, Mix, Param, Unit, render, rng
+from euterpe.sound.core import BLOCK, RATE, Const, Gain, Mix, Unit, render, rng
 from euterpe.sound.env import ADSR, EnvelopeFollower, Segments
-from euterpe.sound.filters import Allpass, Biquad, Comb, Formant, OnePole
+from euterpe.sound.filters import (
+    Allpass,
+    BandPass,
+    Comb,
+    Formant,
+    HighPass,
+    LowPass,
+    Notch,
+    OnePoleHighPass,
+    OnePoleLowPass,
+)
 from euterpe.sound.noise import BrownNoise, LFSRNoise, PinkNoise, Wavetable, WhiteNoise
 from euterpe.sound.osc import Saw, Sine, Square, Triangle
-from euterpe.sound.shape import BitCrush, Compressor, Gate, Limiter, Saturator, Shaper
+from euterpe.sound.shape import BitCrush, Compressor, Gate, HardClip, Limiter, Saturator, SoftClip, Tanh
 from euterpe.sound.space import (
     Chorus,
     ConvolutionReverb,
@@ -23,7 +33,7 @@ __all__ = [
     "Additive",
     "ADSR",
     "Allpass",
-    "Biquad",
+    "BandPass",
     "BitCrush",
     "BLOCK",
     "BrownNoise",
@@ -41,13 +51,17 @@ __all__ = [
     "Formant",
     "Gain",
     "Gate",
+    "HardClip",
+    "HighPass",
     "LFSRNoise",
     "Limiter",
+    "LowPass",
     "Mix",
     "Modal",
-    "OnePole",
+    "Notch",
+    "OnePoleHighPass",
+    "OnePoleLowPass",
     "Pan",
-    "Param",
     "Phaser",
     "PinkNoise",
     "Pluck",
@@ -55,9 +69,10 @@ __all__ = [
     "Saturator",
     "Saw",
     "Segments",
-    "Shaper",
     "Sine",
+    "SoftClip",
     "Square",
+    "Tanh",
     "Triangle",
     "Unit",
     "Wavetable",

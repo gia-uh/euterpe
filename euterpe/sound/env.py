@@ -10,9 +10,8 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from euterpe.sound.core import LN60, RATE, Param, Unit, _after
+from euterpe.sound.core import LN60, RATE, Unit, _after, _arg, _fixed, _signal
 
-_TIME = ("s", 0.0, 30.0, "log")
 _BOW = 6.0  # curve = 1 bends a segment like exp(-6 p): 95 % of the way after half its time
 
 
@@ -33,26 +32,18 @@ class ADSR(Unit):
     until gate seconds (the time the key is held), then falls to 0 in release seconds. If the
     gate ends before the sustain is reached, the release starts from the level at that moment.
     curve bends every segment: 0 is a straight line, positive moves fast first and slows down,
-    as an exponential does, negative the reverse.
+    as an exponential does, negative the reverse; it is clipped to [-100, 100], beyond which
+    the exponential overflows. A time at or below 0 is a jump.
 
     Used as a gain it shapes a sound's loudness over time; multiplying a tone by it spreads each
     of the tone's lines into a band about as wide as 1 / (the shortest segment), so a fast attack
     adds a click, a broad burst of frequencies, and a slow one adds almost nothing.
     """
 
-    params = (
-        Param("attack", *_TIME, default=0.01),
-        Param("decay", *_TIME, default=0.1),
-        Param("sustain", "", 0.0, 1.0, default=0.7),
-        Param("release", *_TIME, default=0.3),
-        Param("gate", "s", 0.0, 3600.0, default=1.0),
-        Param("curve", "", -1.0, 1.0, default=0.0),
-    )
-
     @property
     def duration(self) -> float | None:
         """gate + release, when both are numbers."""
-        g, r = self._values["gate"], self._values["release"]
+        g, r = self.gate, self.release
         return None if isinstance(g, Unit) or isinstance(r, Unit) else g + r
 
     def __init__(
@@ -64,7 +55,9 @@ class ADSR(Unit):
         gate: float | Unit = 1.0,
         curve: float | Unit = 0.0,
     ):
-        self._set_params(attack=attack, decay=decay, sustain=sustain, release=release, gate=gate, curve=curve)
+        """Times in seconds; sustain is a level, 1 the peak."""
+        self.attack, self.decay, self.sustain = _arg(attack), _arg(decay), _arg(sustain)
+        self.release, self.gate, self.curve = _arg(release), _arg(gate), _arg(curve)
         self.reset()
 
     def reset(self) -> None:
@@ -78,7 +71,11 @@ class ADSR(Unit):
         return np.where(t < a, rise, np.where(t < a + d, fall, s))
 
     def block(self, n: int) -> np.ndarray:
-        a, d, s, r, g, c = (self._param(p.name, n).astype(np.float64) for p in self.params)
+        a, d, s, r, g, c = (
+            _signal(v, n).astype(np.float64)
+            for v in (self.attack, self.decay, self.sustain, self.release, self.gate, self.curve)
+        )
+        c = np.clip(c, -100.0, 100.0)
         t = (self._done + np.arange(n)) / RATE
         self._done += n
         held = self._held(t, a, d, s, c)
@@ -136,20 +133,15 @@ class EnvelopeFollower(Unit):
     smaller the longer release is. A stereo source is followed on its louder side.
     """
 
-    params = (Param("attack", *_TIME, default=0.005), Param("release", *_TIME, default=0.1))
-
     @property
     def duration(self) -> float | None:
         """The source's plus 60 dB of release."""
-        return _after(self.src.duration, LN60 * self._fixed("release", 2.0))
+        return _after(self.src.duration, LN60 * _fixed(self.release, 2.0))
 
     def __init__(self, src: Unit, attack: float | Unit = 0.005, release: float | Unit = 0.1):
         self.src = src
-        self._set_params(attack=attack, release=release)
+        self.attack, self.release = _arg(attack), _arg(release)
         self.reset()
-
-    def inputs(self) -> list[Unit]:
-        return [self.src, *super().inputs()]
 
     def reset(self) -> None:
         super().reset()
@@ -162,8 +154,8 @@ class EnvelopeFollower(Unit):
         # one-pole smoothing: each sample moves the level a fraction (1 - k) of the way to |x|
         # The rise/fall switch makes this a per-sample Python loop, about 0.03 s of CPU per second
         # of audio. Chapter 8's dynamics (Compressor, Gate) measure level with an RMS detector instead.
-        rise = np.exp(-1.0 / np.maximum(self._param("attack", n) * RATE, 1e-12))
-        fall = np.exp(-1.0 / np.maximum(self._param("release", n) * RATE, 1e-12))
+        rise = np.exp(-1.0 / np.maximum(_signal(self.attack, n) * RATE, 1e-12))
+        fall = np.exp(-1.0 / np.maximum(_signal(self.release, n) * RATE, 1e-12))
         out = np.empty(n, np.float64)
         y = self._level
         for i, (v, ka, kr) in enumerate(zip(x.tolist(), rise.tolist(), fall.tolist())):

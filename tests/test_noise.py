@@ -75,9 +75,9 @@ def test_lfsr_noise_is_two_levels_held_for_one_step():
     assert np.all(steps == steps[:, :1])
 
 
-def test_lfsr_rate_out_of_range_is_refused():
-    with pytest.raises(ValueError, match="rate"):
-        LFSRNoise(rate=0.0)
+def test_lfsr_at_rate_zero_holds_its_first_value():
+    x = render(LFSRNoise(rate=0.0), 0.01)
+    assert np.all(x == x[0])
 
 
 def test_lfsr_seed_zero_is_refused():
