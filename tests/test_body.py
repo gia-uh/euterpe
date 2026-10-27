@@ -27,3 +27,10 @@ def test_a_mode_decays_in_its_time():
 def test_duration_adds_the_slowest_decay():
     assert Body(click(), [200.0, 400.0], [0.3, 0.5], [1.0, 1.0]).duration == pytest.approx(0.5, abs=1e-3)
     assert Body(Sine(220.0), [200.0], [0.3], [1.0]).duration is None
+
+
+def test_a_mode_has_its_gain_at_its_frequency_and_none_at_dc():
+    tone = render(Body(Sine(200.0), [200.0], [0.3], [1.0], dry=0.0), 2.0)[RATE:]
+    assert np.abs(tone).max() == pytest.approx(1.0, abs=0.02)
+    from euterpe.sound import Const
+    assert np.abs(render(Body(Const(1.0), [100.0], [0.3], [1.0], dry=0.0), 2.0)[RATE:]).max() < 1e-3
