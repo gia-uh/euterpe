@@ -3,6 +3,8 @@ from euterpe.instruments import GuitarBody, Note, Plucked, Staccato
 from euterpe.pitch import A2, A3
 from euterpe.sound.core import RATE
 from tests.helpers import band_db
+from euterpe.instruments import Guitar, Harp, PizzicatoStrings
+from euterpe.pitch import C1, C4, E4, G4, G7
 
 
 def share_above(x, hz):
@@ -36,3 +38,24 @@ def test_parts_are_classes_with_values():
 def test_same_seed_same_samples():
     a, b, c = (np.asarray(Plucked().play([(0.0, A3, 0.5)], seed=s).take(0.3)) for s in (1, 1, 2))
     assert np.array_equal(a, b) and not np.array_equal(a, c)
+
+
+def test_harp_replucking_a_string_stops_it():
+    p = Harp().play([(0.0, C4, 1.0), (0.5, C4, 1.0)])
+    assert p.stops[0] == round(0.5 * RATE) + round(0.005 * RATE)
+
+
+def test_a_harp_arpeggio_is_left_ringing():
+    p = Harp().play([(0.0, C4, 0.3), (0.3, E4, 0.3), (0.6, G4, 0.3)])
+    s = round(1.5 * RATE)
+    assert sum(a <= s < b for a, b in zip(p.starts, p.stops)) == 3
+    assert Harp().playable == (C1, G7)
+
+
+def test_a_pizzicato_is_short():
+    assert PizzicatoStrings().note(A3, 0.5).duration < Guitar().note(A3, 0.5).duration / 2
+
+
+def test_a_section_is_not_one_player():
+    one, three = (np.asarray(PizzicatoStrings(players=k).note(A3, 0.5).take(0.3)) for k in (1, 3))
+    assert not np.allclose(one, three)

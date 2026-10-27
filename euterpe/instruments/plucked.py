@@ -6,9 +6,12 @@ the same string from parts (an exciter, a string, a body), and the presets choos
 
 from __future__ import annotations
 
+import math
+from collections.abc import Hashable
 from dataclasses import dataclass
 
 from euterpe.instruments.core import Instrument, Note, Staccato
+from euterpe.pitch import A7, C1, C2, C6, E6, G2, G7, Pitch
 from euterpe.sound import ADSR, Body, Pluck
 from euterpe.sound.core import Unit
 
@@ -184,3 +187,55 @@ class Plucked(Instrument):
         if self.body is not None:
             string = self.body(string)
         return string * note.velocity * self.level
+
+
+class Harp(Plucked):
+    """A concert harp: 47 gut strings from C1 to G7, plucked with the fingers near the middle,
+    through a harp's soundboard. Each pitch has its own string, so a note rings until it dies
+    or the same pitch is plucked again.
+
+    Limit: no pedals (each pitch is simply its own string), no buzz of a string against the
+    pedal mechanism, and no damping by the hand between chords.
+    """
+
+    polyphony = 16
+    playable = (C1, G7)
+    comfortable = (C2, C6)
+
+    def __init__(self, exciter: Exciter = Finger(position=0.45, brightness=0.3), string: String = Gut(),
+                 body: Soundboard | None = HarpBody(), let_ring: bool = True, mute: float = 0.08,
+                 level: float = 0.25):
+        super().__init__(exciter, string, body, let_ring, mute, level)
+
+    def resource(self, note: Note) -> Hashable:
+        """The string: one per pitch, a frequency in Hz going to the nearest pitch's string."""
+        if isinstance(note.pitch, Pitch):
+            return note.pitch.number
+        return round(69 + 12 * math.log2(float(note.pitch) / 440.0))
+
+
+class PizzicatoStrings(Plucked):
+    """A string section plucking: players slightly out of tune with each other, each a short gut
+    string through a violin's body.
+
+    players: how many play each note; each is detuned by up to 6 cents, drawn per note.
+
+    Limit: one body for the whole section, no room, and all players pluck at the same instant;
+    the low notes sound through a violin's body even where a cello's would be larger.
+    """
+
+    polyphony = 12
+    playable = (C2, A7)
+    comfortable = (G2, E6)
+
+    def __init__(self, players: int = 3, exciter: Exciter = Finger(position=0.3, brightness=0.3),
+                 string: String = Gut(damping=0.97), body: Soundboard | None = ViolinBody(),
+                 let_ring: bool = True, mute: float = 0.08, level: float = 0.25):
+        super().__init__(exciter, string, body, let_ring, mute, level)
+        self.players = players
+
+    def voice(self, note: Note) -> Unit:
+        cents = note.rng.uniform(-6.0, 6.0, self.players)
+        section = sum((self.pluck(note, note.freq * 2 ** (c / 1200)) for c in cents[1:]),
+                      self.pluck(note, note.freq * 2 ** (cents[0] / 1200)))
+        return self.finish(note, section * (1 / math.sqrt(self.players)))
