@@ -204,7 +204,7 @@ For executing agents:
 <p><b>Execution:</b> to be chosen by the maintainer after review.</p>
 <h3>Global constraints</h3>
 <ul>
-  <li>Branch <code>instruments-core</code> from <code>main</code>, one PR to gia-uh/euterpe, CI green, the maintainer merges.</li>
+  <li>Branch <code>instruments-core</code> from <code>main</code> after gia-uh/euterpe#30 has merged (it removes <code>Param</code> and the string-chosen filters and shapers from <code>euterpe.sound</code>; the units used here, <code>Pluck</code>, <code>ADSR</code>, <code>Pan</code>, <code>Sine</code> and <code>Segments</code>, keep their arguments). One PR to gia-uh/euterpe, CI green, the maintainer merges.</li>
   <li>Models, not names: no argument chooses a model or a technique by a string. Pitches are <code>Pitch</code> constants or Hz.</li>
   <li>Instruments take parameters and parts as plain constructor keyword arguments with type hints and a docstring; no <code>Param</code> in <code>euterpe.instruments</code>.</li>
   <li>Any articulation applies to any instrument; nothing declares which articulations an instrument supports.</li>
