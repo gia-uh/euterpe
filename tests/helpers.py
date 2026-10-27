@@ -27,3 +27,19 @@ def band_db(x, lo, hi) -> float:
     freqs, power = _power(x)
     band = power[(freqs >= lo) & (freqs <= hi)].sum()
     return float(10 * np.log10(band / power.sum() + 1e-30))
+
+
+from euterpe.instruments import Instrument  # noqa: E402
+from euterpe.pitch import C4, C6, C7  # noqa: E402
+from euterpe.sound import ADSR, Sine  # noqa: E402
+
+
+class Theremin(Instrument):
+    """A one-voice sine instrument for the tests: polyphony 1, playable C4 to C7."""
+
+    polyphony = 1
+    playable = (C4, C7)
+    comfortable = (C4, C6)
+
+    def voice(self, note):
+        return Sine(note.freq) * ADSR(attack=0.01, release=0.05, gate=note.duration) * note.velocity * 0.5
