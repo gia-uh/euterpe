@@ -14,8 +14,9 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
+from euterpe.instruments import Phrase
 from euterpe.io import read, write
-from euterpe.lint import lint_audio
+from euterpe.lint import Report, lint_audio, lint_notes
 from euterpe.sound.core import RATE, Unit, render
 
 
@@ -76,11 +77,15 @@ def _render(args) -> int:
 
 
 def _lint(args) -> int:
+    notes = Report()
     if _is_target(args.input):
         if args.seconds is None:
             raise _TargetError(f"linting {args.input} needs --seconds: how long to render it")
         _check_seconds(args.seconds)
-        samples, rate = render(_load(args.input, args.seed), args.seconds), RATE
+        unit = _load(args.input, args.seed)
+        if isinstance(unit, Phrase):
+            notes = lint_notes(unit)
+        samples, rate = render(unit, args.seconds), RATE
     elif args.input.endswith(".py"):
         raise _TargetError(f"{args.input} needs a function to call: {args.input}:function")
     elif not Path(args.input).is_file():
@@ -90,7 +95,7 @@ def _lint(args) -> int:
             samples, rate = read(args.input)
         except sf.LibsndfileError as e:
             raise _TargetError(f"cannot read {args.input} as audio: {e.error_string}") from None
-    report = lint_audio(samples, rate, loop=args.loop)
+    report = Report(notes.findings + lint_audio(samples, rate, loop=args.loop).findings)
     print(report.to_json() if args.json else report.to_text())
     return 1 if report.errors else 0
 
