@@ -35,6 +35,8 @@ class Phrase(Unit):
             d = v.duration
             self.ends.append(s + round((d if d is not None else n.duration) * RATE))
         self.stops = list(self.ends)
+        # a voice that never ends is stopped at its note's end, so it fades like a stolen one
+        self.fades = [v.duration is None for v in self.voices]
         cut = [False] * len(played)
         owners = [resource(n) for n in played]
         for i, s in enumerate(self.starts):
@@ -49,7 +51,7 @@ class Phrase(Unit):
 
     def _stop(self, j: int, s: int, cut: list[bool]) -> None:
         self.stops[j] = min(self.stops[j], s + FADE)
-        cut[j] = True
+        cut[j] = self.fades[j] = True
 
     def inputs(self) -> list[Unit]:
         return list(self.voices)
@@ -65,12 +67,12 @@ class Phrase(Unit):
     def block(self, n: int) -> np.ndarray:
         out = np.zeros((n, 2) if self.channels == 2 else n, np.float32)
         a, b = self.pos, self.pos + n
-        for v, s, e, end in zip(self.voices, self.starts, self.stops, self.ends):
+        for v, s, e, fade in zip(self.voices, self.starts, self.stops, self.fades):
             lo, hi = max(a, s), min(b, e)
             if lo >= hi:
                 continue
             x = v.block(hi - lo)
-            if e < end:
+            if fade:
                 x = x * np.clip((e - np.arange(lo, hi)) / FADE, 0.0, 1.0).astype(np.float32).reshape(
                     (-1, 1) if x.ndim == 2 else -1)
             if self.channels == 2 and x.ndim == 1:
@@ -85,7 +87,9 @@ def _slurred(notes: list[Note]) -> list[Note]:
     steps from pitch to pitch with a short glide."""
     runs: list[list[Note]] = []
     for n in notes:
-        if runs and (n.time < max(m.time + m.duration for m in runs[-1]) or isinstance(n.articulation, Legato)):
+        # compared in samples, as allocation is: 0.2 + 0.1 must not overlap a note at 0.3
+        written_end = max(round((m.time + m.duration) * RATE) for m in runs[-1]) if runs else 0
+        if runs and (round(n.time * RATE) < written_end or isinstance(n.articulation, Legato)):
             runs[-1].append(n)
         else:
             runs.append([n])
@@ -96,10 +100,12 @@ def _slurred(notes: list[Note]) -> list[Note]:
             merged.append(first)
             continue
         end = max(m.time + m.duration for m in run)
-        points = [(0.0, run[0].freq)]
-        for prev, n in zip(run, run[1:]):
-            t = max(n.time - first.time, points[-1][0])  # notes at one time glide in turn
-            points += [(t, prev.freq), (t + GLIDE, n.freq)]
+        points = [(0.0, first.freq)]
+        for k in range(1, len(run)):
+            t = run[k].time - first.time
+            following = run[k + 1].time if k + 1 < len(run) else end
+            glide = min(GLIDE, following - first.time - t)  # a glide never runs into the next note
+            points += [(t, run[k - 1].freq), (t + glide, run[k].freq)]
         note = _copy(first, duration=end - first.time)
         note._freq = Segments(points)
         merged.append(note)

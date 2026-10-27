@@ -27,3 +27,8 @@ def test_cli_lints_a_phrase(tmp_path, capsys):
                    "def piece():\n    return Theremin().play([(0.0, B7, 0.5)])\n")
     assert main(["lint", f"{src}:piece", "--seconds", "1"]) == 1
     assert "R-PLAYABLE" in capsys.readouterr().out
+
+
+def test_a_slur_is_not_a_polyphony_warning():
+    r = lint_notes(Theremin().play([(0.0, C4, 0.5), (0.4, E4, 0.5)]))
+    assert not [f for f in r.findings if f.rule == "R-POLYPHONY"]

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+import warnings
 from collections.abc import Hashable, Iterable
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
@@ -127,10 +129,19 @@ def play(instrument, events: Iterable, seed: int = 0) -> Phrase:
         if isinstance(e, Control):
             controls.append(e)
             continue
-        note = e if isinstance(e, Note) else Note(*e)
+        note = _copy(e) if isinstance(e, Note) else Note(*e)  # a copy: the caller's note keeps its rng
         _check(note)
-        notes.append(note.articulation.apply(note) if note.articulation else note)
+        if note.articulation:
+            note = note.articulation.apply(note)
+            _check(note)
+        notes.append(note)
     notes.sort(key=lambda n: n.time)
+    playable = getattr(instrument, "playable", None)
+    for n in notes:
+        side = outside(n.pitch, playable)
+        if side:
+            warnings.warn(f"note at {n.time:.2f} s: {_name(n.pitch)} is {side} of {playable[0]!r} to "
+                          f"{playable[1]!r}; lint_notes reports it", stacklevel=3)
     for note, child in zip(notes, np.random.SeedSequence(seed).spawn(len(notes))):
         note.rng = np.random.default_rng(child)
     perform = getattr(instrument, "perform", None)
@@ -139,7 +150,25 @@ def play(instrument, events: Iterable, seed: int = 0) -> Phrase:
     return Phrase(notes, instrument)
 
 
+def outside(pitch: Pitch | float, span: tuple[Pitch, Pitch] | None) -> str | None:
+    """Where pitch lies against span: "below the bottom", "above the top", or None inside it."""
+    if span is None:
+        return None
+    hz = _hz(pitch)
+    return "below the bottom" if hz < span[0].freq else "above the top" if hz > span[1].freq else None
+
+
+def _hz(pitch: Pitch | float) -> float:
+    return pitch.freq if isinstance(pitch, Pitch) else float(pitch)
+
+
+def _name(pitch: Pitch | float) -> str:
+    return repr(pitch) if isinstance(pitch, Pitch) else f"{float(pitch):g} Hz"
+
+
 def _check(note: Note) -> None:
+    if not all(math.isfinite(x) for x in (note.time, note.duration, note.velocity)):
+        raise ValueError(f"note {note} needs a finite time, duration and velocity")
     if note.duration <= 0:
         raise ValueError(f"note {note} needs a duration above 0")
     if not 0.0 <= note.velocity <= 1.0:

@@ -64,3 +64,24 @@ def test_stereo_voice_makes_a_stereo_phrase():
 def test_mono_notes_at_one_time_slur_into_the_last():
     p = Theremin().play([(0.0, C4, 1.0), (0.0, E4, 1.0), (0.0, G4, 1.0)])
     assert len(p.starts) == 1 and np.isfinite(np.asarray(p.take())).all()
+
+
+def test_detached_notes_stay_apart_despite_float_noise():
+    p = Theremin().play([(0.0, C4, 0.1), (0.1, E4, 0.1), (0.2, G4, 0.1), (0.3, C4, 0.1)])
+    assert len(p.starts) == 4
+
+
+def test_a_fast_run_reaches_its_last_pitch_before_it_ends():
+    from euterpe.instruments.phrase import _slurred
+    notes = [Note(0.01 * i, C4 + i, 0.012) for i in range(10)]
+    [run] = _slurred(notes)
+    assert run._freq.times[-1] <= run.duration and run._freq.levels[-1] == (C4 + 9).freq
+
+
+def test_a_voice_that_never_ends_fades_at_the_note_end():
+    class Drone(Instrument):
+        def voice(self, note):
+            return Sine(note.freq) * 0.5
+    p = Drone().play([(0.0, A4, 0.5)])
+    x = np.asarray(p.take())
+    assert np.abs(x[-5:]).max() < 0.01
