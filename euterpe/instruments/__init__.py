@@ -28,6 +28,7 @@ from euterpe.instruments.plucked import (
     Soundboard,
     Steel,
     String,
+    Tolerance,
     ViolinBody,
 )
 
@@ -60,5 +61,6 @@ __all__ = [
     "Staccato",
     "Steel",
     "String",
+    "Tolerance",
     "ViolinBody",
 ]

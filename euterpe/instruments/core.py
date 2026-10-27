@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import warnings
+import zlib
 from collections.abc import Hashable, Iterable
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
@@ -88,11 +89,20 @@ class Instrument:
     polyphony: how many notes sound at once before the oldest is stopped.
     playable, comfortable: the lowest and highest pitch the instrument can play, and the
     range where it plays well; the lint rules check notes against them.
+    seed: which instrument of its make this one is; character() draws its fixed flaws from it.
     """
 
     polyphony: int = 8
     playable: tuple[Pitch, Pitch] | None = None
     comfortable: tuple[Pitch, Pitch] | None = None
+    seed: int = 0
+
+    def character(self, resource: Hashable) -> np.random.Generator:
+        """A generator fixed by this instrument's seed and one of its resources: draws from it
+        give that string or key its own small flaws, the same on every note, and another seed is
+        another instrument of the same make."""
+        key = resource if isinstance(resource, int) else zlib.crc32(repr(resource).encode())
+        return np.random.default_rng([self.seed, int(key) % 2**32])
 
     def voice(self, note: Note) -> Unit:
         """The sound of one note, from its start until it falls silent."""

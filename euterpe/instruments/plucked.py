@@ -46,10 +46,13 @@ class PluckedString(Instrument):
 @dataclass(frozen=True)
 class Exciter:
     """What sets the string moving. position: where along the string, 0 at the bridge to 0.5
-    at the middle; brightness: how much of the high partials it puts in, 0 to 1."""
+    at the middle; brightness: how much of the high partials it puts in, 0 to 1; variation:
+    how much each pluck's position, brightness and force move, as a fraction, since no finger or
+    pick touches a string twice the same way. The draws come from each note's generator."""
 
     position: float = 0.2
     brightness: float = 0.4
+    variation: float = 0.08
 
 
 @dataclass(frozen=True)
@@ -69,11 +72,24 @@ class Plectrum(Exciter):
 
 
 @dataclass(frozen=True)
+class Tolerance:
+    """How far each string of one instrument is from the ideal, drawn once per string from the
+    instrument's seed: its tuning (up to cents either way), its level (up to that fraction louder
+    or softer) and its losses (up to that fraction more or fewer, so it rings shorter or longer)."""
+
+    cents: float = 0.0
+    level: float = 0.0
+    decay: float = 0.0
+
+
+@dataclass(frozen=True)
 class String:
     """The vibrating string. damping: how much of the vibration survives each trip along it,
-    so a lower value dies sooner, and high notes (more trips per second) die sooner than low."""
+    so a lower value dies sooner, and high notes (more trips per second) die sooner than low.
+    tolerance: how far each string of the instrument is from the ideal (Tolerance)."""
 
     damping: float = 0.997
+    tolerance: Tolerance = Tolerance(cents=3.0, level=0.05, decay=0.1)
 
 
 @dataclass(frozen=True)
@@ -162,34 +178,48 @@ class Plucked(Instrument):
     let_ring: False to have the finger mute each string at its note's end, as Staccato does.
     mute: how long the finger takes to stop the string, in seconds.
     level: the gain of one string at full velocity.
-    variation: how much each pluck differs from the last, as a player's never repeat exactly:
-    position, brightness and force each move by up to this fraction, drawn per note from the seed.
+    seed: which instrument of its make this is: each string's flaws (the string's tolerance)
+    come from it, and stay the same on every note.
     """
 
     polyphony = 6
 
     def __init__(self, exciter: Exciter = Finger(), string: String = Steel(),
                  body: Soundboard | None = GuitarBody(), let_ring: bool = True, mute: float = 0.08,
-                 level: float = 0.25, variation: float = 0.0):
+                 level: float = 0.25, seed: int = 0):
         self.exciter, self.string, self.body = exciter, string, body
-        self.let_ring, self.mute, self.level, self.variation = let_ring, mute, level, variation
+        self.let_ring, self.mute, self.level, self.seed = let_ring, mute, level, seed
+
+    def traits(self, resource: Hashable) -> tuple[float, float, float]:
+        """The flaws of the string that is resource: its detuning in cents, and the fractions by
+        which its level and its losses differ from the ideal; all 0 without tolerance."""
+        tol = self.string.tolerance
+        if not (tol.cents or tol.level or tol.decay):
+            return (0.0, 0.0, 0.0)
+        a, b, c = self.character(resource).uniform(-1.0, 1.0, 3)
+        return (float(a * tol.cents), float(b * tol.level), float(c * tol.decay))
 
     def vary(self, note: Note) -> tuple[float, float, float]:
         """Factors for this pluck's position, brightness and force; all 1 without variation."""
-        if not self.variation:
+        v = self.exciter.variation
+        if not v:
             return (1.0, 1.0, 1.0)
-        a, b, c = 1 + self.variation * note.rng.uniform(-1.0, 1.0, 3)
+        a, b, c = 1 + v * note.rng.uniform(-1.0, 1.0, 3)
         return (float(a), float(b), float(c))
 
-    def pluck(self, note: Note, freq: float, vary: tuple[float, float, float] = (1.0, 1.0, 1.0)) -> Unit:
-        """The bare string for note at freq, before the finger and the body."""
-        return Pluck(freq, damping=self.string.damping,
+    def pluck(self, note: Note, freq: float, vary: tuple[float, float, float] = (1.0, 1.0, 1.0),
+              traits: tuple[float, float, float] = (0.0, 0.0, 0.0)) -> Unit:
+        """The bare string for note at freq, with the string's flaws, before the finger and the body."""
+        cents, _, decay = traits
+        damping = min(0.9999, 1 - (1 - self.string.damping) * (1 + decay))
+        return Pluck(freq * 2 ** (cents / 1200), damping=damping,
                      brightness=min(1.0, self.exciter.brightness * (0.5 + 0.5 * note.velocity) * vary[1]),
                      position=min(0.5, self.exciter.position * vary[0]), seed=int(note.rng.integers(2**31)))
 
     def voice(self, note: Note) -> Unit:
+        traits = self.traits(_string_of(self, note))
         vary = self.vary(note)
-        return self.finish(note, self.pluck(note, note.freq, vary), vary[2])
+        return self.finish(note, self.pluck(note, note.freq, vary, traits), vary[2] * (1 + traits[1]))
 
     def finish(self, note: Note, string: Unit, force: float = 1.0) -> Unit:
         """The finger's mute when asked, then the body, then the note's gain."""
@@ -198,6 +228,16 @@ class Plucked(Instrument):
         if self.body is not None:
             string = self.body(string)
         return string * note.velocity * force * self.level
+
+
+def _string_of(instrument: Instrument, note: Note) -> Hashable:
+    """The string a note sounds on: its resource, or else the nearest pitch's number."""
+    r = instrument.resource(note)
+    if r is not None:
+        return r
+    if isinstance(note.pitch, Pitch):
+        return note.pitch.number
+    return round(69 + 12 * math.log2(float(note.pitch) / 440.0))
 
 
 class Harp(Plucked):
@@ -215,8 +255,8 @@ class Harp(Plucked):
 
     def __init__(self, exciter: Exciter = Finger(position=0.45, brightness=0.3), string: String = Gut(),
                  body: Soundboard | None = HarpBody(), let_ring: bool = True, mute: float = 0.08,
-                 level: float = 0.45):
-        super().__init__(exciter, string, body, let_ring, mute, level)
+                 level: float = 0.45, seed: int = 0):
+        super().__init__(exciter, string, body, let_ring, mute, level, seed)
 
     def resource(self, note: Note) -> Hashable:
         """The string: one per pitch, a frequency in Hz going to the nearest pitch's string."""
@@ -241,14 +281,16 @@ class PizzicatoStrings(Plucked):
 
     def __init__(self, players: int = 3, exciter: Exciter = Finger(position=0.3, brightness=0.3),
                  string: String = Gut(damping=0.97), body: Soundboard | None = ViolinBody(),
-                 let_ring: bool = True, mute: float = 0.08, level: float = 0.6):
-        super().__init__(exciter, string, body, let_ring, mute, level)
+                 let_ring: bool = True, mute: float = 0.08, level: float = 0.6, seed: int = 0):
+        super().__init__(exciter, string, body, let_ring, mute, level, seed)
         if players < 1:
             raise ValueError(f"PizzicatoStrings needs players of at least 1, got {players}")
         self.players = players
 
     def voice(self, note: Note) -> Unit:
+        traits = self.traits(_string_of(self, note))
+        vary = self.vary(note)
         cents = note.rng.uniform(-6.0, 6.0, self.players)
-        section = sum((self.pluck(note, note.freq * 2 ** (c / 1200)) for c in cents[1:]),
-                      self.pluck(note, note.freq * 2 ** (cents[0] / 1200)))
-        return self.finish(note, section * (1 / math.sqrt(self.players)))
+        section = sum((self.pluck(note, note.freq * 2 ** (c / 1200), vary, traits) for c in cents[1:]),
+                      self.pluck(note, note.freq * 2 ** (cents[0] / 1200), vary, traits))
+        return self.finish(note, section * (1 / math.sqrt(self.players)), vary[2] * (1 + traits[1]))
