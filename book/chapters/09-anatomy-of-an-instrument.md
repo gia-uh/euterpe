@@ -10,16 +10,16 @@ Chapter 2 tuned the twelve notes of an octave in equal steps, each 2^(1/12) time
 from euterpe.pitch import A4, C4, Cs4, Db4, E5
 
 print(A4.freq, (A4 + 12).freq, round(C4.freq, 2))
-print(A4 + 7, E5 - A4, Cs4 == Db4)
+print(A4 + 7, E5 - A4, Cs4 is Db4)
 ```
 
-A4 is 440 Hz and the A an octave up, 12 semitones higher, is 880. Seven semitones up from A4 is E5, the fifth of chapter 2. The numbers behind the names are the MIDI numbers that synthesizers use, 60 for C4 and 69 for A4, so a pitch is a whole number of semitones and its frequency is 440 × 2^((number − 69) / 12).
+A4 is 440 Hz and the A an octave up, 12 semitones higher, is 880. Seven semitones up from A4 is E5, the fifth of chapter 2. The numbers behind the names are those of MIDI, the standard that keyboards and synthesizers use to send notes to each other as numbers: 60 for C4 and 69 for A4, so a pitch is a whole number of semitones and its frequency is 440 × 2^((number − 69) / 12).
 
-A *note* is a pitch with a time: when it starts, in seconds; how long it is held, in seconds; and how hard it is played, its *velocity*, from 0 to 1. The short way to write one is a tuple, `(time, pitch, duration)` or `(time, pitch, duration, velocity)`; velocity defaults to 0.8. A pitch can also be a frequency in Hz, for a note between the twelve steps. Rhythm, in bars and beats, comes in Part III; until then a melody is a list of times in seconds.
+A *note* is a pitch with a time: when it starts, in seconds; how long it is held, in seconds; and how hard it is played, its *velocity*, from 0 to 1. The name comes from keyboards, which measure how hard a key is played by the speed at which it goes down. The short way to write one is a tuple, `(time, pitch, duration)` or `(time, pitch, duration, velocity)`; velocity defaults to 0.8. A pitch can also be a frequency in Hz, for a note between the twelve steps. Rhythm, in bars and beats, comes in Part III; until then a melody is a list of times in seconds.
 
 ## An instrument by hand
 
-An instrument is a class with one method, `voice(note)`, which returns the unit that sounds one note. A *theremin* is an electronic instrument from 1920, played without touching it: one hand moves the pitch, the other the volume, and its tone is close to a pure sine with a slight wobble. The class below gives it three things. `polyphony = 1`, because it plays one note at a time. `playable = (C4, C7)`, the range it can reach, and `comfortable = (C4, C6)`, the part of it where it plays well (the end of the chapter uses both). And a voice: a sine whose frequency moves 1 % up and down five times a second (the *vibrato*, chapter 6's slow modulation), shaped by an `ADSR` (chapter 4) that rises in 0.15 s, holds while the note is held, and fades over 0.4 s after it.
+An instrument is a class with one method, `voice(note)`, which returns the unit that sounds one note. A *theremin* is an electronic instrument from the 1920s, played without touching it: one hand moves the pitch, the other the volume, and its tone is close to a pure sine with a slight wobble. The class below gives it three things. `polyphony = 1`: *polyphony* is how many notes an instrument can sound at once, and a theremin sounds one. `playable = (C4, C7)`, the range this one is given (real theremins vary), and `comfortable = (C4, C6)`, the part of it where it plays well (the end of the chapter uses both). And a voice: a sine whose frequency moves 1 % up and down five times a second, the *vibrato* of chapter 6, made with an LFO (chapter 5). `Sine(self.vibrato)` swings between −1 and 1, so `Sine(self.vibrato) * 0.01 + 1.0` swings between 0.99 and 1.01, and multiplying the note's frequency by it moves the pitch 1 % each way. An `ADSR` (chapter 4) shapes the sound: it rises in 0.15 s, falls in its default 0.1 s decay to its default sustain of 0.7, holds there for `gate`, the time the note is held, and fades over 0.4 s after it. The final `* 0.5` keeps the peak at half of full scale, as every example in this book stays below it.
 
 ```python {run}
 from euterpe.instruments import Instrument
@@ -45,7 +45,7 @@ display(Theremin().note(A4, 2.0).take(caption="A theremin plays A4 for 2 s"))
 
 `note.freq` is the note's frequency in Hz and `note.velocity` its velocity, and `voice` builds a fresh graph of units from them for every note. `note(A4, 2.0)` plays one note at time 0, held 2 s. It returns a unit, like any unit of Part I, so `take` renders it and draws it. Without a length, `take` renders until the sound ends: 2 s of note and 0.4 s of release.
 
-`play` takes a whole list. These are the first four bars of the *Ode to Joy* from Beethoven's Ninth Symphony, a quarter note every half second, each held 0.45 s:
+`play` takes a whole list. Below are the first four *bars* of the *Ode to Joy* from Beethoven's Ninth Symphony. A *beat* is the pulse you would tap your foot to, here one every 0.5 s; a bar groups four beats; most notes here last one beat, which musicians call a *quarter note*. `lengths` gives each note's length in beats, and each note is held for 0.45 s of every 0.5 s beat:
 
 ```python {run continue}
 from euterpe.pitch import C4, D4, E4, F4, G4
@@ -65,7 +65,7 @@ The result of `play` is a `Phrase`: one unit that starts each note's voice at it
 
 ## Voices
 
-Each note that sounds needs its own copy of the voice: its own sine, its own envelope, its own place in time. A copy that is sounding is a *voice*, and `polyphony` is how many voices the instrument has. A piano can sound all 88 strings at once; a flute, a trumpet or a voice sings one note at a time. When a note arrives and all the voices are busy, one has to stop. The `Phrase` stops the oldest, and it does not cut it: a cut drops the wave from wherever it is to 0 between two samples, and chapter 4 showed that such a step is heard as a click. The stopped voice fades out over 5 ms, 240 samples, instead.
+Each note that sounds needs its own copy of the voice: its own sine, its own envelope, its own place in time. A copy that is sounding is a *voice*, and `polyphony` is how many voices the instrument has. A piano can sound all 88 strings at once; a flute, a trumpet or a singer plays one note at a time. When a note arrives and all the voices are busy, one has to stop. The `Phrase` stops the oldest, and it does not cut it: a cut drops the wave from wherever it is to 0 between two samples, and chapter 4 showed that such a step is heard as a click. The stopped voice fades out over 5 ms, 240 samples at 48 000 samples a second, instead. This already happened in the first *Ode to Joy*: each note's 0.4 s release was still sounding when the next note started, and the theremin has one voice, so each new note stopped the last with this fade.
 
 The instrument below is the theremin with three voices. `starts` and `stops` say, in samples, when each voice of a phrase starts and stops. A C major chord, C4, E4 and G4, each held 2 s, starts one note every 0.1 s, and a fourth note, C5, arrives at 0.3 s:
 
@@ -80,6 +80,7 @@ class Trio(Theremin):
 
 phrase = Trio().play([(0.0, C4, 2.0), (0.1, E4, 2.0), (0.2, G4, 2.0), (0.3, C5, 2.0)])
 for note, start, stop in zip(phrase.notes, phrase.starts, phrase.stops):
+    # !r prints the pitch's name (C4); :4 pads it to 4 characters
     print(f"{note.pitch!r:4} sounds from {start / RATE:.3f} s to {stop / RATE:.3f} s")
 ```
 
@@ -106,7 +107,7 @@ E4 stops at 0.505 s, when G4 takes string 1, although the instrument had four vo
 
 ### Slurs
 
-On an instrument with one voice there is a third case. A singer or a violinist can move from one note to the next without starting again: the sound goes on and only the pitch changes. Musicians call it a *slur*. On an instrument with `polyphony = 1`, a note that starts before the previous one has ended is slurred: the `Phrase` builds one voice for the whole run, and `note.freq` is no longer a number but a unit that steps from pitch to pitch with a glide of 20 ms. The theremin's voice multiplies `note.freq` by its vibrato either way, so it slurs without a change. The same *Ode to Joy*, with each note held 0.05 s longer than the gap to the next:
+On an instrument with one voice there is a third case. A singer or a violinist can move from one note to the next without starting again: the sound goes on and only the pitch changes. Musicians call it a *slur*. On an instrument with `polyphony = 1`, a note that starts before the previous one's written end, its time plus its duration, is slurred (the release does not count): the `Phrase` builds one voice for the whole run, and `note.freq` is no longer a number but a unit that steps from pitch to pitch with a glide of 20 ms. The theremin's voice multiplies `note.freq` by its vibrato either way, so it slurs without a change. The same *Ode to Joy*, with each note held 0.05 s longer than the gap to the next:
 
 ```python {run continue}
 legato = [(time, pitch, 0.5 * beats + 0.05) for (time, pitch, _), beats in zip(notes, lengths)]
@@ -124,7 +125,7 @@ spectrogram(melody.take(), Theremin().play(legato).take(), labels=["started agai
 
 ### Articulations
 
-How a note is played, beyond its pitch and length, is its *articulation*. `Note` takes one as its fifth argument. Three are generic, and act on the note before the voice sees it: `Staccato()` holds the note for half its length, detached from the next; `Accent()` plays it 1.3 times as hard, up to 1; `Legato()` slurs it into the note before, even with no overlap. Any articulation applies to any instrument. A family of instruments adds its own, which act on its parts: a plucked string muted by the finger, a bowed string plucked instead.
+How a note is played, beyond its pitch and length, is its *articulation*. Musicians use three words for the commonest ones, all Italian: *staccato*, short and separated from the next note; an *accent*, played louder than its neighbours; and *legato*, "tied", played without a gap, which on one voice is the slur above. `Note` takes an articulation as its fifth argument. The three generic ones act on the note before the voice sees it: `Staccato()` holds it for half its length; `Accent()` plays it 1.3 times as hard, up to 1; `Legato()` slurs it into the note before, even with no overlap. Any articulation applies to any instrument. A family of instruments adds its own, which act on its parts: a plucked string muted by the finger, a bowed string plucked instead.
 
 ```python {run continue}
 from euterpe.instruments import Accent, Note, Staccato
@@ -154,9 +155,10 @@ with warnings.catch_warnings(record=True) as caught:
     phrase = Theremin().play([(0.0, A4, 1.0), (1.0, D6, 1.0), (2.0, B7, 0.5)])
 print("play warns:", caught[0].message)
 print(lint_notes(phrase).to_text())
+print(lint_notes(Trio().play([(0.0, C4, 2.0), (0.1, E4, 2.0), (0.2, G4, 2.0), (0.3, C5, 2.0)])).to_text())
 ```
 
-D6 is playable but above C6, so of the 2.5 s of notes, 1.5 s lie outside the comfortable range: 60 %, more than a quarter. `euterpe lint piece.py:fn` runs the same rules first when `fn` returns a phrase, then the audio rules of Part I on what it renders, and exits with 1 on an error. An agent writing music hears about the impossible note before anyone listens to it.
+D6 (1 s) and B7 (0.5 s) lie above C6, so 1.5 s of the 2.5 s of notes are outside the comfortable range: 60 %, more than a quarter. The last line lints the chord of the three-voice theremin from "Voices": four notes are written to sound at once, and the instrument has three. The command `euterpe lint` of chapter 2, given `piece.py:fn`, runs the same rules first when `fn` returns a phrase, then the audio rules on what it renders, and exits with 1 on an error. A program that writes music, such as an AI agent, hears about the impossible note before anyone listens to it.
 
 ## Summary
 
@@ -168,7 +170,7 @@ D6 is playable but above C6, so of the 2.5 s of notes, 1.5 s lie outside the com
 
 ## Exercises
 
-1. Make the theremin's vibrato wider: change `0.01` to `0.03` in its voice. How many cents up and down does the pitch now move?
+1. Make the theremin's vibrato wider: change `0.01` to `0.03` in its voice. How many cents up and down does the pitch now move? (Chapter 2: a ratio r is 1200 × log₂(r) cents.)
 2. In the chord block, change `polyphony = 3` to `polyphony = 2`. Which notes stop, and when?
 3. In the slurred *Ode to Joy*, change `+ 0.05` to `- 0.05`. Why does the melody start every note again?
 
