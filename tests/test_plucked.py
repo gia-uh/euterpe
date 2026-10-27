@@ -59,3 +59,8 @@ def test_a_pizzicato_is_short():
 def test_a_section_is_not_one_player():
     one, three = (np.asarray(PizzicatoStrings(players=k).note(A3, 0.5).take(0.3)) for k in (1, 3))
     assert not np.allclose(one, three)
+
+def test_a_section_needs_a_player():
+    import pytest
+    with pytest.raises(ValueError, match="players"):
+        PizzicatoStrings(players=0)

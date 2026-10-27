@@ -232,6 +232,8 @@ class PizzicatoStrings(Plucked):
                  string: String = Gut(damping=0.97), body: Soundboard | None = ViolinBody(),
                  let_ring: bool = True, mute: float = 0.08, level: float = 0.6):
         super().__init__(exciter, string, body, let_ring, mute, level)
+        if players < 1:
+            raise ValueError(f"PizzicatoStrings needs players of at least 1, got {players}")
         self.players = players
 
     def voice(self, note: Note) -> Unit:

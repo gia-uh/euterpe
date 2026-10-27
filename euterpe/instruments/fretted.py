@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
+from itertools import permutations
 from typing import ClassVar
 
 from euterpe.instruments.core import Control, Note
@@ -38,24 +39,28 @@ class Shape:
 
 
 class Fretted(Plucked):
-    """A plucked instrument whose strings are stopped on frets. A subclass sets tuning (the open
-    strings, lowest first) and frets (how many). Strings are numbered as players do: 1 is the
-    highest. A note's resource is its string; a note written as a pitch alone gets one in
-    perform. The capo raises every string, and frets in a shape or a tab count from it.
+    """A plucked instrument whose strings are stopped on frets. A subclass sets frets (how many)
+    and its standard tuning (the open strings in tab order, from the lowest string), which
+    tuning= replaces. Strings are numbered as players do: 1 is the last in tab order. A note's
+    resource is its string; a note written as a pitch alone gets one in perform. The capo raises
+    every string, and frets in a shape or a tab count from it.
     """
 
-    tuning: ClassVar[tuple[Pitch, ...]] = ()
+    tuning: tuple[Pitch, ...] = ()
     frets: ClassVar[int] = 0
 
-    def __init__(self, capo: int = 0, exciter: Exciter = Finger(), string: String = Steel(),
-                 body: Soundboard | None = GuitarBody(), let_ring: bool = True, mute: float = 0.08,
-                 level: float = 0.25):
+    def __init__(self, tuning: Sequence[Pitch] | None = None, capo: int = 0, exciter: Exciter = Finger(),
+                 string: String = Steel(), body: Soundboard | None = GuitarBody(), let_ring: bool = True,
+                 mute: float = 0.08, level: float = 0.25):
         super().__init__(exciter, string, body, let_ring, mute, level)
         if not 0 <= capo < self.frets:
             raise ValueError(f"capo {capo} is not a fret of {type(self).__name__} (0 to {self.frets - 1})")
+        self.tuning = tuple(tuning) if tuning is not None else type(self).tuning
         self.capo = capo
-        self.playable = (self.tuning[0] + capo, self.tuning[-1] + self.frets)
-        self.comfortable = (self.tuning[0] + capo, self.tuning[-1] + 12)
+        low = min(self.tuning, key=lambda p: p.number)
+        high = max(self.tuning, key=lambda p: p.number)
+        self.playable = (low + capo, high + self.frets)
+        self.comfortable = (low + capo, high + 12)
 
     def _open(self, string: int) -> Pitch:
         """The pitch of string (1 the highest) played open, with the capo."""
@@ -72,26 +77,55 @@ class Fretted(Plucked):
         return [p for _, p in self._sounding(shape)]
 
     def shape(self, pitches: Sequence[Pitch | float]) -> Shape:
-        """A shape that plays pitches: each, from the lowest, on the next free string above the
-        previous one where its fret is lowest."""
-        n = len(self.tuning)
-        frets: list[int | None] = [None] * n
-        last = n + 1  # the string the previous pitch went on; the next goes on a higher one
-        for p in sorted((_pitch(p) for p in pitches), key=lambda p: p.number):
-            options = [(f, s) for s in range(last - 1, 0, -1) if (f := self._fret(p, s)) is not None]
-            if not options:
-                raise ValueError(f"no string of {type(self).__name__} is left for {p!r} in {list(pitches)}")
-            fret, last = min(options, key=lambda o: (o[0], -o[1]))
-            frets[n - last] = fret
+        """A shape that plays pitches, one string each, nearest the nut."""
+        frets: list[int | None] = [None] * len(self.tuning)
+        for p, s in zip(pitches, self._solve(pitches)):
+            frets[len(self.tuning) - s] = self._fret(_pitch(p), s)
         return Shape(*frets)
+
+    def _solve(self, pitches: Sequence[Pitch | float], used: frozenset[int] = frozenset(), hand: int = 0) -> list[int]:
+        """A string for each pitch, the lowest pitch on the lowest open string, all on different
+        strings, the fretted ones within a span of 4 frets; of those, the one whose farthest fret
+        is nearest the hand, then the narrowest, then the one with most open strings."""
+        order = sorted(range(len(pitches)), key=lambda k: _pitch(pitches[k]).number)
+        strings = sorted((s for s in range(1, len(self.tuning) + 1) if s not in used),
+                         key=lambda s: (self._open(s).number, -s))
+        best, best_cost = None, None
+        for chosen in permutations(strings, len(order)):
+            if any(self._open(a).number > self._open(b).number for a, b in zip(chosen, chosen[1:])):
+                continue
+            frets = [self._fret(_pitch(pitches[k]), s) for k, s in zip(order, chosen)]
+            if None in frets:
+                continue
+            fretted = [f for f in frets if f > 0]
+            span = max(fretted) - min(fretted) if fretted else 0
+            if span > 4:
+                continue
+            cost = (max((abs(f - hand) for f in fretted), default=0), span, frets.count(0) * -1, [-s for s in chosen])
+            if best_cost is None or cost < best_cost:
+                best, best_cost = chosen, cost
+        if best is None:
+            names = [repr(_pitch(p)) for p in pitches]
+            missing = next((n for n, p in zip(names, pitches)
+                            if all(self._fret(_pitch(p), s) is None for s in strings)), None)
+            raise ValueError(f"no string of {type(self).__name__} is left for {missing or ', '.join(names)} "
+                             f"in {names}")
+        result = [0] * len(pitches)
+        for k, s in zip(order, best):
+            result[k] = s
+        return result
 
     def strum(self, chord: Shape | Sequence[Pitch | float], at: float, length: float, up: bool = False,
               strings: int | None = None, velocity: float = 0.8, spread: float = 0.012) -> list[Note]:
         """One strum: down from the lowest sounding string to the highest, up the other way,
         spread seconds between strings. strings: only that many of the highest sounding strings."""
-        shape = chord if isinstance(chord, Shape) else self.shape(chord)
-        self._check(shape)
-        sounding = self._sounding(shape)
+        if strings is not None and strings < 1:
+            raise ValueError(f"strum needs strings of at least 1, got {strings}")
+        if isinstance(chord, Shape):
+            self._check(chord)
+            sounding = self._sounding(chord)
+        else:  # keep each pitch as written, Hz included; the solver only picks the strings
+            sounding = sorted(zip(self._solve(chord), chord), key=lambda sp: -sp[0])
         if strings is not None:
             sounding = sounding[-strings:]
         if up:
@@ -118,18 +152,14 @@ class Fretted(Plucked):
                 j += 1
             group = notes[i:j]
             free = [n for n in group if n.resource is None]
+            used = {n.resource for n in group if n.resource is not None}
             if len(free) > 1:
                 try:
-                    shape = self.shape([n.pitch for n in free])
+                    for n, s in zip(free, self._solve([n.pitch for n in free], frozenset(used), hand)):
+                        n.resource = s
                 except ValueError:
-                    shape = None
-                if shape is not None:
-                    by_pitch = {}
-                    for s, p in self._sounding(shape):
-                        by_pitch.setdefault(p, []).append(s)
-                    for n in sorted(free, key=lambda n: _pitch(n.pitch).number):
-                        n.resource = by_pitch[_pitch(n.pitch)].pop(0)
-            used = {n.resource for n in group if n.resource is not None}
+                    pass  # placed one by one below
+                used = {n.resource for n in group if n.resource is not None}
             for n in group:
                 if n.resource is None:
                     p = _pitch(n.pitch)
@@ -149,6 +179,9 @@ class Fretted(Plucked):
         if len(shape.frets) != len(self.tuning):
             raise ValueError(f"{shape!r} has {len(shape.frets)} frets; {type(self).__name__} has "
                              f"{len(self.tuning)} strings")
+        for f in shape.frets:
+            if f is not None and not 0 <= f <= self.frets - self.capo:
+                raise ValueError(f"{shape!r}: fret {f} is not on {type(self).__name__} (0 to {self.frets - self.capo})")
 
     def _sounding(self, shape: Shape) -> list[tuple[int, Pitch]]:
         """(string, pitch) for each string the shape plays, lowest string first."""
@@ -177,10 +210,10 @@ class Guitar(Fretted):
     frets = 19
     polyphony = 6
 
-    def __init__(self, capo: int = 0, exciter: Exciter = Plectrum(), string: String = Steel(),
-                 body: Soundboard | None = GuitarBody(), let_ring: bool = True, mute: float = 0.08,
-                 level: float = 0.75):
-        super().__init__(capo, exciter, string, body, let_ring, mute, level)
+    def __init__(self, tuning: Sequence[Pitch] | None = None, capo: int = 0, exciter: Exciter = Plectrum(),
+                 string: String = Steel(), body: Soundboard | None = GuitarBody(), let_ring: bool = True,
+                 mute: float = 0.08, level: float = 0.75):
+        super().__init__(tuning, capo, exciter, string, body, let_ring, mute, level)
 
 
 class BassGuitar(Fretted):
@@ -195,7 +228,8 @@ class BassGuitar(Fretted):
     frets = 20
     polyphony = 4
 
-    def __init__(self, capo: int = 0, exciter: Exciter = Finger(position=0.15), string: String = Steel(damping=0.998),
+    def __init__(self, tuning: Sequence[Pitch] | None = None, capo: int = 0,
+                 exciter: Exciter = Finger(position=0.15), string: String = Steel(damping=0.998),
                  body: Soundboard | None = BassBody(), let_ring: bool = True, mute: float = 0.08,
                  level: float = 0.7):
-        super().__init__(capo, exciter, string, body, let_ring, mute, level)
+        super().__init__(tuning, capo, exciter, string, body, let_ring, mute, level)

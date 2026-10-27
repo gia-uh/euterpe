@@ -15,7 +15,7 @@ class Body(Unit):
     is dry * src plus what the modes ring.
 
     freqs, decays, amps: each mode's frequency (Hz), its time to fall 60 dB (s) and its gain at
-    its own frequency. Each resonator is a two-pole band-pass with zeros at 0 Hz and at half the
+    its own frequency (slightly less for a decay of a few ms). Each resonator is a two-pole band-pass with zeros at 0 Hz and at half the
     sample rate, so a mode boosts its band and leaves the string's lowest drift alone.
     dry: how much of the string reaches the ear directly.
 
@@ -36,7 +36,7 @@ class Body(Unit):
         keep = f < RATE / 2
         w = 2 * np.pi * f[keep] / RATE
         r = 10 ** (-3 / (t[keep] * RATE))  # 60 dB, a factor of 1000, in decay * RATE samples
-        # (1 - r) / (1 - z^-2) scaled so the gain at the mode's own frequency is amp
+        # amp (1 - r^2) / 2 (1 - z^-2): about amp at the mode's frequency, 0 at 0 Hz and at RATE / 2
         self._ba = [
             (amp * (1 - ri * ri) / 2 * np.array([1.0, 0.0, -1.0]), np.array([1.0, -2 * ri * np.cos(wi), ri * ri]))
             for wi, ri, amp in zip(w, r, a[keep])
