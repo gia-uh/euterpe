@@ -93,7 +93,7 @@ display(kit.play(notes).take(15.5, "Toms: a swing standard's floor-tom beat"))
 
 ## Hands and feet
 
-A hand clap is a burst of noise that the hollow of the hands colours, around 1.2 kHz. One clap of several people is not one burst but several, a few milliseconds apart, since no two people clap at the same instant. `Clap(hands, spread)` makes that: `hands` bursts spread over `spread` seconds, through a band-pass. `Stomp` does the same for feet on wooden boards: several kicks with a short sweep and a loud click, in a hall (chapter 8's `FDNReverb`). Together they play the stomp-stomp-clap of a stadium anthem, at 81 bpm:
+A hand clap is a burst of noise that the hollow of the hands colours, around 1.2 kHz. One clap of several people is not one burst but several, a few milliseconds apart, since no two people clap at the same instant. `Clap(hands, spread)` makes that: `hands` bursts spread over `spread` seconds, through a band-pass. `Stomp` does the same for feet on wooden boards: several kicks with a short sweep, whose beater click is a knock of wood, 12 ms of noise band-passed around 900 Hz, in a hall with a smooth tail (chapter 8's `ConvolutionReverb`). A first version used the kick's own click, noise high-passed above 1.5 kHz, and a feedback-delay hall: it sounded metallic, a third of its spectrum above 2 kHz, and listeners did not hear feet. Together they play the stomp-stomp-clap of a stadium anthem, at 81 bpm:
 
 ```python {run}
 from euterpe.instruments import Clap, Kit, Stomp

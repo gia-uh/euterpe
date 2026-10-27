@@ -8,7 +8,7 @@ import numpy as np
 
 from euterpe.instruments.core import Articulation, Instrument, Note
 from euterpe.pitch import C4, D2, E2, G2, A3, Pitch
-from euterpe.sound import FM, BandPass, FDNReverb, HighPass, Modal, Segments, Sine, Square, WhiteNoise
+from euterpe.sound import FM, BandPass, ConvolutionReverb, HighPass, Modal, Segments, Sine, Square, WhiteNoise
 from euterpe.sound.core import RATE, Unit
 
 MEMBRANE = (1.0, 1.59, 2.14, 2.30, 2.65)  # a circular membrane's lowest modes, over its fundamental
@@ -112,11 +112,12 @@ class Kick(Struck):
 
 
 class Stomp(Kick):
-    """A crowd stamping on wooden boards: people thumps, each a kick with a low sweep and a loud
-    click, a few milliseconds apart, in a hall.
+    """A crowd stamping on wooden boards: people thumps a few milliseconds apart, each a kick
+    with a low sweep whose beater click is a knock of wood (band-passed noise, 12 ms) instead of
+    a hiss, in a hall with a smooth tail.
 
     people: how many stamp. spread: the seconds between the first and the last. room: the
-    hall's reverb time in seconds.
+    hall's reverb time in seconds. click: the knock's level.
 
     Limit: every foot is the same kick, and the hall is a plain reverb, not a stadium's echo.
     """
@@ -133,11 +134,19 @@ class Stomp(Kick):
         """None: many feet are not one drum head, and the hall keeps ringing under the next stamp."""
         return None
 
+    def thump(self, note: Note, at: float = 0.0) -> Unit:
+        """One foot at time at: the kick's falling sine, and a knock of wood around 900 Hz."""
+        force, bright, tuning = self.vary(note)
+        f0 = float(note.freq) * tuning
+        head = Sine(f0 + f0 * (self.sweep - 1) * fall(6.9 * self.drop, at)) * fall(self.decay, at)
+        knock = BandPass(WhiteNoise(_seed(note)), 900.0 * bright, 0.6) * fall(0.012, at) * (self.click * 1.6)
+        return (head + knock) * force
+
     def voice(self, note: Note) -> Unit:
         times = np.sort(note.rng.uniform(0.0, self.spread, self.people))
         feet = sum((self.thump(note, float(t)) for t in times[1:]), self.thump(note, float(times[0])))
         gain = note.velocity * self.level / np.sqrt(self.people)
-        return FDNReverb(feet * gain, decay=self.room, size=1.2, mix=0.3, seed=_seed(note))
+        return ConvolutionReverb(feet * gain, decay=self.room, mix=0.3, seed=_seed(note))
 
 
 class Snare(Struck):
