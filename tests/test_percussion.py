@@ -34,3 +34,43 @@ def test_flam_puts_a_soft_grace_before_the_stroke():
 def test_flam_at_zero_clamps_the_grace():
     grace, main = Block().flam(0.0)
     assert grace.time == 0.0 and main.time > grace.time
+
+
+from euterpe.instruments import Clap, Kick, Snare, Stomp, Tom  # noqa: E402
+from euterpe.sound.core import RATE, render  # noqa: E402
+from tests.helpers import band_db, peak_hz  # noqa: E402
+
+
+def one(drum, seconds=0.5, **hit):
+    return render(drum.play(drum.hit(0.0, **hit)), seconds)
+
+
+def test_the_kick_falls_in_pitch():
+    x = one(Kick(tune=50.0), 0.4, velocity=1.0)
+    assert peak_hz(x[: RATE // 50]) > 75.0
+    assert abs(peak_hz(x[RATE // 10 : 3 * RATE // 10]) - 50.0) < 7.5
+
+
+def test_the_snare_wires_add_the_highs():
+    wet, dry = one(Snare(snappy=1.0), 0.3), one(Snare(snappy=0.0), 0.3)
+    assert band_db(wet, 3000, 20000) - band_db(dry, 3000, 20000) > 10.0
+
+
+def test_a_tom_sounds_its_pitch():
+    x = one(Tom(tune=110.0), 0.6)
+    assert peak_hz(x[RATE // 20 :]) == pytest.approx(110.0, rel=0.03)
+
+
+def test_two_claps_close_together_both_sound():
+    c = Clap()
+    assert c.resource(c.hit(0.0)[0]) is None
+    one_clap = np.abs(render(c.play(c.hit(0.0)), 0.3)).sum()
+    two = np.abs(render(c.play(c.hit(0.0) + c.hit(0.005)), 0.3)).sum()
+    assert two > 1.25 * one_clap  # uncorrelated noise adds in power: about 1.41; a stolen clap gives about 1
+
+
+@pytest.mark.parametrize("cls", [Kick, Stomp, Snare, Tom, Clap])
+def test_each_hit_ends(cls):
+    d = cls()
+    v = d.voice(d.hit(0.0)[0])
+    assert v.duration is not None and 0.05 < v.duration < 3.0
