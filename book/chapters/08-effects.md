@@ -67,9 +67,9 @@ print(f"the copy's pitch moves by up to {100 * r:.2f} %, {1200 * np.log2(1 + r):
 A *cent* is a hundredth of one of chapter 2's equal steps, so 26 cents is about a quarter of a step. Two singers on the same note are never exactly in tune: they drift apart by a few cents and back. The chorus copies that drift, which is where its name comes from. Here is a saw at 220 Hz, alone and then with a chorus:
 
 ```python {run}
-from euterpe.sound import ADSR, Biquad, Chorus, Saw
+from euterpe.sound import ADSR, Chorus, LowPass, Saw
 
-saw = lambda: Biquad(Saw(220.0), "lowpass", cutoff=2500.0) * ADSR(gate=2.6, release=0.3) * 0.5
+saw = lambda: LowPass(Saw(220.0), cutoff=2500.0) * ADSR(gate=2.6, release=0.3) * 0.5
 display(saw().take(3.0, "A filtered saw at 220 Hz, dry"))
 display(Chorus(saw(), rate=0.8, depth=0.003, mix=0.5).take(3.0, "The same saw through a chorus"))
 ```
@@ -114,9 +114,9 @@ flanged.take(8.0).spectrogram(lo=100, hi=8000, caption="Spectrogram of white noi
 Mixed with the source, the chained copy cancels wherever its total delay is an odd number of half periods: 180°, 540°, 900° and so on. Four stages delay 4 × 90° = 360° at the turning frequency, so they pass 180° at one frequency below it and 540° at one above it, two notches; they never reach 900°, since four stages give at most 720°. In general n stages reach at most n × 180°, so they have n / 2 notches, rounded down. A flanger's comb has peaks at 1, 2, 3, 4 ... times one frequency, evenly spaced all the way up. A phaser has only these few notches, and they are not at multiples of one frequency, so its sweep sounds softer:
 
 ```python {run}
-from euterpe.sound import ADSR, Biquad, Phaser, Saw
+from euterpe.sound import ADSR, LowPass, Phaser, Saw
 
-saw = Biquad(Saw(110.0), "lowpass", cutoff=4000.0) * ADSR(gate=5.4, release=0.5) * 0.5
+saw = LowPass(Saw(110.0), cutoff=4000.0) * ADSR(gate=5.4, release=0.5) * 0.5
 display(Phaser(saw, rate=0.3, stages=8, mix=0.5).take(6.0, "A saw at 110 Hz through an 8-stage phaser, rate 0.3 Hz"))
 ```
 
@@ -126,22 +126,22 @@ Eight stages give four notches that move together. Try `stages=2`: a single notc
 
 The effects so far add copies of the sound, and a delay that does not move adds no new frequencies: a sine in gives a sine out, at the same frequency. *Distortion* does add new ones. A *waveshaper* passes each sample through a fixed curve, and a curve that bends the wave adds new frequencies to it. Chapter 1's `BitCrush` was one: its curve was a staircase.
 
-`Shaper(src, kind, drive)` has three curves. Each multiplies the sample by `drive` / 2 first and then bends it. The half is there so that drive 2 puts a full-scale input exactly at u = 1, where the soft and hard curves stop rising, and drive 1 bends only a little:
+Three waveshapers differ only in their curve, and each takes `(src, drive)`. Each multiplies the sample by `drive` / 2 first and then bends it. The half is there so that drive 2 puts a full-scale input exactly at u = 1, where the soft and hard curves stop rising, and drive 1 bends only a little:
 
-- `"tanh"`, the hyperbolic tangent: straight near 0 and bending smoothly towards ±1.
-- `"soft"`, the cubic u − u³/3, which stops rising at u = 1 and stays flat beyond.
-- `"hard"`, a clip: straight up to ±1, then flat. An amplifier pushed past its supply voltage does this.
+- `Tanh`, the hyperbolic tangent: straight near 0 and bending smoothly towards ±1.
+- `SoftClip`, the cubic u − u³/3, which stops rising at u = 1 and stays flat beyond.
+- `HardClip`, a clip: straight up to ±1, then flat. An amplifier pushed past its supply voltage does this.
 
 The output is scaled so a full-scale input comes out at −1 dBFS, so turning up `drive` changes the shape and not the peak. The curves are drawn here at drive 4:
 
 ```python {run echo=false}
-from euterpe.sound import Shaper, Sine
+from euterpe.sound import HardClip, Sine, SoftClip, Tanh
 from euterpe.view import curve
 
-kinds = ("tanh", "soft", "hard")
+shapers = (Tanh, SoftClip, HardClip)
 curve(
-    *[Shaper(Sine(1.0), kind, drive=4.0) for kind in kinds], labels=list(kinds),
-    caption="The three curves of Shaper at drive 4: each input sample maps to one output sample",
+    *[shaper(Sine(1.0), drive=4.0) for shaper in shapers], labels=[s.__name__ for s in shapers],
+    caption="The three waveshaper curves at drive 4: each input sample maps to one output sample",
 )
 ```
 
@@ -150,13 +150,13 @@ A sine pushed through a curve stays periodic with the same period, so whatever t
 ```python {run output=code}
 import numpy as np
 
-from euterpe.sound import Shaper, Sine, render
+from euterpe.sound import HardClip, Sine, SoftClip, Tanh, render
 
-for kind in ("tanh", "soft", "hard"):
-    x = render(Shaper(Sine(220.0), kind, drive=4.0), 1.0)
+for shaper in (Tanh, SoftClip, HardClip):
+    x = render(shaper(Sine(220.0), drive=4.0), 1.0)
     amp = np.abs(np.fft.rfft(x)) * 2 / len(x)          # one bin per Hz, as in chapter 6
     levels = [20 * np.log10(amp[220 * k] + 1e-9) for k in range(1, 8)]
-    print(f"{kind:>4}:", "  ".join(f"{v:6.1f}" for v in levels))
+    print(f"{shaper.__name__:>8}:", "  ".join(f"{v:6.1f}" for v in levels))
 ```
 
 Two things show. First, the even harmonics (2nd, 4th, 6th) are at −150 dB or below: absent. All three curves are *odd*: the bottom half is the top half turned upside down, so the positive and negative halves of the sine are bent the same way, and a wave with that symmetry has only odd harmonics, as the square of chapter 3. The fundamental of all three is above 0 dB although the output peaks at −1 dBFS: a wave squashed towards a square has a fundamental larger than its peak, 1.273 times it for a full square, as chapter 3 measured. Second, the curves bend the wave by different amounts at the same drive. The 7th harmonic is −40.6 dB after `tanh`, −35.1 dB after `hard` and −30.0 dB after `soft`, whose curve rises most steeply in the plot above and then turns flat at the same point as `hard`, with a rounder corner.
@@ -164,17 +164,17 @@ Two things show. First, the even harmonics (2nd, 4th, 6th) are at −150 dB or b
 More drive pushes more of the wave into the bend. Here is the same sine at drive 1, 4 and 16, through `tanh`:
 
 ```python {run}
-from euterpe.sound import ADSR, Shaper, Sine
+from euterpe.sound import ADSR, Sine, Tanh
 
 for drive in (1.0, 4.0, 16.0):
-    display((Shaper(Sine(220.0), "tanh", drive=drive) * ADSR(gate=1.2, release=0.2) * 0.5).take(1.5, f"A sine at 220 Hz through tanh at drive {drive:g}"))
+    display((Tanh(Sine(220.0), drive=drive) * ADSR(gate=1.2, release=0.2) * 0.5).take(1.5, f"A sine at 220 Hz through tanh at drive {drive:g}"))
 ```
 
 At drive 1 you hear a sine with a slight buzz; at 16 the wave is nearly a square, and sounds like one.
 
 ### Saturation and even harmonics
 
-`Saturator(src, drive, bias)` is a tanh with the wave shifted by `bias` before the curve: tanh(drive / 2 × (x + bias)), with `drive` halved as in `Shaper`, so the same drive means the same push into the curve in both. The shift makes the curve lopsided around the wave. The top half is bent more than the bottom half, the symmetry is gone, and the even harmonics appear. Tube amplifiers do the same, and the 2nd harmonic, an octave above the note, is why their distortion is called warm: it adds the note's own octave rather than a harsher odd harmonic. The shift also leaves an offset at 0 Hz, which the unit removes with a high-pass at 10 Hz.
+`Saturator(src, drive, bias)` is a tanh with the wave shifted by `bias` before the curve: tanh(drive / 2 × (x + bias)), with `drive` halved as in `Tanh`, so the same drive means the same push into the curve in both. The shift makes the curve lopsided around the wave. The top half is bent more than the bottom half, the symmetry is gone, and the even harmonics appear. Tube amplifiers do the same, and the 2nd harmonic, an octave above the note, is why their distortion is called warm: it adds the note's own octave rather than a harsher odd harmonic. The shift also leaves an offset at 0 Hz, which the unit removes with a high-pass at 10 Hz.
 
 ```python {run output=code}
 import numpy as np
@@ -189,13 +189,13 @@ print("  ".join(f"{20 * np.log10(amp[220 * k] + 1e-12):6.1f}" for k in range(1, 
 The 2nd harmonic is now at −17.7 dB, as loud as the 3rd, and the 4th and 6th are there too. The plot puts the four spectra one above the other, the first ten harmonics of 220 Hz marked, the first five numbered:
 
 ```python {run echo=false}
-from euterpe.sound import Saturator, Shaper, Sine
+from euterpe.sound import HardClip, Saturator, Sine, SoftClip, Tanh
 from euterpe.view import spectrum
 
 units = {
-    "Shaper tanh, drive 4": Shaper(Sine(220.0), "tanh", drive=4.0),
-    "Shaper soft, drive 4": Shaper(Sine(220.0), "soft", drive=4.0),
-    "Shaper hard, drive 4": Shaper(Sine(220.0), "hard", drive=4.0),
+    "Tanh, drive 4": Tanh(Sine(220.0), drive=4.0),
+    "SoftClip, drive 4": SoftClip(Sine(220.0), drive=4.0),
+    "HardClip, drive 4": HardClip(Sine(220.0), drive=4.0),
     "Saturator, drive 4, bias 0.2": Saturator(Sine(220.0), drive=4.0, bias=0.2),
 }
 spectrum(
@@ -207,10 +207,10 @@ spectrum(
 Listen to the two side by side, a shaper and a saturator at the same drive on a bass note at 110 Hz:
 
 ```python {run}
-from euterpe.sound import ADSR, Saturator, Shaper, Sine
+from euterpe.sound import ADSR, Saturator, Sine, Tanh
 
 note = lambda: Sine(110.0) * ADSR(attack=0.005, decay=0.4, sustain=0.6, gate=1.2, release=0.3)
-display((Shaper(note(), "tanh", drive=4.0) * 0.6).take(1.6, "A 110 Hz note through tanh, drive 4: odd harmonics"))
+display((Tanh(note(), drive=4.0) * 0.6).take(1.6, "A 110 Hz note through tanh, drive 4: odd harmonics"))
 display((Saturator(note(), drive=4.0, bias=0.2) * 0.6).take(1.6, "The same note through a saturator, drive 4, bias 0.2: odd and even"))
 ```
 
@@ -223,10 +223,10 @@ When the two notes are a fifth apart (frequency ratio 3 : 2, here 220 Hz and 330
 ```python {run output=code}
 import numpy as np
 
-from euterpe.sound import Shaper, Sine, render
+from euterpe.sound import HardClip, Sine, render
 
 for top in (330.0, 311.1):
-    x = render(Shaper(Sine(220.0) * 0.5 + Sine(top) * 0.5, "hard", drive=8.0), 10.0)
+    x = render(HardClip(Sine(220.0) * 0.5 + Sine(top) * 0.5, drive=8.0), 10.0)
     amp = np.abs(np.fft.rfft(x))                # 10 s: one bin every 0.1 Hz
     loudest = sorted(np.argsort(amp)[-10:] / 10)
     print(f"220 + {top} Hz, the ten loudest (Hz):", ", ".join(f"{f:g}" for f in loudest))
@@ -235,10 +235,10 @@ for top in (330.0, 311.1):
 The block renders 10 s so that the spectrum has a bin every 0.1 Hz and 311.1 Hz falls exactly on one; over 1 s the bins are 1 Hz apart and its energy would spill into the bins at 311 and 312 Hz. The fifth gives 110, 220, 330, 440 Hz and on, all multiples of 110: 110 Hz itself is 2 × 220 − 330. The tritone gives 128.9 Hz (2 × 220 − 311.1), 37.8 Hz (3 × 220 − 2 × 311.1), 402.2 Hz (2 × 311.1 − 220) and more, on no common series, a cluster that sounds rough:
 
 ```python {run}
-from euterpe.sound import ADSR, Shaper, Sine
+from euterpe.sound import ADSR, HardClip, Sine
 
 for top, name in ((330.0, "a fifth"), (311.1, "a tritone")):
-    chord = Shaper(Sine(220.0) * 0.5 + Sine(top) * 0.5, "hard", drive=8.0)
+    chord = HardClip(Sine(220.0) * 0.5 + Sine(top) * 0.5, drive=8.0)
     display((chord * ADSR(gate=1.7, release=0.2) * 0.5).take(2.0, f"220 and {top:g} Hz, {name}, through a hard clip"))
 ```
 
@@ -501,10 +501,10 @@ for pos in (-1.0, -0.5, 0.0, 0.5, 1.0):
 In the middle each side gets 0.707, −3 dB. `pos` can be a unit, so a slow sine moves the sound from side to side, an *auto-pan*. Listen to this one through headphones:
 
 ```python {run}
-from euterpe.sound import ADSR, Biquad, Pan, Saw, Sine
+from euterpe.sound import ADSR, LowPass, Pan, Saw, Sine
 from euterpe.view import listen
 
-tone = Biquad(Saw(220.0), "lowpass", cutoff=1500.0) * ADSR(gate=7.4, release=0.5) * 0.5
+tone = LowPass(Saw(220.0), cutoff=1500.0) * ADSR(gate=7.4, release=0.5) * 0.5
 listen(Pan(tone, pos=Sine(0.25)), 8.0, "A saw moving from side to side, once every 4 seconds")
 ```
 
@@ -545,7 +545,7 @@ display(Limiter(space * 0.9, ceiling=-1.0).take(7.0, "A pluck at 147 Hz: saturat
 - An effect is a unit whose source is another unit, so effects chain.
 - `Delay(src, time, feedback, mix)` adds the source again after `time` seconds; `feedback` repeats it, each echo `feedback` times the last. Below about 30 to 50 ms the copy is not heard as an echo but as a comb filter, with peaks every 1 / time Hz.
 - A delay that changes while it plays shifts the pitch of the copy by the rate of change. `Chorus` uses a 20 ms delay that swings a few cents of pitch, which thickens a sound; `Flanger` sweeps a delay of 0.5 ms to 0.5 ms + depth, which slides a whole comb of peaks up and down; `Phaser` sweeps a chain of allpasses, which slides a few notches, half as many as stages, rounded down.
-- `Shaper(src, kind, drive)` bends each sample through tanh, a soft cubic or a hard clip. An odd curve adds odd harmonics only; more drive and a harsher curve make them louder. `Saturator` shifts the wave before the curve, which adds even harmonics too. Two notes through a curve also produce sums and differences of their frequencies, intermodulation.
+- `Tanh`, `SoftClip` and `HardClip`, each `(src, drive)`, bend each sample through tanh, a soft cubic or a hard clip. An odd curve adds odd harmonics only; more drive and a harsher curve make them louder. `Saturator` shifts the wave before the curve, which adds even harmonics too. Two notes through a curve also produce sums and differences of their frequencies, intermodulation.
 - `Compressor(src, threshold, ratio, attack, release, makeup)` divides by `ratio` how far the level goes above `threshold`: it shrinks the range between loud and soft. `Limiter(src, ceiling, release)` looks 5 ms ahead and keeps every sample under `ceiling`. `Gate(src, threshold, release)` silences what is quieter than `threshold`.
 - Reverb is the dense tail of echoes a room adds; RT60 is the time it takes to fall 60 dB. `FDNReverb(src, decay, size, damping, mix)` makes it with eight delay lines feeding each other; `ConvolutionReverb(src, decay, mix, seed)` convolves the source with a synthesized impulse response of decaying noise.
 - `Pan(src, pos)` places a mono sound between the speakers at constant power, cos θ left and sin θ right. `Width(src, width)` scales the difference between the sides: 0 is mono, 2 twice as wide.

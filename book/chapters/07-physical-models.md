@@ -8,13 +8,13 @@ A guitar string, plucked, starts with the shape the finger gave it. That shape r
 
 ### Step 1: noise in a delay line
 
-The pluck is a short burst of noise, one period long: at 220 Hz, 1/220 s, 4.5 ms. It goes into a comb whose delay is the same period and whose feedback is 0.996, so it circulates and comes back 220 times a second, losing 0.4 % at each trip. `Segments` (chapter 5) holds the noise at 1 for samples 0 to 218, the first 1/220 s, then at 0. A `OnePole` high-pass at 20 Hz removes the small offset of those 219 random samples, which the comb would otherwise build up. The `ADSR`, with no attack and full sustain, only fades the note out from 2.4 s, as a hand laid on the string would.
+The pluck is a short burst of noise, one period long: at 220 Hz, 1/220 s, 4.5 ms. It goes into a comb whose delay is the same period and whose feedback is 0.996, so it circulates and comes back 220 times a second, losing 0.4 % at each trip. `Segments` (chapter 5) holds the noise at 1 for samples 0 to 218, the first 1/220 s, then at 0. A `OnePoleHighPass` at 20 Hz removes the small offset of those 219 random samples, which the comb would otherwise build up. The `ADSR`, with no attack and full sustain, only fades the note out from 2.4 s, as a hand laid on the string would.
 
 ```python {run}
-from euterpe.sound import ADSR, Comb, OnePole, Segments, WhiteNoise
+from euterpe.sound import ADSR, Comb, OnePoleHighPass, Segments, WhiteNoise
 
 burst = WhiteNoise(seed=1) * Segments([(0.0, 1.0), (1 / 220, 1.0), (1 / 220, 0.0)])
-string = OnePole(Comb(burst, delay=1 / 220, feedback=0.996), 20.0, kind="highpass")
+string = OnePoleHighPass(Comb(burst, delay=1 / 220, feedback=0.996), 20.0)
 display((string * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4) * 0.25).take(3.0, "A burst of noise circulating in a comb at 220 Hz"))
 ```
 
@@ -154,9 +154,9 @@ bar.take(2.0).spectrogram(lo=220, hi=6000, caption="The struck bar over time: ea
 A single sample is the hardest strike possible: it has every frequency at the same level, so every mode starts at its full amplitude. A soft mallet touches the bar for a few milliseconds and pushes less at high frequencies. `Modal` takes the strike as a fourth argument, `excite`, any unit. Here the excitation is 5 ms of noise through a low-pass at 1 500 Hz:
 
 ```python {run}
-from euterpe.sound import ADSR, Biquad, Modal, WhiteNoise
+from euterpe.sound import ADSR, LowPass, Modal, WhiteNoise
 
-mallet = Biquad(WhiteNoise(seed=1), "lowpass", cutoff=1500.0) * ADSR(attack=0.0, decay=0.005, sustain=0.0, release=0.0, gate=1.0)
+mallet = LowPass(WhiteNoise(seed=1), cutoff=1500.0) * ADSR(attack=0.0, decay=0.005, sustain=0.0, release=0.0, gate=1.0)
 soft = Modal([440 * r for r in [1, 2.76, 5.40, 8.93]], decays=[1.2, 0.5, 0.25, 0.12], amps=[1.0, 0.5, 0.3, 0.2], excite=mallet)
 display((soft * 0.1).take(2.0, "The same bar struck with a soft mallet"))
 ```
