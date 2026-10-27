@@ -11,6 +11,8 @@ from euterpe.instruments.core import (
     play,
 )
 from euterpe.instruments.fretted import BassGuitar, Fretted, Guitar, Shape
+from euterpe.instruments.mallets import Bar, Barred, Celesta, Glockenspiel, Marimba, Xylophone
+from euterpe.instruments.percussion import Clap, Crash, Cymbal, HiHat, Kick, Kit, Mallet, Open, Ride, Snare, Stomp, Struck, Timpani, Tom
 from euterpe.instruments.phrase import Phrase
 from euterpe.instruments.plucked import (
     BassBody,
@@ -33,6 +35,24 @@ from euterpe.instruments.plucked import (
 )
 
 __all__ = [
+    "Timpani",
+    "Mallet",
+    "Xylophone",
+    "Marimba",
+    "Glockenspiel",
+    "Celesta",
+    "Barred",
+    "Bar",
+    "Kit",
+    "Ride",
+    "HiHat",
+    "Cymbal",
+    "Crash",
+    "Tom",
+    "Stomp",
+    "Snare",
+    "Kick",
+    "Clap",
     "Accent",
     "Articulation",
     "BassBody",
@@ -50,6 +70,7 @@ __all__ = [
     "Legato",
     "Note",
     "Nylon",
+    "Open",
     "Phrase",
     "PizzicatoStrings",
     "play",
@@ -61,6 +82,7 @@ __all__ = [
     "Staccato",
     "Steel",
     "String",
+    "Struck",
     "Tolerance",
     "ViolinBody",
 ]
