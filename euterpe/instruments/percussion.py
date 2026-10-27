@@ -8,7 +8,7 @@ import numpy as np
 
 from euterpe.instruments.core import Articulation, Instrument, Note
 from euterpe.pitch import Pitch
-from euterpe.sound import BandPass, FDNReverb, HighPass, Modal, Segments, Sine, WhiteNoise
+from euterpe.sound import FM, BandPass, FDNReverb, HighPass, Modal, Segments, Sine, Square, WhiteNoise
 from euterpe.sound.core import Unit
 
 MEMBRANE = (1.0, 1.59, 2.14, 2.30, 2.65)  # a circular membrane's lowest modes, over its fundamental
@@ -210,3 +210,86 @@ class Clap(Struck):
         env = sum((fall(0.012, float(t)) for t in times[:-1]), fall(self.decay, float(times[-1])))
         noise = WhiteNoise(_seed(note)) * env
         return BandPass(noise, float(note.freq) * tuning, 1.2 * bright) * (note.velocity * self.level * force * 2.0)
+
+
+METAL = (205.3, 304.4, 369.6, 522.7, 540.0, 800.0)  # six square waves that beat as metal, in Hz
+
+
+class HiHat(Struck):
+    """A hi-hat: six square waves at inharmonic frequencies that beat against each other as
+    metal does, plus noise, high-passed. Closed it is a tick; Open() lets it ring. One pedal
+    holds both cymbals, so a closed stroke chokes an open one still ringing.
+
+    closed, open: seconds to fall 60 dB in each position. tone: the high-pass in Hz.
+
+    Limit: the metal is a fixed cluster of tones, not the modes of two real cymbals, and the
+    pedal has no half-open position or foot chick.
+    """
+
+    def __init__(self, closed: float = 0.05, open: float = 0.45, tone: float = 7000.0, level: float = 0.35,
+                 variation: float = 0.08, seed: int = 0):
+        self.closed, self.open, self.tone, self.tune = closed, open, tone, METAL[0]
+        self.level, self.variation, self.seed = level, variation, seed
+
+    def voice(self, note: Note) -> Unit:
+        force, bright, tuning = self.vary(note)
+        k = float(note.freq) / METAL[0] * tuning
+        metal = sum((Square(f * k) for f in METAL[1:]), Square(METAL[0] * k)) * (1 / 3)
+        ring = self.open if isinstance(note.articulation, Open) else self.closed
+        shimmer = HighPass(metal + WhiteNoise(_seed(note)) * 0.5, self.tone * bright)
+        return HighPass(shimmer, self.tone * bright) * fall(ring) * (note.velocity * self.level * force)
+
+
+class Cymbal(Struck):
+    """A suspended cymbal: three frequency-modulated pairs at inharmonic ratios for the metal's
+    dense modes, and high-passed noise for its wash, under a long decay. Hits overlap, so the
+    wash builds as a player keeps striking it.
+
+    decay: seconds to fall 60 dB. wash: the noise's level. bell: the level of the bell, two
+    modes struck at the cup.
+
+    Limit: the modes do not spread over time as a real cymbal's energy moves up the spectrum,
+    and there is no choke by hand.
+    """
+
+    def __init__(self, decay: float = 2.0, wash: float = 0.6, bell: float = 0.0, tune: float = 340.0,
+                 level: float = 0.25, variation: float = 0.08, seed: int = 0):
+        self.decay, self.wash, self.bell, self.tune = decay, wash, bell, tune
+        self.level, self.variation, self.seed = level, variation, seed
+
+    def resource(self, note: Note) -> Hashable | None:
+        """None: a cymbal struck again keeps ringing under the new hit."""
+        return None
+
+    def voice(self, note: Note) -> Unit:
+        force, bright, tuning = self.vary(note)
+        f0 = float(note.freq) * tuning
+        metal = (FM(f0, ratio=1.47, index=4.0 * bright) + FM(f0 * 1.53, ratio=2.13, index=3.5 * bright)
+                 + FM(f0 * 2.4, ratio=3.31, index=3.0 * bright)) * (1 / 3)
+        noise = HighPass(WhiteNoise(_seed(note)), 5000.0) * self.wash
+        sound = HighPass(metal + noise, 300.0) * fall(self.decay)
+        if self.bell:
+            sound = sound + Modal([f0 * 2.0, f0 * 5.1], [0.8 * self.decay, 0.5 * self.decay], [self.bell, 0.5 * self.bell])
+        return sound * (note.velocity * self.level * force)
+
+
+class Crash(Cymbal):
+    """A crash cymbal: bright, a lot of wash, about two seconds of ring.
+
+    Limit: as Cymbal's; the swell of a real crash just after the hit is missing.
+    """
+
+    def __init__(self, decay: float = 2.0, wash: float = 0.8, bell: float = 0.0, tune: float = 340.0,
+                 level: float = 0.25, variation: float = 0.08, seed: int = 0):
+        super().__init__(decay, wash, bell, tune, level, variation, seed)
+
+
+class Ride(Cymbal):
+    """A ride cymbal: less wash, a bell, a longer and more defined ring for patterns.
+
+    Limit: as Cymbal's; the stick's ping does not change with where it lands.
+    """
+
+    def __init__(self, decay: float = 3.0, wash: float = 0.25, bell: float = 0.3, tune: float = 420.0,
+                 level: float = 0.2, variation: float = 0.08, seed: int = 0):
+        super().__init__(decay, wash, bell, tune, level, variation, seed)

@@ -11,7 +11,7 @@ from euterpe.instruments.core import (
     play,
 )
 from euterpe.instruments.fretted import BassGuitar, Fretted, Guitar, Shape
-from euterpe.instruments.percussion import Clap, Kick, Open, Snare, Stomp, Struck, Tom
+from euterpe.instruments.percussion import Clap, Crash, Cymbal, HiHat, Kick, Open, Ride, Snare, Stomp, Struck, Tom
 from euterpe.instruments.phrase import Phrase
 from euterpe.instruments.plucked import (
     BassBody,
@@ -34,6 +34,10 @@ from euterpe.instruments.plucked import (
 )
 
 __all__ = [
+    "Ride",
+    "HiHat",
+    "Cymbal",
+    "Crash",
     "Tom",
     "Stomp",
     "Snare",

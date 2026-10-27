@@ -74,3 +74,37 @@ def test_each_hit_ends(cls):
     d = cls()
     v = d.voice(d.hit(0.0)[0])
     assert v.duration is not None and 0.05 < v.duration < 3.0
+
+
+from euterpe.instruments import Crash, HiHat, Open, Ride  # noqa: E402
+
+
+def to_40db(x):
+    m = np.abs(np.asarray(x))
+    return np.nonzero(m > 0.01 * m.max())[0][-1] / RATE
+
+
+def test_an_open_hihat_rings_far_longer_than_a_closed_one():
+    h = HiHat()
+    closed = render(h.play(h.hit(0.0)), 1.0)
+    opened = render(h.play(h.hit(0.0, articulation=Open())), 1.0)
+    assert to_40db(opened) > 5 * to_40db(closed)
+
+
+def test_a_closed_hihat_chokes_the_open_one():
+    # each note's rng depends on its order, so the pair cannot be compared by subtraction:
+    # read where the phrase stops the open voice instead
+    h = HiHat()
+    p = h.play(h.hit(0.0, articulation=Open()) + h.hit(0.2))
+    assert p.stops[0] <= round(0.2 * RATE) + round(0.005 * RATE) < p.ends[0]
+
+
+def test_the_hihat_is_bright():
+    assert band_db(one(HiHat(), 0.2), 6000, 24000) > 10 * np.log10(0.6)
+
+
+@pytest.mark.parametrize("cls", [Crash, Ride])
+def test_cymbal_hits_overlap(cls):
+    c = cls()
+    p = c.play(c.hit(0.0) + c.hit(0.3))
+    assert p.stops == p.ends and p.ends[0] > round(0.3 * RATE)
