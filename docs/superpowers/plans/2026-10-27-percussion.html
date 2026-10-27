@@ -331,7 +331,7 @@ kick   x.....x.x.......</pre></div>
 
 <h2 id="tasks"><span class="n">06</span>Tasks</h2>
 
-<details class="task" id="task-1" data-state="pending">
+<details class="task" id="task-1" data-state="done">
 <summary><span class="tn">1</span><span class="tt">Struck and its techniques</span><span class="tf">instruments/percussion.py</span><span class="ts"></span></summary>
 <p><b>Interfaces.</b> <code>Struck(Instrument)</code>, the base of every hit instrument, with <code>tune: float</code> (Hz), <code>level: float</code>, <code>variation: float = 0.08</code>, <code>seed: int = 0</code>, <code>resource(note)</code> returning <code>self</code> by default, and:</p>
 <ul>
@@ -388,7 +388,7 @@ def test_flam_at_zero_clamps_the_grace():
 <div class="verify"><b>verify</b> <code>uv run pytest tests/test_percussion.py -q</code> passes.</div>
 </details>
 
-<details class="task" id="task-2" data-state="pending">
+<details class="task" id="task-2" data-state="done">
 <summary><span class="tn">2</span><span class="tt">Membranes and hands: Kick, Stomp, Snare, Tom, Clap</span><span class="tf">instruments/percussion.py</span><span class="ts"></span></summary>
 <p><b>Interfaces.</b> The five classes of the models table, each a <code>Struck</code> with its parameters as keyword arguments. Velocity scales level and, for the snare and the tom, the pulse's brightness. <code>Clap.resource</code> returns <code>None</code>.</p>
 <ol>
@@ -412,7 +412,7 @@ def test_the_kick_falls_in_pitch():
 <div class="verify"><b>verify</b> <code>uv run pytest tests/test_percussion.py -q</code> passes.</div>
 </details>
 
-<details class="task" id="task-3" data-state="pending">
+<details class="task" id="task-3" data-state="done">
 <summary><span class="tn">3</span><span class="tt">Metals: HiHat, Cymbal, Crash, Ride</span><span class="tf">instruments/percussion.py</span><span class="ts"></span></summary>
 <p><b>Interfaces.</b> <code>HiHat(closed=0.05, open=0.45)</code>, whose resource is one shared pedal object per hi-hat; <code>Cymbal(decay=2.0, wash=0.6)</code> with <code>resource</code> returning <code>None</code>; <code>Crash(Cymbal)</code> and <code>Ride(Cymbal)</code> as presets with their defaults.</p>
 <ol>
@@ -423,7 +423,7 @@ def test_the_kick_falls_in_pitch():
 <div class="verify"><b>verify</b> <code>uv run pytest tests/test_percussion.py -q</code> passes.</div>
 </details>
 
-<details class="task" id="task-4" data-state="pending">
+<details class="task" id="task-4" data-state="done">
 <summary><span class="tn">4</span><span class="tt">Kit and step patterns</span><span class="tf">instruments/percussion.py, tests/test_kit.py</span><span class="ts"></span></summary>
 <p><b>Interfaces.</b> <code>Kit(kick=Kick(), snare=Snare(), hihat=HiHat(), toms=(Tom(196), Tom(147), Tom(98)), crash=Crash(), ride=Ride(), seed=0)</code>, <code>polyphony = 24</code>. Attributes keep the drums: <code>kit.kick</code>, <code>kit.toms[0]</code>. <code>voice(note)</code> sends the note to the drum it was made by (the note's <code>resource</code>, or the hi-hat for the pedal); <code>resource(note)</code> asks that drum. <code>Kit.pattern(grid: dict[Struck, str], step: float, at=0.0, repeat=1) -&gt; list[Note]</code>: one character per step; <code>x</code> a hit at 0.8, <code>X</code> an accent at 1.0, <code>g</code> a ghost at 0.3, <code>o</code> an open hit (the <code>Open()</code> articulation), <code>.</code> or a space a rest; any other character raises <code>ValueError</code> naming it and its position. Rows may differ in length; the pattern lasts as long as its longest row.</p>
 <ol>
@@ -463,7 +463,7 @@ def test_an_unknown_step_names_itself():
 <div class="verify"><b>verify</b> <code>uv run pytest tests/test_kit.py tests/test_percussion.py -q</code> passes.</div>
 </details>
 
-<details class="task" id="task-5" data-state="pending">
+<details class="task" id="task-5" data-state="done">
 <summary><span class="tn">5</span><span class="tt">Timpani</span><span class="tf">instruments/percussion.py</span><span class="ts"></span></summary>
 <p><b>Interfaces.</b> <code>Timpani(mallet=Mallet(hardness=0.3), kettles=4, decay=2.5, level=0.5, seed=0)</code>, <code>playable = (D2, C4)</code>, <code>comfortable = (E2, A3)</code>, <code>polyphony = kettles</code>. A note goes to the kettle already tuned to its pitch, or else the one free longest. <code>Mallet</code> comes from task 6's module; write it there first if task 6 is not done.</p>
 <ol>
@@ -473,7 +473,7 @@ def test_an_unknown_step_names_itself():
 <div class="verify"><b>verify</b> <code>uv run pytest tests/test_percussion.py -q</code> passes.</div>
 </details>
 
-<details class="task" id="task-6" data-state="pending">
+<details class="task" id="task-6" data-state="done">
 <summary><span class="tn">6</span><span class="tt">Mallets: Mallet, Bar, Barred and four presets</span><span class="tf">instruments/mallets.py</span><span class="ts"></span></summary>
 <p><b>Interfaces.</b> <code>Mallet(hardness=0.5)</code>: the contact as a raised pulse from 4 ms at hardness 0 to 0.3 ms at 1 (a <code>Segments</code> triangle). <code>Bar(ratios, decays, amps, tolerance=Tolerance())</code>: a frozen dataclass of the bar's modes, decays relative to the fundamental's. <code>Barred(Struck)</code> with <code>bar</code>, <code>mallet</code>, <code>decay</code> (the fundamental's, in seconds at C4, shorter up the range by <code>(C4 / pitch) ** 0.5</code>), <code>resonator: bool</code>, <code>polyphony = 16</code>, one bar per pitch as the harp has one string per pitch. <code>Struck.roll</code> works on any of them. Presets <code>Marimba</code>, <code>Xylophone</code>, <code>Glockenspiel</code>, <code>Celesta</code> with the values and ranges of the mallets table.</p>
 <ol>
@@ -484,7 +484,7 @@ def test_an_unknown_step_names_itself():
 <div class="verify"><b>verify</b> <code>uv run pytest tests/test_mallets.py -q</code> passes.</div>
 </details>
 
-<details class="task" id="task-7" data-state="pending">
+<details class="task" id="task-7" data-state="done">
 <summary><span class="tn">7</span><span class="tt">Every preset, cleanly</span><span class="tf">tests/test_percussion_presets.py</span><span class="ts"></span></summary>
 <ol>
   <li>Parametrise over the thirteen instruments: each plays a short phrase (a bar of hits; a scale for the pitched ones) that passes the audio lint of Part I with no clipping or silence; each docstring has a line starting <code>Limit:</code>; the pitched ones keep their phrase inside <code>playable</code>.</li>
@@ -495,7 +495,7 @@ def test_an_unknown_step_names_itself():
 <div class="verify"><b>verify</b> <code>uv run pytest -q</code> passes; <code>uv run ruff check</code> is clean.</div>
 </details>
 
-<details class="task" id="task-8" data-state="pending">
+<details class="task" id="task-8" data-state="doing">
 <summary><span class="tn">8</span><span class="tt">Listening card, review and PR</span><span class="tf">.playground/euterpe-percussion/card.py</span><span class="ts"></span></summary>
 <ol>
   <li>Write the riffs and showcases of section 03 in <code>card.py</code>, each rendered with <code>take(seconds=...)</code> to mp3; transcribe the melodies and the swing tom and Zarathustra parts from public-domain scores, note by note.</li>
@@ -519,6 +519,9 @@ def test_an_unknown_step_names_itself():
   <li><b>More instruments than the spec lists:</b> <code>Stomp</code> and <code>Clap</code> for the stadium showcase, and four named mallet presets where the spec says "mallets". The Sugar Plum Fairy is written for celesta, so it plays on a <code>Celesta</code>.</li>
   <li><b>A riff per instrument</b>, not only the three showcases: every drum, the timpani and each mallet instrument plays something known, at the maintainer's request.</li>
   <li><b>Step grids as strings</b> (see the review focus): notation, not a name that chooses a model.</li>
+  <li><b>Three riffs changed in execution:</b> the xylophone plays the Rondo alla Turca, the marimba Greensleeves with its held notes rolled, and the glockenspiel the ostinato of Leontovych's Shchedryk, in place of Danse macabre, the Rondo and Papageno's bells. No note-by-note text of the first and last could be checked; the swaps are melodies that could.</li>
+  <li><b>Tuned bars and kettles ignore the per-hit tuning variation</b>, which only untuned drums keep: a bar does not change pitch between strokes (found in review).</li>
+  <li><b>Struck instruments never slur</b>: <code>Phrase</code> reads a <code>slurs</code> attribute, so a one-kettle timpani rolls instead of merging strokes (found in review).</li>
   <li><b>A chapter 16</b>, "Putting it all together", closes Part II with a hand-built orchestra; the spec's Part II table gains its row when the chapter PR lands.</li>
 </ul>
 </main>
