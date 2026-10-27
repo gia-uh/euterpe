@@ -11,17 +11,45 @@ from euterpe.instruments.core import (
     play,
 )
 from euterpe.instruments.phrase import Phrase
-from euterpe.instruments.plucked import PluckedString
+from euterpe.instruments.plucked import (
+    BassBody,
+    Exciter,
+    Finger,
+    GuitarBody,
+    Gut,
+    HarpBody,
+    Nylon,
+    Plectrum,
+    Plucked,
+    PluckedString,
+    Soundboard,
+    Steel,
+    String,
+    ViolinBody,
+)
 
 __all__ = [
     "Accent",
     "Articulation",
+    "BassBody",
     "Control",
+    "Exciter",
+    "Finger",
+    "GuitarBody",
+    "Gut",
+    "HarpBody",
     "Instrument",
     "Legato",
     "Note",
+    "Nylon",
     "Phrase",
-    "PluckedString",
-    "Staccato",
     "play",
+    "Plectrum",
+    "Plucked",
+    "PluckedString",
+    "Soundboard",
+    "Staccato",
+    "Steel",
+    "String",
+    "ViolinBody",
 ]
