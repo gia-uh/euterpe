@@ -98,7 +98,7 @@ def _slurred(notes: list[Note]) -> list[Note]:
         end = max(m.time + m.duration for m in run)
         points = [(0.0, run[0].freq)]
         for prev, n in zip(run, run[1:]):
-            t = n.time - first.time
+            t = max(n.time - first.time, points[-1][0])  # notes at one time glide in turn
             points += [(t, prev.freq), (t + GLIDE, n.freq)]
         note = _copy(first, duration=end - first.time)
         note._freq = Segments(points)

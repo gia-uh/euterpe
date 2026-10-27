@@ -59,3 +59,8 @@ def test_stereo_voice_makes_a_stereo_phrase():
             return Pan(super().voice(note), 0.5) if note.pitch == C4 else super().voice(note)
     p = Wide().play([(0.0, C4, 0.3), (0.0, E4, 0.3)])
     assert p.channels == 2 and np.asarray(p.take()).shape[1] == 2
+
+
+def test_mono_notes_at_one_time_slur_into_the_last():
+    p = Theremin().play([(0.0, C4, 1.0), (0.0, E4, 1.0), (0.0, G4, 1.0)])
+    assert len(p.starts) == 1 and np.isfinite(np.asarray(p.take())).all()
