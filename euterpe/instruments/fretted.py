@@ -179,7 +179,7 @@ class Guitar(Fretted):
 
     def __init__(self, capo: int = 0, exciter: Exciter = Plectrum(), string: String = Steel(),
                  body: Soundboard | None = GuitarBody(), let_ring: bool = True, mute: float = 0.08,
-                 level: float = 0.25):
+                 level: float = 0.75):
         super().__init__(capo, exciter, string, body, let_ring, mute, level)
 
 
@@ -197,5 +197,5 @@ class BassGuitar(Fretted):
 
     def __init__(self, capo: int = 0, exciter: Exciter = Finger(position=0.15), string: String = Steel(damping=0.998),
                  body: Soundboard | None = BassBody(), let_ring: bool = True, mute: float = 0.08,
-                 level: float = 0.3):
+                 level: float = 0.7):
         super().__init__(capo, exciter, string, body, let_ring, mute, level)

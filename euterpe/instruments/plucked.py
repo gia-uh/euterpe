@@ -204,7 +204,7 @@ class Harp(Plucked):
 
     def __init__(self, exciter: Exciter = Finger(position=0.45, brightness=0.3), string: String = Gut(),
                  body: Soundboard | None = HarpBody(), let_ring: bool = True, mute: float = 0.08,
-                 level: float = 0.25):
+                 level: float = 0.45):
         super().__init__(exciter, string, body, let_ring, mute, level)
 
     def resource(self, note: Note) -> Hashable:
@@ -230,7 +230,7 @@ class PizzicatoStrings(Plucked):
 
     def __init__(self, players: int = 3, exciter: Exciter = Finger(position=0.3, brightness=0.3),
                  string: String = Gut(damping=0.97), body: Soundboard | None = ViolinBody(),
-                 let_ring: bool = True, mute: float = 0.08, level: float = 0.25):
+                 let_ring: bool = True, mute: float = 0.08, level: float = 0.6):
         super().__init__(exciter, string, body, let_ring, mute, level)
         self.players = players
 
