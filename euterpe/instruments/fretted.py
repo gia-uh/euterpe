@@ -223,8 +223,10 @@ class BassGuitar(Fretted):
     5 % of their vibration each trip (damping=0.95): a low string makes few trips a second, so
     a gentler damping would let it ring almost unchanged and run each note into the next.
 
-    Limit: the low strings' stiffness is not modelled, so the upper partials sit exactly in
-    tune, and the body's three modes give less boom than a real box.
+    Limit: the least convincing preset of its family. The low strings' stiffness is not
+    modelled, so the upper partials sit exactly in tune; there is no thump of the finger at the
+    attack, which carries much of what the ear recognises; and the body's three modes give less
+    boom than a real box.
     """
 
     tuning = (E1, A1, D2, G2)
