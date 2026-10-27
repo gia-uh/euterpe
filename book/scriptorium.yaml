@@ -20,6 +20,7 @@ files:
   - chapters/08-effects.md
   - chapters/09-anatomy-of-an-instrument.md
   - chapters/10-plucked-strings.md
+  - chapters/14-drums-and-percussion.md
 
 outputs:
   site:
