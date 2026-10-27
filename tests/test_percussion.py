@@ -108,3 +108,26 @@ def test_cymbal_hits_overlap(cls):
     c = cls()
     p = c.play(c.hit(0.0) + c.hit(0.3))
     assert p.stops == p.ends and p.ends[0] > round(0.3 * RATE)
+
+
+from euterpe.instruments import Timpani  # noqa: E402
+from euterpe.pitch import C2, G2  # noqa: E402
+
+
+def test_a_timpano_sounds_its_pitch():
+    t = Timpani()
+    x = render(t.play(t.hit(0.0, pitch=G2)), 1.5)
+    assert peak_hz(x[RATE // 5 :]) == pytest.approx(G2.freq, rel=0.02)
+
+
+def test_a_timpani_roll_stays_on_one_kettle():
+    t = Timpani()
+    p = t.play(t.roll(0.0, 1.0, pitch=G2))
+    starts = p.starts
+    assert all(p.stops[i] <= starts[i + 1] + round(0.005 * RATE) for i in range(len(starts) - 1))
+
+
+def test_below_the_timpani_warns():
+    t = Timpani()
+    with pytest.warns(UserWarning, match="below the bottom"):
+        t.play(t.hit(0.0, pitch=C2))

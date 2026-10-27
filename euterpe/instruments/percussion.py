@@ -7,9 +7,9 @@ from collections.abc import Hashable
 import numpy as np
 
 from euterpe.instruments.core import Articulation, Instrument, Note
-from euterpe.pitch import Pitch
+from euterpe.pitch import C4, D2, E2, G2, A3, Pitch
 from euterpe.sound import FM, BandPass, FDNReverb, HighPass, Modal, Segments, Sine, Square, WhiteNoise
-from euterpe.sound.core import Unit
+from euterpe.sound.core import RATE, Unit
 
 MEMBRANE = (1.0, 1.59, 2.14, 2.30, 2.65)  # a circular membrane's lowest modes, over its fundamental
 
@@ -347,3 +347,58 @@ class Kit(Instrument):
                 for r in range(repeat):
                     notes += drum.hit(at + (r * length + i) * step, STEPS[c], articulation=Open() if c == "o" else None)
         return sorted(notes, key=lambda n: n.time)
+
+
+class Mallet:
+    """What strikes a timpano or a bar: its contact as a raised pulse, from 4 ms long at
+    hardness 0 (soft felt or yarn) to 0.3 ms at 1 (hard plastic or brass). A shorter contact
+    holds higher frequencies, so a harder mallet is brighter."""
+
+    def __init__(self, hardness: float = 0.5):
+        if not 0.0 <= hardness <= 1.0:
+            raise ValueError(f"Mallet hardness must be from 0 to 1, got {hardness}")
+        self.hardness = hardness
+
+    def pulse(self, force: float = 1.0) -> Segments:
+        """The contact force over time, with an area of one sample at force 1."""
+        w = 0.004 * (0.0003 / 0.004) ** self.hardness
+        return Segments([(0.0, 0.0), (w / 2, force * 2 / (w * RATE)), (w, 0.0)])
+
+
+TIMPANI = (1.0, 1.50, 1.98, 2.44, 2.90)  # the kettle's modes over the principal one
+
+
+class Timpani(Struck):
+    """Timpani: a membrane over a copper kettle, whose air pulls its modes close to the
+    harmonics 1, 1.5, 2, 2.5 and 3 of a note an octave below the principal, so a timpano has a
+    pitch where a tom has none; plus the head's lowest mode, a short thud below it. A felt
+    mallet strikes it.
+
+    kettles: how many drums, so how many pitches ring at once. decay: the principal mode's
+    seconds to fall 60 dB.
+
+    Limit: the kettles are retuned instantly (no pedal glissando), and the roll is single
+    strokes with no alternation between two mallets.
+    """
+
+    playable = (D2, C4)
+    comfortable = (E2, A3)
+
+    def __init__(self, mallet: Mallet | None = None, kettles: int = 4, decay: float = 2.5, level: float = 0.3,
+                 variation: float = 0.08, seed: int = 0):
+        self.mallet = mallet or Mallet(0.3)
+        self.polyphony, self.decay, self.tune = kettles, decay, G2.freq
+        self.level, self.variation, self.seed = level, variation, seed
+
+    def resource(self, note: Note) -> Hashable:
+        """The kettle tuned to the note's pitch: a stroke on it stops the one ringing there."""
+        return round(69 + 12 * np.log2(float(note.freq) / 440.0))
+
+    def voice(self, note: Note) -> Unit:
+        force, bright, tuning = self.vary(note)
+        f0 = float(note.freq) * tuning
+        d = self.decay
+        head = Modal([f0 * r for r in TIMPANI] + [0.82 * f0], [d, 0.8 * d, 0.6 * d, 0.5 * d, 0.4 * d, 0.2],
+                     [1.0, 0.8 * bright, 0.5 * bright, 0.35 * bright, 0.25 * bright, 0.6],
+                     excite=self.mallet.pulse(force))
+        return head * (note.velocity * self.level)
