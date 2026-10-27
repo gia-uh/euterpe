@@ -3,7 +3,17 @@ import pytest
 
 from euterpe.sound.core import render
 from euterpe.sound.env import Segments
-from euterpe.sound.filters import Allpass, Biquad, Comb, Formant, OnePole
+from euterpe.sound.filters import (
+    Allpass,
+    BandPass,
+    Comb,
+    Formant,
+    HighPass,
+    LowPass,
+    Notch,
+    OnePoleHighPass,
+    OnePoleLowPass,
+)
 from euterpe.sound.osc import Saw, Sine
 from euterpe.sound.noise import WhiteNoise
 from tests.helpers import band_db
@@ -16,12 +26,12 @@ def gain_db(f, filt):
 
 
 def test_lowpass_passes_low_and_cuts_two_octaves_up_by_24_db():
-    lp = lambda s: Biquad(s, "lowpass", cutoff=1_000.0)
+    lp = lambda s: LowPass(s, cutoff=1_000.0)
     assert abs(gain_db(100.0, lp)) < 0.5 and gain_db(4_000.0, lp) < -22
 
 
 def test_highpass_mirrors_it():
-    hp = lambda s: Biquad(s, "highpass", cutoff=1_000.0)
+    hp = lambda s: HighPass(s, cutoff=1_000.0)
     assert abs(gain_db(10_000.0, hp)) < 0.5 and gain_db(250.0, hp) < -22
 
 
@@ -31,7 +41,7 @@ def test_a_comb_resonates_at_multiples_of_one_over_its_delay():
 
 
 def test_block_size_does_not_change_a_modulated_filter():
-    f = lambda: Biquad(WhiteNoise(seed=2), "lowpass", cutoff=Sine(2.0) * 500 + 1_000)
+    f = lambda: LowPass(WhiteNoise(seed=2), cutoff=Sine(2.0) * 500 + 1_000)
     assert np.array_equal(render(f(), 0.5), render(f(), 0.5, block=100))
 
 
@@ -45,26 +55,26 @@ def test_formant_vowels_differ():
 
 
 def test_bandpass_keeps_its_centre_and_notch_removes_it():
-    bp = lambda s: Biquad(s, "bandpass", cutoff=1_000.0, q=5.0)
-    notch = lambda s: Biquad(s, "notch", cutoff=1_000.0, q=5.0)
+    bp = lambda s: BandPass(s, cutoff=1_000.0, q=5.0)
+    notch = lambda s: Notch(s, cutoff=1_000.0, q=5.0)
     assert abs(gain_db(1_000.0, bp)) < 0.5 and gain_db(4_000.0, bp) < -20
     assert gain_db(1_000.0, notch) < -30 and abs(gain_db(4_000.0, notch)) < 0.5
 
 
 def test_q_raises_a_peak_at_the_cutoff():
-    assert gain_db(1_000.0, lambda s: Biquad(s, "lowpass", cutoff=1_000.0, q=8.0)) > 17
+    assert gain_db(1_000.0, lambda s: LowPass(s, cutoff=1_000.0, q=8.0)) > 17
 
 
 def test_one_pole_is_3_db_down_at_its_cutoff_and_falls_6_db_per_octave():
-    lp = lambda s: OnePole(s, 500.0)
-    hp = lambda s: OnePole(s, 500.0, kind="highpass")
+    lp = lambda s: OnePoleLowPass(s, 500.0)
+    hp = lambda s: OnePoleHighPass(s, 500.0)
     assert abs(gain_db(500.0, lp) + 3) < 0.3
     assert abs(gain_db(4_000.0, lp) - gain_db(8_000.0, lp) - 6) < 1.0
     assert abs(gain_db(10_000.0, hp)) < 0.5 and gain_db(50.0, hp) < -18
 
 
 def test_one_pole_highpass_removes_a_dc_offset():
-    x = render(OnePole(Saw(110.0) + 0.5, 20.0, kind="highpass"), 2.0)
+    x = render(OnePoleHighPass(Saw(110.0) + 0.5, 20.0), 2.0)
     assert abs(x[48_000:].mean()) < 1e-3
 
 
@@ -86,15 +96,11 @@ def test_a_stereo_source_is_filtered_per_channel():
             x = super().block(n)
             return np.stack([x, np.zeros_like(x)], axis=1)
 
-    y = render(Biquad(Stereo(100.0), "lowpass"), 0.2)
+    y = render(LowPass(Stereo(100.0)), 0.2)
     assert y.shape == (9_600, 2) and np.abs(y[:, 1]).max() == 0 and np.abs(y[:, 0]).max() > 0.9
 
 
 def test_bad_arguments_are_refused():
-    with pytest.raises(ValueError, match="kind"):
-        Biquad(Sine(), "shelf")
-    with pytest.raises(ValueError, match="q"):
-        Biquad(Sine(), "lowpass", q=0.0)
     with pytest.raises(ValueError, match="feedback"):
         Comb(Sine(), 0.01, 1.0)
     with pytest.raises(ValueError, match="vowel"):
@@ -102,8 +108,19 @@ def test_bad_arguments_are_refused():
 
 
 def test_a_modulated_cutoff_moves():
-    x = render(Biquad(WhiteNoise(seed=1), "lowpass", cutoff=Segments([(0.0, 200.0), (1.0, 8_000.0)])), 1.0)
+    x = render(LowPass(WhiteNoise(seed=1), cutoff=Segments([(0.0, 200.0), (1.0, 8_000.0)])), 1.0)
     assert band_db(x[-9_600:], 4_000, 24_000) - band_db(x[:9_600], 4_000, 24_000) > 20
+
+
+@pytest.mark.parametrize("cutoff, q", [(-100.0, 0.707), (30_000.0, 0.707), (1_000.0, 0.0), (1_000.0, -2.0)])
+def test_a_cutoff_or_q_where_the_poles_would_escape_is_clipped(cutoff, q):
+    x = render(LowPass(WhiteNoise(seed=1), cutoff=cutoff, q=q), 0.5)
+    assert np.all(np.isfinite(x)) and np.abs(x).max() < 10
+
+
+def test_a_negative_one_pole_cutoff_stays_stable():
+    x = render(OnePoleLowPass(WhiteNoise(seed=1), Sine(1.0) * 1_000.0), 1.0)
+    assert np.all(np.isfinite(x)) and np.abs(x).max() <= 1.0
 
 
 def test_comb_and_allpass_take_numbers_only():

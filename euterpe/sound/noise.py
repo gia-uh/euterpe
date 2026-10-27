@@ -7,8 +7,8 @@ from collections.abc import Sequence
 import numpy as np
 from scipy.signal import lfilter
 
-from euterpe.sound.core import RATE, Param, Unit, rng
-from euterpe.sound.osc import _FREQ, _ONE, _Oscillator
+from euterpe.sound.core import RATE, Unit, _arg, _signal, rng
+from euterpe.sound.osc import _ONE, _Oscillator
 
 _LEVEL = 0.18  # the RMS of pink and brown noise, about -15 dBFS, so their peaks stay below 1
 
@@ -92,10 +92,9 @@ class LFSRNoise(Unit):
     repeats every 32 767 steps and its spectrum is a dense set of lines that sounds like hiss.
     With short=True it has 7 bits and repeats every 127 steps: few enough lines to hear a buzzy,
     metallic pitch. Holding each value for a step puts most of the energy below rate Hz. seed is
-    the starting state of the register and must not be 0 in its low 15 (or 7) bits.
+    the starting state of the register and must not be 0 in its low 15 (or 7) bits. A negative
+    rate steps the register backwards.
     """
-
-    params = (Param("rate", "Hz", 1.0, 48_000.0, "log"),)
 
     def __init__(self, rate: float | Unit, short: bool = False, seed: int = 1):
         bits = 7 if short else 15
@@ -103,7 +102,7 @@ class LFSRNoise(Unit):
         if state == 0:
             raise ValueError(f"LFSRNoise.seed={seed} gives an all-zero {bits}-bit register, which never changes")
         self.short, self.seed = short, int(seed)
-        self._set_params(rate=rate)
+        self.rate = _arg(rate)
         period = (1 << bits) - 1
         seq = np.empty(period, np.float32)
         for i in range(period):
@@ -119,7 +118,7 @@ class LFSRNoise(Unit):
         self._step = 0
 
     def block(self, n: int) -> np.ndarray:
-        inc = np.round(self._param("rate", n).astype(np.float64) / RATE * _ONE).astype(np.int64)
+        inc = np.round(_signal(self.rate, n).astype(np.float64) / RATE * _ONE).astype(np.int64)
         acc = self._acc + np.cumsum(inc)
         steps = self._step + (acc - inc) // _ONE  # the step each sample is on, counted before it
         if n:
@@ -134,17 +133,16 @@ class Wavetable(_Oscillator):
 
     The spectrum is the harmonics of freq that the table's shape gives, plus the edges of the
     steps: a 32-step table has the buzz of early sound chips. Those edges are not band-limited,
-    so a high note folds some of them back. Samples at or above 24 000 Hz are zero.
+    so a high note folds some of them back. Samples at or above 24 000 Hz are zero; a negative
+    freq plays the table backwards.
     """
-
-    params = (_FREQ,)
 
     def __init__(self, table: Sequence[float], freq: float | Unit):
         values = np.asarray(table, np.float64).ravel()
         if values.size == 0 or not np.all(np.isfinite(values)):
             raise ValueError("Wavetable.table must hold at least one finite value")
         self.table = values
-        self._set_params(freq=freq)
+        self.freq = _arg(freq)
         self.reset()
 
     def _naive(self, t, dt, n):

@@ -32,7 +32,7 @@ class _Probe(Unit):
 
 def _probe(unit: Unit, signal: np.ndarray, seconds: float) -> np.ndarray:
     """The unit's output when its source is replaced by signal; its parameters must be fixed."""
-    if any(isinstance(v, Unit) for v in getattr(unit, "_values", {}).values()):
+    if any(u is not unit.src for u in unit.inputs()):
         raise ValueError(f"{type(unit).__name__} has a moving parameter; a response needs fixed parameters")
     u = copy.deepcopy(unit)
     u.src = _Probe(signal)
@@ -82,7 +82,7 @@ class Response(View):
         ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:,.0f}".replace(",", " ")))
         ax.set_ylim(max(ax.get_ylim()[0], -60), ax.get_ylim()[1])
         octave_ruler(ax, self.lo, self.hi)
-        cutoffs = {getattr(f, "_values", {}).get("cutoff") for f in self.filters}
+        cutoffs = {getattr(f, "cutoff", None) for f in self.filters}
         if len(cutoffs) == 1 and isinstance(c := cutoffs.pop(), float):
             ax.axvline(c, color=MADDER, lw=0.6)
             ax.annotate(f"cutoff {c:g} Hz, near {note_name(c)}", (c, 0), xycoords=("data", "axes fraction"),

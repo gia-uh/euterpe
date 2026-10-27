@@ -73,9 +73,8 @@ def test_additive_refuses_an_amplitude_that_is_not_finite(amp):
         Additive(200.0, [(1, 1.0), (2, amp)])
 
 
-def test_additive_refuses_a_frequency_out_of_range():
-    with pytest.raises(ValueError, match="freq"):
-        Additive(-5.0, [(1, 1.0)])
+def test_additive_at_a_negative_frequency_has_the_same_lines():
+    assert abs(peak_hz(render(Additive(-200.0, [(1, 1.0)]), 1.0)) - 200.0) < 0.5
 
 
 def test_a_pluck_is_in_tune_and_decays():
@@ -170,9 +169,9 @@ def test_fm_at_or_above_nyquist_is_silent():
     assert not render(FM(24_000.0, index=2.0), 0.01).any()
 
 
-def test_fm_index_out_of_range_is_refused():
-    with pytest.raises(ValueError, match="index"):
-        FM(440.0, index=25.0)
+def test_fm_takes_an_index_beyond_twenty():
+    x = render(FM(440.0, index=25.0), 0.1)
+    assert np.all(np.isfinite(x)) and np.abs(x).max() <= 1.0
 
 
 def test_modal_rings_at_its_modes():

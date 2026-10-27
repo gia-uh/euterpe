@@ -118,14 +118,14 @@ Several notes sounding together are a *chord*. These three are A3, C♯4 and E4:
 `FM` has a fourth parameter, `feedback`, in radians from 0 to 1.5. It feeds the modulator's own last output back into its phase. A sine that pushes its own phase spends longer on one side of its cycle than the other, and as feedback rises it turns into something close to a saw, with harmonics of its own. Those harmonics then modulate the carrier, so feedback makes the tone brighter and rougher than the index alone can:
 
 ```python {run}
-from euterpe.sound import ADSR, FM, OnePole
+from euterpe.sound import ADSR, FM, OnePoleHighPass
 
 for feedback in (0.0, 1.5):
-    tone = OnePole(FM(110.0, ratio=1.0, index=1.5, feedback=feedback), 20.0, kind="highpass")
+    tone = OnePoleHighPass(FM(110.0, ratio=1.0, index=1.5, feedback=feedback), 20.0)
     display((tone * ADSR(gate=1.0, release=0.2) * 0.4).take(1.3, f"FM at 110 Hz, index 1.5, feedback {feedback:g}"))
 ```
 
-A modulator that leans to one side also pushes the carrier off-centre, so feedback adds a DC offset (chapter 4). The `OnePole` high-pass at 20 Hz removes it, as chapter 5 showed.
+A modulator that leans to one side also pushes the carrier off-centre, so feedback adds a DC offset (chapter 4). The `OnePoleHighPass` at 20 Hz removes it, as chapter 5 showed.
 
 ## The colours of noise
 
@@ -153,15 +153,15 @@ for noise in (WhiteNoise(seed=1), PinkNoise(seed=1), BrownNoise(seed=1)):
 Each line is relative to its first band. White noise stays within a fraction of a dB: flat. Pink falls about 3 dB at each octave, to −15 at 8 000 Hz, five octaves above 250. Brown falls about 6 per octave, to −29.5.
 
 ```python {run}
-from euterpe.sound import ADSR, BrownNoise, OnePole, PinkNoise, WhiteNoise
+from euterpe.sound import ADSR, BrownNoise, OnePoleHighPass, PinkNoise, WhiteNoise
 
 display((WhiteNoise(seed=1) * ADSR(gate=1.7, release=0.3) * 0.25).take(2.2, "White noise"))
 display((PinkNoise(seed=1) * ADSR(gate=1.7, release=0.3) * 1.0).take(2.2, "Pink noise"))
-brown = OnePole(BrownNoise(seed=1), 20.0, kind="highpass")
+brown = OnePoleHighPass(BrownNoise(seed=1), 20.0)
 display((brown * ADSR(gate=1.7, release=0.3) * 1.0).take(2.2, "Brown noise"))
 ```
 
-White noise hisses like a detuned radio. Pink sounds even from bottom to top, like steady rain; it is the noise engineers play through speakers to check them, because a meter that reads in octaves shows it flat. Brown is a deep roar, like surf heard from a distance. Brown noise has so much of its energy at the lowest frequencies that two seconds of it do not average 0, so a `OnePole` high-pass at 20 Hz (chapter 5) takes away what lies below hearing. White noise drawn evenly between −1 and 1 has an RMS level of 1 / √3 = 0.58. `PinkNoise` and `BrownNoise` are scaled to an RMS of 0.18, a level chosen so that their peaks stay below 1, which is why they need a gain of 1.0 where white noise needs 0.25.
+White noise hisses like a detuned radio. Pink sounds even from bottom to top, like steady rain; it is the noise engineers play through speakers to check them, because a meter that reads in octaves shows it flat. Brown is a deep roar, like surf heard from a distance. Brown noise has so much of its energy at the lowest frequencies that two seconds of it do not average 0, so a `OnePoleHighPass` at 20 Hz (chapter 5) takes away what lies below hearing. White noise drawn evenly between −1 and 1 has an RMS level of 1 / √3 = 0.58. `PinkNoise` and `BrownNoise` are scaled to an RMS of 0.18, a level chosen so that their peaks stay below 1, which is why they need a gain of 1.0 where white noise needs 0.25.
 
 ```python {run echo=false}
 from euterpe.sound import BrownNoise, PinkNoise, WhiteNoise
@@ -193,12 +193,12 @@ for bits in (7, 15):
 A register of b bits has 2^b − 1 states other than all zeros, and with this feedback it visits every one: 127 for 7 bits, 32 767 for 15. `LFSRNoise(rate, short=False, seed=1)` is that register, stepped `rate` times a second, each value held until the next step. Stepping faster moves the noise up, as a higher frequency moves a tone up. With `short=True` the register has 7 bits, and a sequence that repeats every 127 steps is a pitch: 12 000 / 127 = 94.5 Hz with many harmonics, a metallic buzz.
 
 ```python {run}
-from euterpe.sound import ADSR, LFSRNoise, OnePole
+from euterpe.sound import ADSR, LFSRNoise, OnePoleHighPass
 
 for rate in (2_000.0, 12_000.0):
-    noise = OnePole(LFSRNoise(rate=rate), 20.0, kind="highpass")
+    noise = OnePoleHighPass(LFSRNoise(rate=rate), 20.0)
     display((noise * ADSR(gate=0.8, release=0.2) * 0.12).take(1.2, f"LFSR noise stepped at {rate:.0f} Hz"))
-short = OnePole(LFSRNoise(rate=12_000.0, short=True), 20.0, kind="highpass")
+short = OnePoleHighPass(LFSRNoise(rate=12_000.0, short=True), 20.0)
 display((short * ADSR(gate=0.8, release=0.2) * 0.12).take(1.2, "Short LFSR noise at 12000 Hz: a 127-step loop"))
 ```
 
@@ -211,11 +211,11 @@ Most of a drum's sound has no pitch. A cymbal is a thin plate that vibrates at t
 A hi-hat, the pair of small cymbals a drummer plays on most beats, has its energy above about 7 000 Hz. A high-pass at 7 000 Hz keeps that band. A closed hi-hat lasts about 50 ms, an open one about 0.4 s:
 
 ```python {run}
-from euterpe.sound import ADSR, Biquad, WhiteNoise
+from euterpe.sound import ADSR, HighPass, WhiteNoise
 
 def hat(decay):
     env = ADSR(attack=0.001, decay=decay, sustain=0.0, release=0.0, gate=1.0, curve=0.8)
-    return Biquad(WhiteNoise(seed=1), "highpass", cutoff=7000.0) * env * 0.6
+    return HighPass(WhiteNoise(seed=1), cutoff=7000.0) * env * 0.6
 
 display(hat(0.05).take(0.5, "A closed hi-hat: high-passed noise, 50 ms"))
 display(hat(0.4).take(1.0, "An open hi-hat: the same noise, 0.4 s"))
@@ -224,12 +224,12 @@ display(hat(0.4).take(1.0, "An open hi-hat: the same noise, 0.4 s"))
 A snare drum has two parts: the skin, struck, gives a short tone near 180 Hz whose pitch drops a little, as the bass drum of chapter 4 did; the wires give a burst of noise above 1 000 Hz that lasts longer than the tone. The snare is the sum of the two:
 
 ```python {run}
-from euterpe.sound import ADSR, Biquad, Sine, WhiteNoise
+from euterpe.sound import ADSR, HighPass, Sine, WhiteNoise
 
 def snare():
     pitch = ADSR(attack=0.0, decay=0.04, sustain=0.0, gate=1.0) * 60 + 180
     skin = Sine(pitch) * ADSR(attack=0.001, decay=0.12, sustain=0.0, release=0.0, gate=1.0, curve=0.7)
-    wires = Biquad(WhiteNoise(seed=2), "highpass", cutoff=1000.0) * ADSR(attack=0.001, decay=0.22, sustain=0.0, release=0.0, gate=1.0, curve=0.8)
+    wires = HighPass(WhiteNoise(seed=2), cutoff=1000.0) * ADSR(attack=0.001, decay=0.22, sustain=0.0, release=0.0, gate=1.0, curve=0.8)
     return skin * 0.35 + wires * 0.3
 
 display(snare().take(0.6, "A snare: a falling tone at 240 to 180 Hz and high-passed noise"))

@@ -1,4 +1,4 @@
-"""Units, parameters, mixing and block rendering.
+"""Units, mixing and block rendering.
 
 A unit is a stateful sound processor. It answers block(n) with its next n
 samples, pulling from the units it was built on. render() asks the top unit
@@ -9,9 +9,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from dataclasses import dataclass
 from pathlib import Path
-from typing import ClassVar, Literal
 
 import numpy as np
 
@@ -19,56 +17,18 @@ RATE = 48_000
 BLOCK = 1024
 
 
-@dataclass(frozen=True)
-class Param:
-    """A unit's parameter: its name, its physical unit, its range and its default."""
-
-    name: str
-    unit: str
-    lo: float
-    hi: float
-    scale: Literal["lin", "log"] = "lin"
-    default: float | None = None
-
-
 class Unit(ABC):
-    """A sound processor that keeps its own state and yields samples block by block."""
+    """A sound processor that keeps its own state and yields samples block by block.
 
-    params: ClassVar[tuple[Param, ...]] = ()
+    A parameter is a plain attribute holding a number or a Unit; a Unit moves it every sample.
+    """
+
     channels: int = 1
 
-    def _set_params(self, **values) -> None:
-        known = {p.name: p for p in self.params}
-        unknown = set(values) - set(known)
-        if unknown:
-            raise TypeError(f"{type(self).__name__} has no parameter {', '.join(sorted(unknown))}")
-        self._values = {}
-        for p in self.params:
-            v = values.get(p.name, p.default)
-            if v is None:
-                raise TypeError(f"{type(self).__name__}.{p.name} is required")
-            if not isinstance(v, Unit):
-                v = float(v)
-                if not p.lo <= v <= p.hi:
-                    raise ValueError(
-                        f"{type(self).__name__}.{p.name}={v} outside [{p.lo}, {p.hi}]"
-                        + (f" {p.unit}" if p.unit else "")
-                    )
-            self._values[p.name] = v
-
-    def _param(self, name: str, n: int) -> np.ndarray:
-        v = self._values[name]
-        if not isinstance(v, Unit):
-            return np.full(n, v, np.float32)
-        p = next(p for p in self.params if p.name == name)
-        x = v.block(n)
-        if x.ndim == 2:
-            x = x.mean(axis=1)
-        return np.clip(x, p.lo, p.hi).astype(np.float32)
-
     def inputs(self) -> list[Unit]:
-        """The units this one pulls from: its modulated parameters and its sources."""
-        return [v for v in getattr(self, "_values", {}).values() if isinstance(v, Unit)]
+        """The units this one pulls from: every attribute that is a Unit, its source and the
+        units that move its parameters."""
+        return [v for v in vars(self).values() if isinstance(v, Unit)]
 
     def reset(self) -> None:
         """Return this unit and its inputs to their state before the first sample."""
@@ -83,11 +43,6 @@ class Unit(ABC):
     def duration(self) -> float | None:
         """Seconds after which the output stays below -60 dBFS, or None if it never ends."""
         return None
-
-    def _fixed(self, name: str, worst: float) -> float:
-        """A parameter's value, or worst (the end of its range with the longest tail) if it moves."""
-        v = self._values[name]
-        return worst if isinstance(v, Unit) else v
 
     def take(self, seconds: float | None = None, caption: str | None = None):
         """Render into a Clip, captioned for its view. Without seconds: duration, at most
@@ -163,6 +118,24 @@ MAX_DEFAULT = 10.0
 LN60 = float(np.log(1000.0))
 
 
+def _arg(x: Unit | float) -> Unit | float:
+    """A parameter as given: a Unit stays one, anything else becomes a float."""
+    return x if isinstance(x, Unit) else float(x)
+
+
+def _signal(x: Unit | float, n: int) -> np.ndarray:
+    """A parameter's next n values, float32: a number repeated, or a unit's samples (mono)."""
+    if not isinstance(x, Unit):
+        return np.full(n, x, np.float32)
+    y = x.block(n)
+    return (y.mean(axis=1) if y.ndim == 2 else y).astype(np.float32)
+
+
+def _fixed(x: Unit | float, worst: float) -> float:
+    """A parameter's value, or worst (the value with the longest tail) if a unit moves it."""
+    return worst if isinstance(x, Unit) else x
+
+
 def _unit(x: Unit | float) -> Unit:
     return x if isinstance(x, Unit) else Const(x)
 
@@ -216,26 +189,21 @@ class Gain(Unit):
     (an envelope, a slow sine) spreads each component into sidebands at the gain's frequencies.
     """
 
-    params = (Param("gain", "", -1e6, 1e6, default=1.0),)  # also scales modulators, in Hz
-
     @property
     def duration(self) -> float | None:
         """The shortest that ends of the source and a gain unit: either one silences the product."""
-        g = self._values["gain"]
+        g = self.gain
         ds = [d for d in (self.src.duration, g.duration if isinstance(g, Unit) else None) if d is not None]
         return min(ds) if ds else None
 
     def __init__(self, src: Unit, gain: float | Unit):
         self.src = src
         self.channels = src.channels
-        self._set_params(gain=gain)
-
-    def inputs(self) -> list[Unit]:
-        return [self.src, *super().inputs()]
+        self.gain = _arg(gain)
 
     def block(self, n: int) -> np.ndarray:
         x = self.src.block(n)
-        g = self._param("gain", n)
+        g = _signal(self.gain, n)
         return x * (g[:, None] if x.ndim == 2 else g)
 
 

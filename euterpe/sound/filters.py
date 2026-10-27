@@ -11,10 +11,11 @@ from typing import Literal
 import numpy as np
 from scipy.signal import lfilter
 
-from euterpe.sound.core import LN60, RATE, Param, Unit, _after
+from euterpe.sound.core import LN60, RATE, Unit, _after, _arg, _fixed, _signal
 
 _GRID = 64  # a modulated cutoff or q is read once per this many samples, counted from the start
-_CUTOFF = ("Hz", 10.0, 23_000.0, "log")
+_CUTOFF = (1.0, 23_000.0)  # Hz: a biquad stays stable between 0 and RATE / 2
+_MIN_Q = 0.01  # and with q above 0
 
 
 class _Section:
@@ -42,27 +43,34 @@ def _out(y: np.ndarray, channels: int) -> np.ndarray:
 
 
 class _Filter(Unit):
-    """A source run through one IIR section whose coefficients come from the parameters.
+    """A source run through one IIR section whose coefficients come from the parameters named
+    in _names.
 
     Constant parameters give one set of coefficients. A modulated one is read every _GRID
     samples from the start of the render, and the coefficients are recomputed there.
     """
 
+    _names: tuple[str, ...] = ()
+
     def __init__(self, src: Unit, **values):
         self.src = src
         self.channels = src.channels
-        self._set_params(**values)
+        for name, v in values.items():
+            setattr(self, name, _arg(v))
         self._section = _Section(self.channels, 2)
-        self._moving = any(isinstance(v, Unit) for v in self._values.values())
+        self._moving = any(isinstance(getattr(self, k), Unit) for k in self._names)
         if not self._moving:
-            self._ba = self._coeffs(*self._values.values())
+            self._ba = self._coeffs(*(getattr(self, k) for k in self._names))
         self.reset()
 
     def _coeffs(self, *values: float) -> tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError
 
-    def inputs(self) -> list[Unit]:
-        return [self.src, *super().inputs()]
+    def response(self, **kw):
+        """This filter's gain over frequency, as a view."""
+        from euterpe.view import response
+
+        return response(self, **kw)
 
     def reset(self) -> None:
         super().reset()
@@ -75,7 +83,7 @@ class _Filter(Unit):
         if not self._moving:
             self._done += n
             return _out(self._section.run(*self._ba, x), self.channels)
-        values = [self._param(p.name, n).astype(np.float64) for p in self.params]
+        values = [_signal(getattr(self, k), n).astype(np.float64) for k in self._names]
         first = (-self._done) % _GRID
         cuts = [0, *range(first, n, _GRID), n]
         y = np.empty_like(x)
@@ -87,9 +95,6 @@ class _Filter(Unit):
             y[lo:hi] = self._section.run(*self._ba, x[lo:hi])
         self._done += n
         return _out(y, self.channels)
-
-
-_KINDS = ("lowpass", "highpass", "bandpass", "notch")
 
 
 def _rbj(kind: str, cutoff: float, q: float) -> tuple[np.ndarray, np.ndarray]:
@@ -108,83 +113,110 @@ def _rbj(kind: str, cutoff: float, q: float) -> tuple[np.ndarray, np.ndarray]:
     return np.array(b) / a[0], a / a[0]
 
 
-class Biquad(_Filter):
-    """A two-pole, two-zero filter: lowpass, highpass, bandpass or notch around cutoff Hz.
+class _Biquad(_Filter):
+    """A two-pole, two-zero filter around cutoff Hz, from R. Bristow-Johnson's Audio EQ Cookbook.
 
-    lowpass keeps frequencies below cutoff and cuts those above by 12 dB per octave; highpass
-    does the reverse. bandpass keeps a band around cutoff, about cutoff / q Hz wide, at 0 dB in
-    its centre, and falls 6 dB per octave on each side. notch removes that band and keeps the
-    rest. In lowpass and highpass a q above 0.707 adds a peak at the cutoff, q times the level
-    (+20 log10 q dB): the filter resonates there.
+    Its poles leave the unit circle unless 0 < cutoff < RATE / 2 and q > 0, so cutoff is
+    clipped to [1, 23 000] Hz and q to at least 0.01.
     """
 
-    params = (Param("cutoff", *_CUTOFF, default=1_000.0), Param("q", "", 0.1, 40.0, "log", default=0.707))
+    _kind: str
+    _names = ("cutoff", "q")
 
     @property
     def duration(self) -> float | None:
         """The source's plus the ringing of the resonance: 60 dB at q / (pi cutoff) per time constant."""
-        tail = LN60 * self._fixed("q", 40.0) / (np.pi * self._fixed("cutoff", 20.0))
+        tail = LN60 * _fixed(self.q, 40.0) / (np.pi * _fixed(self.cutoff, 20.0))
         return _after(self.src.duration, float(tail))
 
-    def response(self, **kw):
-        """This filter's gain over frequency, as a view."""
-        from euterpe.view import response
-
-        return response(self, **kw)
-
-    def __init__(
-        self,
-        src: Unit,
-        kind: Literal["lowpass", "highpass", "bandpass", "notch"],
-        cutoff: float | Unit = 1000.0,
-        q: float | Unit = 0.707,
-    ):
-        if kind not in _KINDS:
-            raise ValueError(f"Biquad kind must be one of {', '.join(_KINDS)}, got {kind!r}")
-        self.kind = kind
+    def __init__(self, src: Unit, cutoff: float | Unit = 1000.0, q: float | Unit = 0.707):
+        """cutoff in Hz; q sets the resonance (lowpass, highpass) or the width (bandpass, notch)."""
         super().__init__(src, cutoff=cutoff, q=q)
 
     def _coeffs(self, cutoff: float, q: float) -> tuple[np.ndarray, np.ndarray]:
-        return _rbj(self.kind, cutoff, q)
+        return _rbj(self._kind, np.clip(cutoff, *_CUTOFF), max(q, _MIN_Q))
 
 
-class OnePole(_Filter):
-    """The simplest filter: one pole, a gentle slope of 6 dB per octave beyond cutoff Hz.
+class LowPass(_Biquad):
+    """Keeps frequencies below cutoff Hz and cuts those above by 12 dB per octave.
 
-    lowpass keeps what is below cutoff and is 3 dB down at it; highpass keeps what is above.
-    Each output sample of the lowpass moves a fixed fraction of the way from the last output
-    to the new input. A highpass at a few Hz removes a DC offset (a component at 0 Hz).
+    A q above 0.707 adds a peak at the cutoff, q times the level (+20 log10 q dB): the filter
+    resonates there.
     """
 
-    params = (Param("cutoff", *_CUTOFF, default=1_000.0),)
+    _kind = "lowpass"
+
+
+class HighPass(_Biquad):
+    """Keeps frequencies above cutoff Hz and cuts those below by 12 dB per octave.
+
+    A q above 0.707 adds a peak at the cutoff, q times the level (+20 log10 q dB): the filter
+    resonates there.
+    """
+
+    _kind = "highpass"
+
+
+class BandPass(_Biquad):
+    """Keeps a band around cutoff Hz, about cutoff / q Hz wide, at 0 dB in its centre, and falls
+    6 dB per octave on each side."""
+
+    _kind = "bandpass"
+
+
+class Notch(_Biquad):
+    """Removes a band around cutoff Hz, about cutoff / q Hz wide, and keeps the rest."""
+
+    _kind = "notch"
+
+
+class _OnePole(_Filter):
+    """The simplest filter: one pole, a gentle slope of 6 dB per octave beyond cutoff Hz.
+
+    The pole leaves the unit circle below 0 Hz, so cutoff is taken as at least 0.
+    """
+
+    _names = ("cutoff",)
 
     @property
     def duration(self) -> float | None:
         """The source's plus 60 dB of the pole's time constant, 1 / (2 pi cutoff)."""
-        return _after(self.src.duration, float(LN60 / (2 * np.pi * self._fixed("cutoff", 20.0))))
+        return _after(self.src.duration, float(LN60 / (2 * np.pi * _fixed(self.cutoff, 20.0))))
 
-    def response(self, **kw):
-        """This filter's gain over frequency, as a view."""
-        from euterpe.view import response
-
-        return response(self, **kw)
-
-    def __init__(self, src: Unit, cutoff: float | Unit, kind: Literal["lowpass", "highpass"] = "lowpass"):
-        if kind not in ("lowpass", "highpass"):
-            raise ValueError(f"OnePole kind must be lowpass or highpass, got {kind!r}")
-        self.kind = kind
+    def __init__(self, src: Unit, cutoff: float | Unit):
+        """cutoff in Hz."""
         super().__init__(src, cutoff=cutoff)
 
+    def _pole(self, cutoff: float) -> float:
+        return np.exp(-2 * np.pi * max(cutoff, 0.0) / RATE)
+
+
+class OnePoleLowPass(_OnePole):
+    """One pole: keeps what is below cutoff Hz, is 3 dB down at it and falls 6 dB per octave
+    above. Each output sample moves a fixed fraction of the way from the last output to the new
+    input."""
+
     def _coeffs(self, cutoff: float) -> tuple[np.ndarray, np.ndarray]:
-        p = np.exp(-2 * np.pi * cutoff / RATE)
-        b = [1 - p, 0.0, 0.0] if self.kind == "lowpass" else [p, -p, 0.0]
-        return np.array(b), np.array([1.0, -p, 0.0])
+        p = self._pole(cutoff)
+        return np.array([1 - p, 0.0, 0.0]), np.array([1.0, -p, 0.0])
+
+
+class OnePoleHighPass(_OnePole):
+    """One pole: keeps what is above cutoff Hz and falls 6 dB per octave below. At a few Hz it
+    removes a DC offset (a component at 0 Hz)."""
+
+    def _coeffs(self, cutoff: float) -> tuple[np.ndarray, np.ndarray]:
+        p = self._pole(cutoff)
+        return np.array([p, -p, 0.0]), np.array([1.0, -p, 0.0])
 
 
 class _Delayed(Unit):
     """A filter built on a delay line of round(delay * RATE) samples, run in chunks no longer
     than the delay so each chunk is computed from samples already in the line. Its delay and
-    gain are numbers: a moving delay is a chorus or a flanger, not a comb."""
+    gain are numbers: a moving delay is a chorus or a flanger, not a comb. The feedback loop
+    grows without end unless |gain| < 1."""
+
+    _gain_name: str
 
     @property
     def duration(self) -> float | None:
@@ -192,18 +224,19 @@ class _Delayed(Unit):
         g = abs(self.g)
         # the feedback also builds the level up, by up to 1 / (1 - |g|), before it decays
         trips = (LN60 + np.log(1 / (1 - g))) / -np.log(g) if 0 < g < 1 else 1.0
-        return _after(self.src.duration, float(self._values["delay"] * (trips + 1)))
+        return _after(self.src.duration, float(self.delay * (trips + 1)))
 
     def __init__(self, src: Unit, delay: float, gain: float):
         self.src = src
         self.channels = src.channels
-        gain_name = self.params[1].name
-        for name, v in (("delay", delay), (gain_name, gain)):
+        name = f"{type(self).__name__}.{self._gain_name}"
+        for what, v in (("delay", delay), (self._gain_name, gain)):
             if isinstance(v, Unit):
-                raise TypeError(f"{type(self).__name__}.{name} must be a number, not a Unit")
-        self._set_params(**{"delay": delay, gain_name: gain})
-        self.d = max(1, round(self._values["delay"] * RATE))
-        self.g = self._values[gain_name]
+                raise TypeError(f"{type(self).__name__}.{what} must be a number, not a Unit")
+        if not abs(gain) < 1:
+            raise ValueError(f"{name}={gain} makes the loop grow without end; it needs |{self._gain_name}| < 1")
+        self.delay, self.g = float(delay), float(gain)
+        self.d = max(1, round(self.delay * RATE))
         self.reset()
 
     def inputs(self) -> list[Unit]:
@@ -239,7 +272,7 @@ class Comb(_Delayed):
     so feedback 0.9 makes the peaks 25.6 dB above the dips and 20 dB above the input.
     """
 
-    params = (Param("delay", "s", 1 / RATE, 2.0, "log"), Param("feedback", "", -0.999, 0.999))
+    _gain_name = "feedback"
 
     def __init__(self, src: Unit, delay: float, feedback: float):
         super().__init__(src, delay, feedback)
@@ -256,7 +289,7 @@ class Allpass(_Delayed):
     of them are the diffusers inside reverbs.
     """
 
-    params = (Param("delay", "s", 1 / RATE, 2.0, "log"), Param("gain", "", -0.999, 0.999))
+    _gain_name = "gain"
 
     def __init__(self, src: Unit, delay: float, gain: float):
         super().__init__(src, delay, gain)

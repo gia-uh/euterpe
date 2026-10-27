@@ -117,30 +117,30 @@ def test_every_view_marks_the_default_length(view):
     assert any(t.get_text() == "1 s (default)" for ax in fig.axes for t in ax.texts)
 
 
-from euterpe.sound import Biquad, OnePole, Saturator, Shaper
+from euterpe.sound import HardClip, LowPass, OnePoleLowPass, Saturator
 from euterpe.view import curve, figure, response, row
 
 
 def test_response_of_a_resonant_lowpass_peaks_near_its_cutoff():
-    v = response(Biquad(Sine(1), "lowpass", cutoff=800, q=12))
+    v = response(LowPass(Sine(1), cutoff=800, q=12))
     line = v.figure().axes[0].lines[0]
     f, db = line.get_xdata(), line.get_ydata()
     assert 700 < f[np.argmax(db)] < 900 and db.max() > 15
 
 
 def test_response_method_and_labels():
-    fig = OnePole(Sine(1), cutoff=500).response().figure()
+    fig = OnePoleLowPass(Sine(1), cutoff=500).response().figure()
     assert any("500 Hz" in t.get_text() for t in fig.axes[0].texts)
 
 
 def test_response_refuses_a_moving_filter():
     with pytest.raises(ValueError, match="fixed"):
-        response(Biquad(Sine(1), "lowpass", cutoff=Sine(1) * 100 + 500)).figure()
+        response(LowPass(Sine(1), cutoff=Sine(1) * 100 + 500)).figure()
 
 
 def test_curve_of_a_hard_clipper_is_flat_beyond_its_knee():
     # at drive 4, hard is 0.891 * min(2x, 1): a straight line up to x = 0.5, flat after
-    line = curve(Shaper(Sine(1), "hard", drive=4)).figure().axes[0].lines[-1]
+    line = curve(HardClip(Sine(1), drive=4)).figure().axes[0].lines[-1]
     x, y = line.get_xdata(), line.get_ydata()
     at = lambda v: y[np.argmin(np.abs(x - v))]
     assert at(0.25) == pytest.approx(0.4455, abs=0.01)

@@ -108,7 +108,7 @@ def test_convolution_reverb_decays_by_its_setting():
 @pytest.mark.parametrize(
     "make",
     [
-        lambda: Delay(Sine(220.0), time=Sine(0.5) * 0.01 + 0.2, feedback=0.6, mix=0.5),
+        lambda: Delay(Sine(220.0), time=Sine(0.5) * 0.01 + 0.2, feedback=0.6, mix=0.5, max_time=0.21),
         lambda: Chorus(Sine(220.0), rate=1.5),
         lambda: Flanger(Sine(220.0), rate=0.7, feedback=-0.7),
         lambda: Phaser(Sine(220.0), rate=2.0, stages=6),
@@ -208,8 +208,20 @@ def test_width_two_doubles_the_side_and_keeps_the_mid():
         lambda rate: Phaser(Sine(220.0), rate=rate),
     ],
 )
-def test_a_modulating_rate_is_clipped_to_20_hz(make):
-    assert np.array_equal(render(make(Const(50.0)), 0.3), render(make(Const(20.0)), 0.3))
+def test_a_fast_modulating_rate_stays_finite(make):
+    x = render(make(Sine(1.0) * 500.0), 0.3)
+    assert np.all(np.isfinite(x)) and np.abs(x).max() < 2
+
+
+def test_a_moving_delay_time_needs_max_time():
+    with pytest.raises(TypeError, match="max_time"):
+        Delay(Sine(220.0), time=Sine(0.5) * 0.01 + 0.2)
+
+
+def test_a_delay_time_beyond_max_time_is_clipped_to_it():
+    a = render(Delay(Click(), time=Const(0.3), feedback=0.0, mix=1.0, max_time=0.1), 0.3)
+    b = render(Delay(Click(), time=0.1, feedback=0.0, mix=1.0), 0.3)
+    assert np.array_equal(a, b)
 
 
 @pytest.mark.parametrize("decay", [0.5, 2.0, 20.0])

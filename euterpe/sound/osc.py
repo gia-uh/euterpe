@@ -5,17 +5,16 @@ samples are the same in any block size. Saw and square jump once or twice per
 cycle; a jump has energy at every frequency, and the part above half the sample
 rate would fold back as aliasing. polyBLEP (a polynomial band-limited step)
 replaces the two samples around each jump with a smoothed step, which removes
-most of that energy. Samples whose frequency is at or above RATE / 2 are zero.
+most of that energy. Samples whose frequency is at or above RATE / 2 (either sign) are zero.
 """
 
 from __future__ import annotations
 
 import numpy as np
 
-from euterpe.sound.core import RATE, Param, Unit
+from euterpe.sound.core import RATE, Unit, _arg, _signal
 
 _ONE = 1 << 32  # one cycle of phase in the fixed-point accumulator
-_FREQ = Param("freq", "Hz", 0.01, 24_000.0, "log", 440.0)
 
 
 def _blep(t: np.ndarray, dt: np.ndarray) -> np.ndarray:
@@ -53,12 +52,15 @@ class _Oscillator(Unit):
     def _phase(self, n: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Phase in cycles [0, 1) and increment per sample for the next n samples, and a mask
         of the samples at or above Nyquist."""
-        freq = self._param("freq", n).astype(np.float64)
+        freq = self._freq(n)
         inc = np.round(freq / RATE * _ONE).astype(np.int64)
         acc = self._acc + np.cumsum(inc)
         self._acc = int(acc[-1] % _ONE) if n else self._acc
         t = ((acc - inc) % _ONE) / _ONE
-        return t, inc / _ONE, freq >= RATE / 2
+        return t, inc / _ONE, np.abs(freq) >= RATE / 2
+
+    def _freq(self, n: int) -> np.ndarray:
+        return _signal(self.freq, n).astype(np.float64)
 
     def _naive(self, t: np.ndarray, dt: np.ndarray, n: int) -> np.ndarray:
         raise NotImplementedError
@@ -73,20 +75,28 @@ class _Oscillator(Unit):
 class Sine(_Oscillator):
     """A sine wave: all its energy sits at one frequency, freq.
 
-    phase offsets the wave by a fraction of a cycle; modulating it is phase modulation.
+    phase offsets the wave by a fraction of a cycle; modulating it is phase modulation. A
+    negative freq runs the phase backwards, the wave mirrored in time.
     """
 
-    params = (_FREQ, Param("phase", "cycles", 0.0, 1.0, default=0.0))
-
     def __init__(self, freq: float | Unit = 440.0, phase: float | Unit = 0.0):
-        self._set_params(freq=freq, phase=phase)
+        """freq in Hz; phase in cycles, where 1 is a whole cycle."""
+        self.freq, self.phase = _arg(freq), _arg(phase)
         self.reset()
 
     def _naive(self, t, dt, n):
-        return np.sin(2 * np.pi * (t + self._param("phase", n)))
+        return np.sin(2 * np.pi * (t + _signal(self.phase, n)))
 
 
-class Saw(_Oscillator):
+class _Stepped(_Oscillator):
+    """An oscillator with jumps or corners, smoothed by polyBLEP, which needs the phase to move
+    forward: a negative freq is taken as 0."""
+
+    def _freq(self, n: int) -> np.ndarray:
+        return np.maximum(super()._freq(n), 0.0)
+
+
+class Saw(_Stepped):
     """A sawtooth rising from -1 to 1 once per cycle: every harmonic k of freq, at amplitude 1/k
     (6 dB lower per octave). Band-limited with polyBLEP.
 
@@ -95,11 +105,9 @@ class Saw(_Oscillator):
     and for deliberately harsh, lo-fi tones.
     """
 
-    params = (_FREQ,)
-
     def __init__(self, freq: float | Unit = 440.0, *, antialias: bool = True):
         self.antialias = antialias
-        self._set_params(freq=freq)
+        self.freq = _arg(freq)
         self.reset()
 
     def _naive(self, t, dt, n):
@@ -107,21 +115,20 @@ class Saw(_Oscillator):
         return ramp - _blep(t, dt) if self.antialias else ramp
 
 
-class Square(_Oscillator):
+class Square(_Stepped):
     """A pulse wave, 1 for the first duty fraction of each cycle and -1 for the rest.
 
     At duty 0.5 it holds only the odd harmonics of freq, at amplitude 1/k. Other duties add
-    even harmonics and move the mean to 2 * duty - 1. Band-limited with polyBLEP.
+    even harmonics and move the mean to 2 * duty - 1. Band-limited with polyBLEP. duty is a
+    fraction of the cycle, so it is clipped to [0, 1]; at 0 or 1 the wave is a constant.
     """
 
-    params = (_FREQ, Param("duty", "", 0.01, 0.99, default=0.5))
-
     def __init__(self, freq: float | Unit = 440.0, duty: float | Unit = 0.5):
-        self._set_params(freq=freq, duty=duty)
+        self.freq, self.duty = _arg(freq), _arg(duty)
         self.reset()
 
     def _naive(self, t, dt, n):
-        duty = self._param("duty", n).astype(np.float64)
+        duty = np.clip(_signal(self.duty, n).astype(np.float64), 0.0, 1.0)
         return _square(t, dt, duty)
 
 
@@ -130,7 +137,7 @@ def _square(t, dt, duty):
     return out + _blep(t, dt) - _blep((t - duty) % 1.0, dt)
 
 
-class Triangle(_Oscillator):
+class Triangle(_Stepped):
     """A triangle wave: only the odd harmonics of freq, at amplitude 1/k² (12 dB lower per
     octave), so it sounds softer than a square.
 
@@ -141,10 +148,8 @@ class Triangle(_Oscillator):
     for a wave with no component above 24 kHz.
     """
 
-    params = (_FREQ,)
-
     def __init__(self, freq: float | Unit = 440.0):
-        self._set_params(freq=freq)
+        self.freq = _arg(freq)
         self.reset()
 
     def _naive(self, t, dt, n):
