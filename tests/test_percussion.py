@@ -131,3 +131,13 @@ def test_below_the_timpani_warns():
     t = Timpani()
     with pytest.warns(UserWarning, match="below the bottom"):
         t.play(t.hit(0.0, pitch=C2))
+
+
+def test_a_stomp_is_wood_not_hiss():
+    from euterpe.sound import ConvolutionReverb
+    s = Stomp()
+    assert isinstance(s.voice(s.hit(0.0)[0]), ConvolutionReverb)
+    x = np.asarray(s.play(s.hit(0.0, 1.0)).take(seconds=1.5)).mean(axis=1)
+    m = np.abs(np.fft.rfft(x))
+    f = np.fft.rfftfreq(len(x), 1 / RATE)
+    assert m[f > 2000].sum() / m.sum() < 0.27  # the kick's high-passed click put 33 % up there
