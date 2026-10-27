@@ -1,5 +1,6 @@
+import pytest
 import numpy as np
-from euterpe.instruments import GuitarBody, Note, Plucked, Staccato
+from euterpe.instruments import Finger, GuitarBody, Note, Plucked, Staccato, Steel
 from euterpe.pitch import A2, A3
 from euterpe.sound.core import RATE
 from tests.helpers import band_db
@@ -73,7 +74,7 @@ def test_variation_spreads_identical_notes_but_repeats_with_the_seed():
         x = np.asarray(bass.play([(1.0 * k, E2, 0.5) for k in range(8)], seed=3).take(8.0))
         rms = [np.sqrt(np.mean(x[k * RATE: k * RATE + RATE // 2] ** 2)) for k in range(8)]
         return np.std(rms) / np.mean(rms)
-    assert spread(BassGuitar()) > 2 * spread(BassGuitar(variation=0.0))
+    assert spread(BassGuitar()) > 2 * spread(BassGuitar(exciter=Finger(position=0.15, brightness=0.5, variation=0.0)))
     a, b = (np.asarray(BassGuitar().play([(0.0, E2, 0.5)], seed=3).take(0.5)) for _ in range(2))
     assert np.array_equal(a, b)
 
@@ -95,3 +96,29 @@ def test_each_bass_note_stands_out_from_the_last():
         s = round(0.5 * k * RATE)
         attack, before = rms(s, s + RATE // 20), rms(s - RATE // 20, s)
         assert 20 * np.log10(attack / before) > 6
+
+
+
+def test_each_string_keeps_its_character_and_a_seed_is_another_instrument():
+    from euterpe.instruments import Guitar
+    g7, again, g8 = Guitar(seed=7), Guitar(seed=7), Guitar(seed=8)
+    assert g7.traits(1) == again.traits(1) and g7.traits(1) != g7.traits(2) and g7.traits(1) != g8.traits(1)
+    cents, level, decay = g7.traits(1)
+    assert abs(cents) <= 3.0 and abs(level) <= 0.05 and abs(decay) <= 0.1
+
+
+def test_a_string_without_tolerance_is_exact():
+    from euterpe.instruments import Guitar, Tolerance
+    assert Guitar(string=Steel(tolerance=Tolerance())).traits(1) == (0.0, 0.0, 0.0)
+
+
+def test_a_string_sounds_its_detuned_pitch_on_every_note():
+    from euterpe.instruments import Guitar
+    from euterpe.pitch import E5
+    from tests.helpers import peak_hz
+    dark = Finger(position=0.0, brightness=0.0, variation=0.0)
+    g = next(g for g in (Guitar(seed=s, body=None, exciter=dark) for s in range(50)) if abs(g.traits(1)[0]) > 2)
+    expected = E5.freq * 2 ** (g.traits(1)[0] / 1200)
+    for at in (0.0, 1.0):
+        x = np.asarray(g.play(g.pick(1, 12, at=at, length=1.0)).take(at + 1.0))
+        assert peak_hz(x[round((at + 0.1) * RATE):]) == pytest.approx(expected, abs=0.3)

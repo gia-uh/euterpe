@@ -51,8 +51,8 @@ class Fretted(Plucked):
 
     def __init__(self, tuning: Sequence[Pitch] | None = None, capo: int = 0, exciter: Exciter = Finger(),
                  string: String = Steel(), body: Soundboard | None = GuitarBody(), let_ring: bool = True,
-                 mute: float = 0.08, level: float = 0.25, variation: float = 0.0):
-        super().__init__(exciter, string, body, let_ring, mute, level, variation)
+                 mute: float = 0.08, level: float = 0.25, seed: int = 0):
+        super().__init__(exciter, string, body, let_ring, mute, level, seed)
         if not 0 <= capo < self.frets:
             raise ValueError(f"capo {capo} is not a fret of {type(self).__name__} (0 to {self.frets - 1})")
         self.tuning = tuple(tuning) if tuning is not None else type(self).tuning
@@ -212,14 +212,14 @@ class Guitar(Fretted):
 
     def __init__(self, tuning: Sequence[Pitch] | None = None, capo: int = 0, exciter: Exciter = Plectrum(),
                  string: String = Steel(), body: Soundboard | None = GuitarBody(), let_ring: bool = True,
-                 mute: float = 0.08, level: float = 0.75):
-        super().__init__(tuning, capo, exciter, string, body, let_ring, mute, level)
+                 mute: float = 0.08, level: float = 0.75, seed: int = 0):
+        super().__init__(tuning, capo, exciter, string, body, let_ring, mute, level, seed)
 
 
 class BassGuitar(Fretted):
     """An acoustic bass guitar: four strings tuned E1 A1 D2 G2, 20 frets, played with the
     fingers, through a bass body. As a bass player does, it damps each note when the next one
-    is due (let_ring=False), and no two plucks are the same (variation=0.15). Its strings lose
+    is due (let_ring=False), and its finger varies each pluck by 0.15. Its strings lose
     5 % of their vibration each trip (damping=0.95): a low string makes few trips a second, so
     a gentler damping would let it ring almost unchanged and run each note into the next.
 
@@ -232,7 +232,7 @@ class BassGuitar(Fretted):
     polyphony = 4
 
     def __init__(self, tuning: Sequence[Pitch] | None = None, capo: int = 0,
-                 exciter: Exciter = Finger(position=0.15, brightness=0.5), string: String = Steel(damping=0.95),
+                 exciter: Exciter = Finger(position=0.15, brightness=0.5, variation=0.15), string: String = Steel(damping=0.95),
                  body: Soundboard | None = BassBody(), let_ring: bool = False, mute: float = 0.06,
-                 level: float = 1.1, variation: float = 0.15):
-        super().__init__(tuning, capo, exciter, string, body, let_ring, mute, level, variation)
+                 level: float = 1.1, seed: int = 0):
+        super().__init__(tuning, capo, exciter, string, body, let_ring, mute, level, seed)
