@@ -219,7 +219,9 @@ class Guitar(Fretted):
 class BassGuitar(Fretted):
     """An acoustic bass guitar: four strings tuned E1 A1 D2 G2, 20 frets, played with the
     fingers, through a bass body. As a bass player does, it damps each note when the next one
-    is due (let_ring=False), and no two plucks are the same (variation=0.15).
+    is due (let_ring=False), and no two plucks are the same (variation=0.15). Its strings lose
+    5 % of their vibration each trip (damping=0.95): a low string makes few trips a second, so
+    a gentler damping would let it ring almost unchanged and run each note into the next.
 
     Limit: the low strings' stiffness is not modelled, so the upper partials sit exactly in
     tune, and the body's three modes give less boom than a real box.
@@ -230,7 +232,7 @@ class BassGuitar(Fretted):
     polyphony = 4
 
     def __init__(self, tuning: Sequence[Pitch] | None = None, capo: int = 0,
-                 exciter: Exciter = Finger(position=0.15), string: String = Steel(damping=0.998),
+                 exciter: Exciter = Finger(position=0.15, brightness=0.5), string: String = Steel(damping=0.95),
                  body: Soundboard | None = BassBody(), let_ring: bool = False, mute: float = 0.06,
                  level: float = 1.1, variation: float = 0.15):
         super().__init__(tuning, capo, exciter, string, body, let_ring, mute, level, variation)

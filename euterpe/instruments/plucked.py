@@ -123,12 +123,13 @@ class GuitarBody(Soundboard):
 
 @dataclass(frozen=True)
 class BassBody(Soundboard):
-    """An acoustic bass guitar's larger box, its air mode near 70 Hz."""
+    """An acoustic bass guitar's larger box, its air mode near 70 Hz, kept below the string so
+    the box does not colour every note the same."""
 
     freqs: tuple[float, ...] = (70.0, 140.0, 260.0)
     decays: tuple[float, ...] = (0.20, 0.12, 0.08)
-    amps: tuple[float, ...] = (1.0, 0.6, 0.3)
-    dry: float = 0.5
+    amps: tuple[float, ...] = (0.6, 0.4, 0.2)
+    dry: float = 0.7
 
 
 @dataclass(frozen=True)

@@ -82,3 +82,16 @@ def test_a_bass_player_damps_each_note():
     from euterpe.instruments import BassGuitar
     from euterpe.pitch import E2
     assert BassGuitar().note(E2, 0.5).duration < 1.0
+
+
+def test_each_bass_note_stands_out_from_the_last():
+    from euterpe.instruments import BassGuitar
+    from euterpe.pitch import A1, D2
+    notes = [(0.5 * k, (D2, A1)[k % 2], 0.45) for k in range(4)]
+    x = np.asarray(BassGuitar().play(notes, seed=1).take(2.0)).astype(np.float64)
+    def rms(a, b):
+        return np.sqrt(np.mean(x[a:b] ** 2))
+    for k in range(1, 4):
+        s = round(0.5 * k * RATE)
+        attack, before = rms(s, s + RATE // 20), rms(s - RATE // 20, s)
+        assert 20 * np.log10(attack / before) > 6
