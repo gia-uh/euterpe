@@ -10,6 +10,7 @@ from euterpe.instruments.core import (
     Staccato,
     play,
 )
+from euterpe.instruments.fretted import BassGuitar, Fretted, Guitar, Shape
 from euterpe.instruments.phrase import Phrase
 from euterpe.instruments.plucked import (
     BassBody,
@@ -32,9 +33,12 @@ __all__ = [
     "Accent",
     "Articulation",
     "BassBody",
+    "BassGuitar",
     "Control",
     "Exciter",
     "Finger",
+    "Fretted",
+    "Guitar",
     "GuitarBody",
     "Gut",
     "HarpBody",
@@ -47,6 +51,7 @@ __all__ = [
     "Plectrum",
     "Plucked",
     "PluckedString",
+    "Shape",
     "Soundboard",
     "Staccato",
     "Steel",
