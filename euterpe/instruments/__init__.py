@@ -11,6 +11,7 @@ from euterpe.instruments.core import (
     play,
 )
 from euterpe.instruments.fretted import BassGuitar, Fretted, Guitar, Shape
+from euterpe.instruments.percussion import Open, Struck
 from euterpe.instruments.phrase import Phrase
 from euterpe.instruments.plucked import (
     BassBody,
@@ -50,6 +51,7 @@ __all__ = [
     "Legato",
     "Note",
     "Nylon",
+    "Open",
     "Phrase",
     "PizzicatoStrings",
     "play",
@@ -61,6 +63,7 @@ __all__ = [
     "Staccato",
     "Steel",
     "String",
+    "Struck",
     "Tolerance",
     "ViolinBody",
 ]
