@@ -293,3 +293,57 @@ class Ride(Cymbal):
     def __init__(self, decay: float = 3.0, wash: float = 0.25, bell: float = 0.3, tune: float = 420.0,
                  level: float = 0.2, variation: float = 0.08, seed: int = 0):
         super().__init__(decay, wash, bell, tune, level, variation, seed)
+
+
+STEPS = {"x": 0.8, "X": 1.0, "g": 0.3, "o": 0.8}  # what each step of a grid plays, at what velocity
+
+
+class Kit(Instrument):
+    """A drum kit: the drums a drummer plays sitting at one kit, each one an instrument of its
+    own (kit.kick, kit.toms[0]). A note sounds on the drum that made it, so a pattern may also
+    name a drum that is not part of the kit, such as a Clap().
+
+    toms: from the highest to the lowest.
+
+    Limit: each drum sounds alone; the snare's wires do not buzz when the toms ring, and the
+    drums share no room.
+    """
+
+    polyphony = 24
+
+    def __init__(self, kick: Struck | None = None, snare: Struck | None = None, hihat: Struck | None = None,
+                 toms: tuple[Struck, ...] | None = None, crash: Struck | None = None, ride: Struck | None = None):
+        self.kick, self.snare, self.hihat = kick or Kick(), snare or Snare(), hihat or HiHat()
+        self.toms = toms if toms is not None else (Tom(196.0), Tom(147.0), Tom(98.0, decay=0.7))
+        self.crash, self.ride = crash or Crash(), ride or Ride()
+
+    @staticmethod
+    def _drum(note: Note) -> Struck:
+        if not isinstance(note.resource, Struck):
+            raise ValueError(f"note at {note.time:.2f} s names no drum; make it with a drum's hit() or Kit.pattern")
+        return note.resource
+
+    def voice(self, note: Note) -> Unit:
+        return self._drum(note).voice(note)
+
+    def resource(self, note: Note) -> Hashable | None:
+        return self._drum(note).resource(note)
+
+    def pattern(self, grid: dict[Struck, str], step: float, at: float = 0.0, repeat: int = 1) -> list[Note]:
+        """Notes from a step grid: one row of characters per drum, one character per step of
+        step seconds. x is a hit, X an accent, g a ghost note, o an open stroke (the hi-hat's
+        Open()); a dot or a space is a rest. The grid lasts as long as its longest row, and
+        repeat plays it that many times."""
+        if step <= 0 or repeat < 1:
+            raise ValueError(f"pattern needs a step above 0 and repeat of at least 1, got {step} and {repeat}")
+        length = max((len(row) for row in grid.values()), default=0)
+        notes = []
+        for drum, row in grid.items():
+            for i, c in enumerate(row):
+                if c in ". ":
+                    continue
+                if c not in STEPS:
+                    raise ValueError(f"pattern: {c!r} at step {i} is not one of x X g o . or a space")
+                for r in range(repeat):
+                    notes += drum.hit(at + (r * length + i) * step, STEPS[c], articulation=Open() if c == "o" else None)
+        return sorted(notes, key=lambda n: n.time)
