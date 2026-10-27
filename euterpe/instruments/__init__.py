@@ -11,6 +11,7 @@ from euterpe.instruments.core import (
     play,
 )
 from euterpe.instruments.phrase import Phrase
+from euterpe.instruments.plucked import PluckedString
 
 __all__ = [
     "Accent",
@@ -20,6 +21,7 @@ __all__ = [
     "Legato",
     "Note",
     "Phrase",
+    "PluckedString",
     "Staccato",
     "play",
 ]

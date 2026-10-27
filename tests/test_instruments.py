@@ -3,6 +3,10 @@ import pytest
 from euterpe.instruments import Accent, Instrument, Note, Staccato, play
 from euterpe.pitch import A4, C4
 from tests.helpers import Theremin
+from euterpe.instruments import PluckedString
+from euterpe.lint import lint_audio
+from euterpe.pitch import B2, B3, E2, E3, E4, Gs3
+from euterpe.sound.core import RATE
 
 
 def test_tuples_and_notes_are_the_same_note():
@@ -43,3 +47,23 @@ def test_same_seed_same_samples_other_seed_other_rng():
 
 def test_note_is_one_note():
     assert len(Theremin().note(A4, 0.5).notes) == 1
+
+
+def test_a_full_strum_stays_under_full_scale():
+    chord = [E2, B2, E3, Gs3, B3, E4]
+    clip = PluckedString().play([(0.015 * i, p, 1.6, 1.0) for i, p in enumerate(chord)]).take()
+    assert np.abs(np.asarray(clip)).max() < 1.0 and not lint_audio(np.asarray(clip)).errors
+
+
+def test_high_partials_die_first():
+    x = np.asarray(PluckedString(position=0.0, brightness=1.0).note(A4, 2.0).take(2.0))
+    def share_above(seg, hz):
+        spec = np.abs(np.fft.rfft(seg)); f = np.fft.rfftfreq(len(seg), 1 / RATE)
+        return spec[f > hz].sum() / spec.sum()
+    early, late = x[: RATE // 10], x[RATE: RATE + RATE // 10]
+    assert share_above(late, 2000) < share_above(early, 2000)
+
+
+def test_the_finger_mutes_the_string():
+    x = np.asarray(PluckedString(damping=0.999).note(A4, 0.5).take(1.0))
+    assert np.abs(x[int(0.7 * RATE):]).max() < 1e-3
