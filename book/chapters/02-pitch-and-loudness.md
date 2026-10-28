@@ -117,8 +117,10 @@ from euterpe.sound import Sine
 from euterpe.view import listen
 
 for gain in (0.5, 0.25, 0.125, 0.0625):
-    display(listen(Sine(440.0) * gain, 1.5, f"The 440 Hz sine at gain {gain}"))
+    display(listen(Sine(440.0) * gain, 1.5, f"The 440 Hz sine at gain {gain}", normalize=False))
 ```
+
+Every other player in this book brings its sound to the same loudness. These four pass `normalize=False`, which plays each at the level it was made at, since the level is what they show.
 
 Each player is 6 dB quieter than the one before it, and each drop sounds about as large as the last.
 
@@ -145,10 +147,11 @@ Each line has a severity, a rule and a message. A `metric` is a measurement, a `
 Two sounds with the same peak do not always sound equally loud. Here are four sines, each at gain 0.5, so each peaks at −6 dBFS: 100 Hz, 1 000 Hz, 3 000 Hz and 12 000 Hz.
 
 ```python {run}
+from euterpe import display
 from euterpe.sound import Sine
 
 for freq in (100.0, 1_000.0, 3_000.0, 12_000.0):
-    display((Sine(freq) * 0.5).take(1.5, f"A {freq:.0f} Hz sine at gain 0.5"))
+    display((Sine(freq) * 0.5).take(1.5, f"A {freq:.0f} Hz sine at gain 0.5"), normalize=False)
 ```
 
 On most loudspeakers and headphones the 3 000 Hz sine sounds the loudest and the 100 Hz sine much quieter, although their samples swing equally far. The ear is most sensitive between about 2 000 and 5 000 Hz, where the ear canal resonates, and grows less sensitive towards low frequencies, and again above about 10 000 Hz. (Small loudspeakers also play 100 Hz weakly, which adds to the effect.)
@@ -191,10 +194,11 @@ The measurement follows the ear at the bottom: a 100 Hz sine measures about 2 dB
 The shape of a wave changes its loudness too. Here are four basic waveforms, `Sine`, `Triangle`, `Square` and `Saw`, at 220 Hz, all at gain 0.5. A triangle rises and falls in straight lines. A saw rises in a straight line and drops back at once, as in chapter 1. A square jumps between its high and its low value and stays at each for half a cycle. Chapter 3 looks at their shapes and what they contain.
 
 ```python {run}
+from euterpe import display
 from euterpe.sound import Saw, Sine, Square, Triangle
 
 for wave in (Sine, Triangle, Square, Saw):
-    display((wave(220.0) * 0.5).take(1.5, f"{wave.__name__} at 220 Hz, gain 0.5"))
+    display((wave(220.0) * 0.5).take(1.5, f"{wave.__name__} at 220 Hz, gain 0.5"), normalize=False)
 ```
 
 The square sounds the loudest. It spends almost all of its time at +0.5 or −0.5, so it carries more power than the others, which pass through the values in between. *RMS*, the root of the mean of the squared samples, is that average power expressed as an amplitude. This block measures the peak, the RMS and the loudness of each wave:
@@ -219,10 +223,11 @@ The loudness spans 5 dB, from the triangle to the square, although the peaks are
 To make the square as loud as the sine, lower it by the difference, 3.4 dB. That is a gain of 10^(−3.4/20) = 0.68 on top of the 0.5, so about 0.34:
 
 ```python {run}
+from euterpe import display
 from euterpe.sound import Sine, Square
 
-display((Sine(220.0) * 0.5).take(1.5, "Sine at 220 Hz, gain 0.5"))
-display((Square(220.0) * 0.34).take(1.5, "Square at 220 Hz, gain 0.34: as loud as the sine"))
+display((Sine(220.0) * 0.5).take(1.5, "Sine at 220 Hz, gain 0.5"), normalize=False)
+display((Square(220.0) * 0.34).take(1.5, "Square at 220 Hz, gain 0.34: as loud as the sine"), normalize=False)
 ```
 
 ```python {run output=code}
