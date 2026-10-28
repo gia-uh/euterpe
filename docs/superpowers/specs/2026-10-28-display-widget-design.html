@@ -231,6 +231,9 @@ pre .c{color:var(--faint)} pre .k{color:var(--accent)} pre .s{color:var(--ok)}
 <tr><td>Static first</td><td>The HTML holds a static SVG of the widget and the player; the script draws over it.</td><td class="why">The PDF, an untrusted Jupyter notebook and a page without scripts still show the envelope, the average spectrum and a working player.</td><td class="who">agent</td></tr>
 <tr><td>Normalize argument</td><td><code>x.view(normalize=False)</code>, <code>listen(x, normalize=False)</code>, and <code>euterpe.display(x, normalize=False)</code>.</td><td class="why"><code>display</code> is the host's builtin (IPython's or scriptorium's) and passes no arguments to the object. Euterpe's own <code>display</code> builds the views and hands them to the host's.</td><td class="who">agent</td></tr>
 <tr><td>A clip keeps its source</td><td><code>unit.take(...)</code> stores the unit on the clip as <code>source</code>.</td><td class="why">The book writes <code>guitar.play(notes).take(caption=...)</code>; without the source the clip would lose its tablature.</td><td class="who">agent</td></tr>
+<tr><td>Figure markup</td><td>Euterpe's HTML is one <code>&lt;figure class="euterpe-widget"&gt;</code> ending in its <code>&lt;figcaption&gt;</code>. Scriptorium does not wrap it: it stamps the id (<code>fig-</code> prefix) on that figure and counts it.</td><td class="why">Jupyter needs the caption inside the HTML; a second wrapper would print it twice on the site.</td><td class="who">agent</td></tr>
+<tr><td>Static drawing</td><td>Written by hand as SVG in Python, with labels as text, not with matplotlib.</td><td class="why">The house style turns matplotlib labels into paths, which is heavy across 127 figures, and a hand-written SVG gives the script known coordinates to draw on.</td><td class="who">agent</td></tr>
+<tr><td>Page weight</td><td>Each widget's HTML stays under 12 KB without its MP3 and the shared script.</td><td class="why">A limit the book check can fail; 127 widgets then add at most about 1.5 MB to the site over twelve pages.</td><td class="who">agent</td></tr>
 <tr><td>Chord names</td><td>A shape's diagram is labelled with its tab, <code>x02220</code>, not a chord name.</td><td class="why">Naming a chord needs the theory layer of milestone 3; the label gains the name then.</td><td class="who">agent</td></tr>
 </tbody>
 </table>
@@ -315,6 +318,7 @@ pre .c{color:var(--faint)} pre .k{color:var(--accent)} pre .s{color:var(--ok)}
   <li>The view measures the clip's integrated loudness with pyloudnorm (BS.1770-4), already a runtime dependency. A clip shorter than 0.4 s is measured padded with silence to 0.4 s; the gate drops the silence.</li>
   <li>The gain is <code>10 ** ((-16 - lufs) / 20)</code>, capped at <code>10 ** (-1 / 20) / peak</code>, so the sample peak never exceeds −1 dBFS. A sound that is quiet but peaky plays below −16 LUFS rather than being limited.</li>
   <li>A silent clip (loudness −∞) plays with a gain of 1.</li>
+  <li>The cap applies to the samples before encoding. MP3 encoding can overshoot by a few tenths of a dB on transients, so the decoded MP3 is held to −0.5 dBFS, not −1.</li>
   <li>The gain multiplies the samples written to the MP3 and the envelope drawn; the line next to the player prints both levels.</li>
   <li>With <code>normalize=False</code> the gain is 1 and the line says so.</li>
 </ol>
@@ -362,7 +366,8 @@ pre .c{color:var(--faint)} pre .k{color:var(--accent)} pre .s{color:var(--ok)}
 <ol>
   <li>A bundle whose metadata has <code>"site": "html"</code> and that carries <code>text/html</code> is spliced as that HTML in the site output (format <code>docs</code>).</li>
   <li>Before splicing, its <code>audio/mpeg</code> is written under <code>build/audio</code> as today, and the exact data URI of that MP3 in the HTML is replaced by the file's path, so pages do not carry base64 audio.</li>
-  <li>The figure numbering, caption and id work as for an image with audio: one figure, one number.</li>
+  <li>The HTML's outermost element is a <code>&lt;figure&gt;</code> that ends in its <code>&lt;figcaption&gt;</code>. Scriptorium does not wrap it: it sets the figure's id from the bundle's <code>id</code> with the <code>fig-</code> prefix, and the figure is numbered as an image with audio is.</li>
+  <li>Only the <code>docs</code> format reads the key. The reader format (<code>html</code>) and print ignore it, which needs the output format passed down to where bundles are placed (<code>place()</code> does not receive it today).</li>
   <li>The print output (PDF) ignores the key and uses the image and the audio as today.</li>
   <li>The freeze cache already stores bundles; a frozen build writes the files again.</li>
 </ol>
@@ -373,7 +378,7 @@ pre .c{color:var(--faint)} pre .k{color:var(--accent)} pre .s{color:var(--ok)}
   <li>Chapter 1 describes the two panels of today's default view (line 22: "The drawing has two panels…"). Its text and every example whose prose refers to the magnified cycles change to the new widget, and those examples add <code>x.waveform(span=...)</code> where the shape of the wave is the lesson.</li>
   <li>An audit of the 127 <code>display</code> and 23 <code>listen</code> calls marks every example whose lesson is a level difference; those pass <code>normalize=False</code>. Chapters 2 (loudness), 4 (envelopes), 5 (filters) and 8 (effects, the compressor and the limiter) are where to look first.</li>
   <li>Chapters 10 and 14 gain tablature and hit grids without code changes, through the clip's source.</li>
-  <li>Every chapter page is checked at 390 px and at desktop width, and the site's page weight is compared with today's.</li>
+  <li>Every chapter page is checked at 390 px and at desktop width, and every widget's HTML stays under the 12 KB of section 02.</li>
 </ul>
 
 <h2 id="delivery"><span class="n">10</span>Delivery</h2>
@@ -388,7 +393,7 @@ pre .c{color:var(--faint)} pre .k{color:var(--accent)} pre .s{color:var(--ok)}
 
 <h2 id="testing"><span class="n">11</span>Testing</h2>
 <ul>
-  <li>Loudness: the widget's MP3, decoded, of <code>Sine(440.0)</code> and of the default kit's rock bar both measure −16 ± 0.5 LUFS; a peaky click stays at or below −1 dBFS; a silent clip and a 0.1 s clip do not raise; with <code>normalize=False</code> the decoded MP3 matches the rendered clip's level within MP3 tolerance.</li>
+  <li>Loudness: the widget's MP3, decoded, of <code>Sine(440.0)</code> and of the default kit's rock bar both measure −16 ± 0.5 LUFS; a peaky click's samples before encoding stay at or below −1 dBFS and its decoded MP3 at or below −0.5 dBFS; a silent clip and a 0.1 s clip do not raise; with <code>normalize=False</code> the decoded MP3 matches the rendered clip's level within MP3 tolerance.</li>
   <li>Bundle: the keys of section 07 are present; the HTML contains the SVG, one <code>&lt;audio</code>, and the script; the same sound gives the same bytes twice.</li>
   <li>Browser: a Playwright test opens a page with two widgets (Chromium with autoplay allowed), plays one, and checks the playhead moves, the spectrum canvas changes, the other widget pauses when it starts, and a click on the envelope seeks. The same page at 390 px has nothing wider than the viewport.</li>
   <li>Special views: the SVG text of each holds what the reader needs: the shape's fret numbers, ×, ○ and tab; the tablature's string names and frets; the kit's drum names; the roll's note names.</li>
