@@ -157,3 +157,12 @@ def test_special_views_go_to_print_too():
     data, _ = Shape(None, 0, 2, 2, 2, 0)._repr_mimebundle_()
     assert "x02220" in data["image/svg+xml"] and "x02220" in data["text/html"]
     assert base64.b64decode(data["audio/mpeg"])
+
+
+def test_notes_after_the_clip_ends_are_left_out():
+    body = Widget(Harp().play([(0.0, C4, 0.5), (3.0, G4, 0.5)]).take(1.0)).special[0]
+    assert ">C4<" in body and ">G4<" not in body and 'width="-' not in body
+
+
+def test_a_single_note_has_no_piano_roll():
+    assert Widget(Harp().play([(0.0, C4, 0.5)]).take(1.0)).special is None

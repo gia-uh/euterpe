@@ -62,7 +62,7 @@ def special_view(x, seconds: float) -> tuple | None:
         return tablature(x.notes, x.instrument, seconds)
     if isinstance(x.instrument, Kit):
         return hits(x.notes, x.instrument, seconds)
-    if all(isinstance(n.pitch, (Pitch, int, float)) for n in x.notes):
+    if len(x.notes) > 1 and all(isinstance(n.pitch, (Pitch, int, float)) for n in x.notes):
         return roll(x.notes, seconds)
     return None
 
@@ -122,7 +122,7 @@ def tablature(notes, instrument, seconds: float) -> tuple:
                  f'<line x1="{X0 - 4}" x2="{X1}" y1="{y}" y2="{y}" stroke="{RULE}" stroke-width="0.7"/>')
     for note in notes:
         s = note.resource
-        if not isinstance(s, int) or not 1 <= s <= n:
+        if not isinstance(s, int) or not 1 <= s <= n or note.time >= seconds:
             continue
         fret = _number(note.pitch) - instrument._open(s).number
         x, y = X0 + (X1 - X0) * note.time / seconds, top + (s - 1) * dy
@@ -169,7 +169,7 @@ def hits(notes, kit, seconds: float) -> tuple:
         y = top + r * rh
         p.append(f'<text x="{X0 - 10}" y="{y + rh / 2 + 3}" text-anchor="end" fill="#555">{html.escape(name)}</text>')
         for n in notes:
-            if n.resource is drum:
+            if n.resource is drum and n.time < seconds:
                 x = X0 + (X1 - X0) * n.time / seconds
                 p.append(f'<rect x="{_num(x - 3)}" y="{y + 2}" width="6" height="{rh - 4}" rx="1.5" fill="{PRUSSIAN}" '
                          f'fill-opacity="{0.35 + 0.65 * min(1.0, n.velocity):.2f}" data-t="{n.time:.3f}"/>')
@@ -184,7 +184,7 @@ def roll(notes, seconds: float) -> tuple:
     numbers = [_number(n.pitch) for n in notes]
     lo, hi = min(numbers) - 2, max(numbers) + 2
     rows = hi - lo + 1
-    rh = max(3.0, min(8.0, 160 / rows))
+    rh = max(3.0, min(12.0, 160 / rows))
     top = 4
     h = top + rows * rh + 18
     p = []
@@ -198,6 +198,8 @@ def roll(notes, seconds: float) -> tuple:
         if m % 12 == 0:
             p.append(f'<text x="{X0 - 32}" y="{_num(y + rh - 1)}" text-anchor="end" font-size="7" fill="#555">{_name(m)}</text>')
     for n, m in zip(notes, numbers):
+        if n.time >= seconds:  # the clip ends before this note starts
+            continue
         x = X0 + (X1 - X0) * n.time / seconds
         w = max(2.0, (X1 - X0) * n.duration / seconds)
         y = top + (hi - m) * rh
