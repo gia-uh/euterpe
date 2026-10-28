@@ -7,8 +7,25 @@ from euterpe.view.base import Player, View, listen, sources
 from euterpe.view.layout import figure, row
 from euterpe.view.signal import default, level, spectrogram, spectrum, waveform
 from euterpe.view.system import curve, response
+from euterpe.view.widget import Widget, widget
+
+
+def display(*xs, normalize: bool = True, caption: str | None = None, id: str | None = None) -> None:
+    """Show each object's default view through the host's display (IPython's or scriptorium's),
+    at -16 LUFS unless normalize is false. A view is shown as it is."""
+    import builtins
+
+    show = getattr(builtins, "display", None)
+    if show is None:
+        from IPython.display import display as show
+    for x in xs:
+        if not isinstance(x, View):
+            x = x.view(normalize=normalize)
+            x.caption = caption if caption is not None else x.caption
+            x.id = id if id is not None else x.id
+        show(x)
 
 __all__ = [
-    "Player", "View", "curve", "default", "figure", "level", "listen", "response", "row", "sources",
-    "spectrogram", "spectrum", "waveform",
+    "Player", "View", "Widget", "curve", "default", "display", "figure", "level", "listen", "response", "row", "sources",
+    "spectrogram", "spectrum", "waveform", "widget",
 ]

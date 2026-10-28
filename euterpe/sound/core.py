@@ -50,17 +50,18 @@ class Unit(ABC):
         from euterpe.sound.clip import Clip
 
         if seconds is not None:
-            return Clip(render(self, seconds), caption=caption)
+            return Clip(render(self, seconds), caption=caption, source=self)
         d = self.duration
         if d is None or d > MAX_DEFAULT:
-            return Clip(render(self, 1.0 if d is None else MAX_DEFAULT), defaulted=True, caption=caption)
-        return Clip(render(self, d), caption=caption)
+            return Clip(render(self, 1.0 if d is None else MAX_DEFAULT), defaulted=True, caption=caption,
+                        source=self)
+        return Clip(render(self, d), caption=caption, source=self)
 
-    def view(self):
-        """The default view: what display() shows."""
+    def view(self, normalize: bool = True):
+        """The default view: what display() shows, at -16 LUFS unless normalize is false."""
         from euterpe.view import default
 
-        return default(self)
+        return default(self, normalize=normalize)
 
     def waveform(self, **kw):
         from euterpe.view import waveform
