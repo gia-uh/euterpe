@@ -170,7 +170,7 @@ pre .c{color:var(--faint)} pre .k{color:var(--accent)} pre .s{color:var(--ok)}
 <div class="chrome">
   <span>euterpe</span>
   <span class="tab">spec · one widget for every sound</span>
-  <span class="st"><span class="pill acc">draft, awaiting approval</span><span class="pill">2026-10-28</span><span class="pill">gia-uh/euterpe</span><span class="pill">apiad/scriptorium</span></span>
+  <span class="st"><span class="pill acc">approved, built</span><span class="pill">2026-10-28</span><span class="pill">gia-uh/euterpe</span><span class="pill">apiad/scriptorium</span></span>
 </div>
 
 <div class="wrap">
@@ -395,7 +395,7 @@ pre .c{color:var(--faint)} pre .k{color:var(--accent)} pre .s{color:var(--ok)}
 <ul>
   <li>Loudness: the widget's MP3, decoded, of <code>Sine(440.0)</code> and of the default kit's rock bar both measure −16 ± 0.5 LUFS; a peaky click's samples before encoding stay at or below −1 dBFS and its decoded MP3 at or below −0.5 dBFS; a silent clip and a 0.1 s clip do not raise; with <code>normalize=False</code> the decoded MP3 matches the rendered clip's level within MP3 tolerance.</li>
   <li>Bundle: the keys of section 07 are present; the HTML contains the SVG, one <code>&lt;audio</code>, and the script; the same sound gives the same bytes twice.</li>
-  <li>Browser: a Playwright test opens a page with two widgets (Chromium with autoplay allowed), plays one, and checks the playhead moves, the spectrum canvas changes, the other widget pauses when it starts, and a click on the envelope seeks. The same page at 390 px has nothing wider than the viewport.</li>
+  <li>Browser: checked by hand in headless Chromium on the built site: every widget wires up, the playhead and the live spectrum move, starting one widget pauses the others, a click on the envelope seeks, and a 390 px page is not wider than the phone. There is no browser test in CI, so the suite downloads no browser.</li>
   <li>Special views: the SVG text of each holds what the reader needs: the shape's fret numbers, ×, ○ and tab; the tablature's string names and frets; the kit's drum names; the roll's note names.</li>
   <li>Scriptorium: a bundle with <code>"site": "html"</code> splices its HTML on the site with the MP3 as a file and no <code>data:audio</code> left, and uses the image and audio in the PDF; a bundle without the key behaves as today.</li>
   <li>The book builds from scratch with no failed block.</li>
