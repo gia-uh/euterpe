@@ -24,10 +24,20 @@ class View:
     audio: Clip | None = None
     width: float = 7.0  # inches; row() narrows its panels so the whole row keeps this width
 
-    def __init__(self, *, caption: str | None = None, id: str | None = None):
+    def __init__(self, *, caption: str | None = None, id: str | None = None, normalize: bool = True):
         self.caption = caption
         self.id = id
+        self.normalize = normalize
         self._svg: bytes | None = None
+        self._gain: tuple[float, float] | None = None
+
+    def gain(self) -> tuple[float, float]:
+        """(gain, loudness in LUFS) the audio plays at: -16 LUFS unless normalize is false."""
+        if self._gain is None:
+            from euterpe.view.loudness import gain
+
+            self._gain = gain(self.audio, self.normalize)
+        return self._gain
 
     def draw(self):
         """A matplotlib Figure, or None for a view that only plays."""
@@ -70,7 +80,7 @@ class View:
 
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "view.mp3"
-            write(self.audio.samples, path)
+            write(self.audio.samples * self.gain()[0], path)
             return path.read_bytes()
 
     def _repr_mimebundle_(self, include=None, exclude=None):
@@ -100,12 +110,13 @@ class Player(View):
     """Audio only: an MP3 in the book, an audio tag in a notebook."""
 
     def __init__(self, x: Unit | Clip, seconds: float | None = None, caption: str | None = None, *,
-                 id: str | None = None):
-        super().__init__(caption=caption, id=id)
+                 id: str | None = None, normalize: bool = True):
+        super().__init__(caption=caption, id=id, normalize=normalize)
         self.audio = x.take(seconds) if isinstance(x, Unit) and seconds is not None else sources(x)[0]
 
 
 def listen(x: Unit | Clip, seconds: float | None = None, caption: str | None = None, *,
-           id: str | None = None) -> Player:
-    """The player alone: a unit for seconds (or its duration), or a clip."""
-    return Player(x, seconds, caption, id=id)
+           id: str | None = None, normalize: bool = True) -> Player:
+    """The player alone: a unit for seconds (or its duration), or a clip, at -16 LUFS unless
+    normalize is false."""
+    return Player(x, seconds, caption, id=id, normalize=normalize)
