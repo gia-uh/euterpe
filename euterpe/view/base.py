@@ -67,7 +67,7 @@ class View:
                 if fig is None:
                     return None
                 buf = io.BytesIO()
-                fig.savefig(buf, format="svg", bbox_inches="tight", pad_inches=0.06,
+                fig.savefig(buf, format="svg", bbox_inches="tight", pad_inches=0.15,
                             metadata={"Date": None}, dpi=200)
                 plt.close(fig)
             self._svg = buf.getvalue()
