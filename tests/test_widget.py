@@ -65,6 +65,10 @@ def test_silence_and_very_short_clips_do_not_raise():
     assert "audio/mpeg" in Widget(Sine(440.0).take(0.1))._repr_mimebundle_()[0]
 
 
+def test_an_empty_clip_draws_finite_coordinates():
+    assert "nan" not in Widget(Clip(np.zeros(0)))._repr_mimebundle_()[0]["text/html"]
+
+
 def test_listen_normalizes_too():
     assert listen((Sine(440.0) * 0.05).take(1.0)).gain()[0] > 1
     assert listen((Sine(440.0) * 0.05).take(1.0), normalize=False).gain()[0] == 1.0

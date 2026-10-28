@@ -115,7 +115,7 @@ class Widget(View):
         ticks = np.arange(0, c.seconds + 1e-9, step)
         decimals = 0 if step >= 1 else 1 if step >= 0.1 else 2
         for t in ticks:
-            px = 4 + (ENV_W - 8) * t / c.seconds
+            px = 4 + (ENV_W - 8) * t / max(c.seconds, 1e-9)
             anchor = "start" if t == 0 else "end" if px > ENV_W - 12 else "middle"
             parts.append(f'<text x="{_num(px)}" y="{LABEL}" text-anchor="{anchor}">{t:.{decimals}f}</text>')
         if c.defaulted:
