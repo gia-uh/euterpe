@@ -70,6 +70,27 @@ class Accent(Articulation):
 
 
 @dataclass
+class PalmMute(Articulation):
+    """The picking hand's palm resting on the strings by the bridge: a plucked string falls
+    60 dB within decay seconds, whatever its pitch, and the pluck is brightness times as
+    bright. An instrument without strings ignores it."""
+
+    decay: float = 0.6
+    brightness: float = 0.4
+
+
+@dataclass
+class Feedback(Articulation):
+    """A note an amplifier holds: the string, driven by its own sound from the speaker, does not
+    die, and after onset seconds the partial at harmonic times its frequency swells over rise
+    seconds until it is the loudest. Read by Electric instruments; written by their feedback()."""
+
+    harmonic: int = 2
+    onset: float = 0.8
+    rise: float = 1.5
+
+
+@dataclass
 class Legato(Articulation):
     """Joined to the note before it: a monophonic instrument slurs into it in one breath or
     bow stroke instead of starting again."""

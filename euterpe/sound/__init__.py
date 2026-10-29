@@ -10,13 +10,17 @@ from euterpe.sound.filters import (
     Comb,
     Formant,
     HighPass,
+    HighShelf,
     LowPass,
+    LowShelf,
+    Peak,
     Notch,
     OnePoleHighPass,
     OnePoleLowPass,
 )
 from euterpe.sound.noise import BrownNoise, LFSRNoise, PinkNoise, Wavetable, WhiteNoise
 from euterpe.sound.osc import Saw, Sine, Square, Triangle
+from euterpe.sound.amp import Amp, Cabinet
 from euterpe.sound.shape import BitCrush, Compressor, Gate, HardClip, Limiter, Saturator, SoftClip, Tanh
 from euterpe.sound.space import (
     Chorus,
@@ -31,6 +35,8 @@ from euterpe.sound.space import (
 from euterpe.sound.synth import FM, Additive, Modal, Pluck
 
 __all__ = [
+    "Amp",
+    "Cabinet",
     "Additive",
     "ADSR",
     "Allpass",
@@ -57,7 +63,10 @@ __all__ = [
     "HighPass",
     "LFSRNoise",
     "Limiter",
+    "HighShelf",
     "LowPass",
+    "LowShelf",
+    "Peak",
     "Mix",
     "Modal",
     "Notch",

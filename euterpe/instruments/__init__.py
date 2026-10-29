@@ -7,22 +7,26 @@ from euterpe.instruments.core import (
     Instrument,
     Legato,
     Note,
+    PalmMute,
     Staccato,
     play,
 )
-from euterpe.instruments.fretted import BassGuitar, Fretted, Guitar, Shape
+from euterpe.instruments.fretted import BassGuitar, Electric, ElectricBass, ElectricGuitar, Fretted, Guitar, Shape
 from euterpe.instruments.mallets import Bar, Barred, Celesta, Glockenspiel, Marimba, Xylophone
 from euterpe.instruments.percussion import Clap, Crash, Cymbal, HiHat, Kick, Kit, Mallet, Open, Ride, Snare, Stomp, Struck, Timpani, Tom
 from euterpe.instruments.phrase import Phrase
 from euterpe.instruments.plucked import (
     BassBody,
+    Bridge,
     Exciter,
     Finger,
     GuitarBody,
     Gut,
     Harp,
     HarpBody,
+    Neck,
     Nylon,
+    Pickup,
     PizzicatoStrings,
     Plectrum,
     Plucked,
@@ -35,6 +39,13 @@ from euterpe.instruments.plucked import (
 )
 
 __all__ = [
+    "PalmMute",
+    "Electric",
+    "ElectricBass",
+    "ElectricGuitar",
+    "Bridge",
+    "Neck",
+    "Pickup",
     "Timpani",
     "Mallet",
     "Xylophone",

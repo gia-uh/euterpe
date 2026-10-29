@@ -10,10 +10,12 @@ import math
 from collections.abc import Hashable
 from dataclasses import dataclass
 
-from euterpe.instruments.core import Instrument, Note, Staccato
+import numpy as np
+
+from euterpe.instruments.core import Feedback, Instrument, Note, PalmMute, Staccato
 from euterpe.pitch import A7, C1, C2, C6, E6, G2, G7, Pitch
-from euterpe.sound import ADSR, Body, Pluck
-from euterpe.sound.core import Unit
+from euterpe.sound import ADSR, Body, LowPass, Pluck
+from euterpe.sound.core import RATE, Unit
 
 
 class PluckedString(Instrument):
@@ -114,6 +116,69 @@ class Gut(String):
 
 
 @dataclass(frozen=True)
+class Pickup:
+    """An electric guitar's magnetic pickup: a coil under the strings at position (the distance
+    from the bridge, as a fraction of the open string) that hears each string's motion there.
+
+    Like a pluck at that point, it misses every harmonic with a still point under it: a comb with
+    notches at the multiples of 1 / fraction, where fraction is position over the part of the
+    string that sounds (a fretted note's string is shorter, so the fraction grows). The coil
+    then rolls the highs off with a resonant lowpass at resonance Hz, q its peak.
+    Calling it on a string gives that unit."""
+
+    position: float = 0.15
+    resonance: float = 3500.0
+    q: float = 1.5
+
+    def __call__(self, src: Unit, freq: float, fraction: float) -> Unit:
+        return LowPass(_Pickup(src, round(fraction * RATE / freq)), self.resonance, self.q)
+
+
+@dataclass(frozen=True)
+class Neck(Pickup):
+    """The neck pickup, a quarter of the way along the string: it misses the 4th harmonic and
+    rolls off early. Round and warm."""
+
+    position: float = 0.25
+    resonance: float = 2500.0
+    q: float = 1.2
+
+
+@dataclass(frozen=True)
+class Bridge(Pickup):
+    """The bridge pickup, near the bridge: its first notch is far up, and its coil rolls off
+    late with a sharper peak. Thin, bright and biting, the sound for distortion."""
+
+    position: float = 0.06
+    resonance: float = 4500.0
+    q: float = 1.8
+
+
+class _Pickup(Unit):
+    """A feedforward comb, x[n] - x[n - delay]: the string as heard at one point along it."""
+
+    def __init__(self, src: Unit, delay: int):
+        self.src, self.delay = src, max(1, int(delay))
+        self.channels = src.channels
+        self.reset()
+
+    @property
+    def duration(self) -> float | None:
+        d = self.src.duration
+        return None if d is None else d + self.delay / RATE
+
+    def reset(self) -> None:
+        super().reset()
+        self._line = np.zeros((self.delay,) + ((2,) if self.channels == 2 else ()), np.float32)
+
+    def block(self, n: int) -> np.ndarray:
+        x = self.src.block(n)
+        both = np.concatenate([self._line, x])
+        self._line = both[-self.delay:]
+        return (x - both[:n]).astype(np.float32)
+
+
+@dataclass(frozen=True)
 class Soundboard:
     """An instrument's body as a few resonant modes (frequency in Hz, decay in s, gain), plus how
     much of the string reaches the ear directly. Calling it on a string gives a Body unit."""
@@ -208,12 +273,18 @@ class Plucked(Instrument):
         return (float(a), float(b), float(c))
 
     def pluck(self, note: Note, freq: float, vary: tuple[float, float, float] = (1.0, 1.0, 1.0),
-              traits: tuple[float, float, float] = (0.0, 0.0, 0.0)) -> Unit:
-        """The bare string for note at freq, with the string's flaws, before the finger and the body."""
+              traits: tuple[float, float, float] = (0.0, 0.0, 0.0), damping: float | None = None) -> Unit:
+        """The bare string for note at freq, with the string's flaws, before the finger and the body.
+        damping, when given, replaces the string's loss per trip."""
         cents, _, decay = traits
-        damping = min(0.9999, 1 - (1 - self.string.damping) * (1 + decay))
+        if damping is None:
+            damping = min(0.9999, 1 - (1 - self.string.damping) * (1 + decay))
+        brightness = self.exciter.brightness * (0.5 + 0.5 * note.velocity) * vary[1]
+        if isinstance(note.articulation, PalmMute):
+            damping = min(damping, 10 ** (-3 / (note.articulation.decay * freq)))  # 60 dB in decay s
+            brightness *= note.articulation.brightness
         return Pluck(freq * 2 ** (cents / 1200), damping=damping,
-                     brightness=min(1.0, self.exciter.brightness * (0.5 + 0.5 * note.velocity) * vary[1]),
+                     brightness=min(1.0, brightness),
                      position=min(0.5, self.exciter.position * vary[0]), seed=int(note.rng.integers(2**31)))
 
     def voice(self, note: Note) -> Unit:
@@ -222,8 +293,9 @@ class Plucked(Instrument):
         return self.finish(note, self.pluck(note, note.freq, vary, traits), vary[2] * (1 + traits[1]))
 
     def finish(self, note: Note, string: Unit, force: float = 1.0) -> Unit:
-        """The finger's mute when asked, then the body, then the note's gain."""
-        if not self.let_ring or isinstance(note.articulation, Staccato):
+        """The finger's mute when asked (and always for a Feedback note, held only for its
+        length), then the body, then the note's gain."""
+        if not self.let_ring or isinstance(note.articulation, (Staccato, Feedback)):
             string = string * ADSR(attack=0.0, decay=0.0, sustain=1.0, release=self.mute, gate=note.duration)
         if self.body is not None:
             string = self.body(string)

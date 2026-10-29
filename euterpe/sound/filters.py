@@ -97,10 +97,23 @@ class _Filter(Unit):
         return _out(y, self.channels)
 
 
-def _rbj(kind: str, cutoff: float, q: float) -> tuple[np.ndarray, np.ndarray]:
+def _rbj(kind: str, cutoff: float, q: float, gain_db: float = 0.0) -> tuple[np.ndarray, np.ndarray]:
     """Biquad coefficients from R. Bristow-Johnson's Audio EQ Cookbook."""
     w = 2 * np.pi * cutoff / RATE
     cos, alpha = np.cos(w), np.sin(w) / (2 * q)
+    if kind in ("peak", "lowshelf", "highshelf"):
+        A = 10 ** (gain_db / 40)
+        if kind == "peak":
+            b = [1 + alpha * A, -2 * cos, 1 - alpha * A]
+            a = np.array([1 + alpha / A, -2 * cos, 1 - alpha / A])
+        else:
+            s = 1 if kind == "lowshelf" else -1  # the high shelf flips the sign of the (A - 1) terms
+            r = 2 * np.sqrt(A) * alpha
+            b = [A * ((A + 1) - s * (A - 1) * cos + r), 2 * s * A * ((A - 1) - s * (A + 1) * cos),
+                 A * ((A + 1) - s * (A - 1) * cos - r)]
+            a = np.array([(A + 1) + s * (A - 1) * cos + r, -2 * s * ((A - 1) + s * (A + 1) * cos),
+                          (A + 1) + s * (A - 1) * cos - r])
+        return np.array(b) / a[0], a / a[0]
     if kind == "lowpass":
         b = [(1 - cos) / 2, 1 - cos, (1 - cos) / 2]
     elif kind == "highpass":
@@ -168,6 +181,41 @@ class Notch(_Biquad):
     """Removes a band around cutoff Hz, about cutoff / q Hz wide, and keeps the rest."""
 
     _kind = "notch"
+
+
+class _Gained(_Biquad):
+    """A biquad that lifts or cuts a region by gain dB and leaves the rest at 0 dB."""
+
+    _names = ("cutoff", "q", "gain")
+
+    def __init__(self, src: Unit, cutoff: float | Unit = 1000.0, q: float | Unit = 0.707,
+                 gain: float | Unit = 0.0):
+        """cutoff in Hz; q the width of the region or the steepness of the step; gain in dB."""
+        _Filter.__init__(self, src, cutoff=cutoff, q=q, gain=gain)
+
+    def _coeffs(self, cutoff: float, q: float, gain: float) -> tuple[np.ndarray, np.ndarray]:
+        return _rbj(self._kind, np.clip(cutoff, *_CUTOFF), max(q, _MIN_Q), gain)
+
+
+class Peak(_Gained):
+    """Lifts (gain above 0) or cuts (below 0) a bell around cutoff Hz, about cutoff / q Hz wide,
+    by gain dB at its centre; far from it the level is unchanged. An equaliser's middle band."""
+
+    _kind = "peak"
+
+
+class LowShelf(_Gained):
+    """Lifts or cuts everything below cutoff Hz by gain dB, with a step around cutoff; above it
+    the level is unchanged. A tone control's bass knob."""
+
+    _kind = "lowshelf"
+
+
+class HighShelf(_Gained):
+    """Lifts or cuts everything above cutoff Hz by gain dB, with a step around cutoff; below it
+    the level is unchanged. A tone control's treble knob."""
+
+    _kind = "highshelf"
 
 
 class _OnePole(_Filter):
