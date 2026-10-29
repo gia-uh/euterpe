@@ -176,11 +176,13 @@ class Saturator(Unit):
         x = _frames(self.src.block(n))
         d = np.maximum(_signal(self.drive, n).astype(np.float64), _MIN_DRIVE)[:, None] / 2
         b = np.clip(_signal(self.bias, n).astype(np.float64), -1.0, 1.0)[:, None]
-        rest = np.tanh(d * b)
+        # with drive and bias numbers, the level below is the same for every sample: compute it once
+        dl, bl = (d, b) if isinstance(self.drive, Unit) or isinstance(self.bias, Unit) else (d[:1], b[:1])
+        rest = np.tanh(dl * bl)
         # a full-scale sine through the curve: its offset (its mean over a cycle), which the
         # highpass removes, and its peak on either side of that offset
-        offset = np.tanh(d * (_CYCLE + b)).mean(axis=1, keepdims=True)
-        scale = np.maximum(np.tanh(d * (1 + b)) - offset, offset - np.tanh(d * (b - 1)))
+        offset = np.tanh(dl * (_CYCLE + bl)).mean(axis=1, keepdims=True)
+        scale = np.maximum(np.tanh(dl * (1 + bl)) - offset, offset - np.tanh(dl * (bl - 1)))
         y = (np.tanh(d * (x + b)) - rest) / scale
         p = self._p  # one-pole highpass at 10 Hz: y[n] = p * (y[n-1] + x[n] - x[n-1])
         y, self._zi = lfilter([p, -p], [1.0, -p], y, axis=0, zi=self._zi)
