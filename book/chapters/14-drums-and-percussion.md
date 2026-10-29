@@ -1,36 +1,47 @@
 # Drums and percussion
 
-A string or a column of air has harmonics in neat ratios, so it has a clear pitch. A drum head, a cymbal or a metal bar vibrates in modes at ratios no one chose, and most of the sound is in the first fraction of a second. That makes percussion the easiest family to synthesize with the units of Part I: a sine whose pitch falls, a burst of filtered noise, a few decaying modes. This chapter builds a drum kit from those, then timpani, then four instruments of tuned bars, and plays something known on each one.
+A string or a column of air has harmonics in neat ratios, so it has a clear pitch. A drum head, a cymbal or a metal bar vibrates in modes at ratios no one chose, and most of the sound is in the first fraction of a second. That makes percussion the easiest family to synthesize with the units of Part I: a sine whose pitch falls, a burst of filtered noise, a few decaying modes. This chapter builds a drum kit from those, then timpani, then four instruments of tuned bars, and plays something known on each one. This is where it ends up:
 
-## Words for drums and rhythm
+```python {run echo=false}
+# The teaser: the start of the finale, built by the code of this chapter's last section, which it
+# reads from this file so the two never differ. The block's own player is skipped.
+import re
+from pathlib import Path
 
-A *drum kit* is the set of drums one drummer plays sitting down. The *kick*, or bass drum, is the large drum on the floor, struck by a beater on a pedal. The *snare* drum has *wires* (the snares) stretched under its lower head, which buzz against it. The *toms* are drums without wires, from high to low; the lowest stands on the floor. The *hi-hat* is a pair of cymbals on a stand, which a pedal closes against each other. A *crash* is a cymbal struck for an accent, and a *ride* is one struck in a steady pattern. A *mallet* is a stick with a round head, of felt, yarn, rubber or metal.
+from euterpe.sound.clip import Clip
+from euterpe.sound.core import RATE, render
 
-Music is counted in *beats*, and a *bar* groups a fixed number of them, four unless a piece says otherwise (chapter 9); the beats of a bar are numbered from 1, and beat 1 is the *downbeat*. An *eighth* lasts half a beat and a *sixteenth* a quarter of one; a *triplet* splits a beat in three. A *fill* is a short break from the pattern, often on the toms, that leads into the next section. Between two notes, a *third* is 3 or 4 semitones, a *fourth* 5, and a *fifth* 7 (chapter 7).
+text = Path("chapters/14-drums-and-percussion.md").read_text()
+scope = {}
+code = re.search(r"```python \{[^}\n]*name=finale\b[^}\n]*\}\n(.*?)\n```", text, re.S).group(1)
+exec("\n".join(line for line in code.split("\n") if ".take(" not in line), scope)
+display(Clip(render(scope["song"], 16.0)[6 * RATE:], caption="The celesta's entry in the chapter's finale"))
+```
 
-A *roll* is a stream of strokes so fast they blur into a sustained sound. A *flam* is a stroke with a soft *grace* stroke just before it, which makes it sound thicker. A *ghost note* is a very soft stroke between the loud ones. Tempo is counted in beats per minute (bpm): at 120 bpm a beat lasts 0.5 s. *Swing* plays pairs of eighths long-short, as the first and third notes of a triplet. An *ostinato* is a short pattern repeated all through a piece.
+Tchaikovsky's *Dance of the Sugar Plum Fairy*, on the celesta, the instrument it made famous: a keyboard of struck steel plates, built in this chapter, over chapter 10's plucked strings.
 
 ## Struck
 
-Every instrument of this chapter is a `Struck`, a subclass of the `Instrument` of chapter 9. A struck instrument never sustains: each hit dies on its own and rings past its written duration, unless a new hit on the same drum stops it, as a stick does to a drum head still moving. A drum's tuning is `tune`, in Hz: a note made without a pitch plays at that tuning, and a pitch given to one hit retunes that hit alone. Three techniques make notes:
+Every instrument of this chapter is a `Struck`, a subclass of the `Instrument` of chapter 9. A struck instrument never sustains: each hit dies on its own and rings past its written duration, unless a new hit on the same drum stops it, as a stick does to a drum head still moving. A drum's tuning is `tune`, in Hz: a note made without a pitch plays at that tuning, and a pitch given to one hit retunes that hit alone. Three techniques make notes, the three every drummer learns:
 
 - `hit(at, velocity)`: one stroke at time `at`;
-- `roll(at, length, velocity, end, rate)`: strokes `rate` times a second for `length` seconds, the velocity moving in a straight line from `velocity` to `end`;
-- `flam(at, velocity, grace)`: a stroke at half the velocity `grace` seconds early (0.025 s by default), then the stroke.
+- `roll(at, length, velocity, end, rate)`: a *roll*, strokes so fast they blur into one sustained sound, `rate` times a second for `length` seconds, the velocity moving in a straight line from `velocity` to `end`;
+- `flam(at, velocity, grace)`: a *flam*, a soft *grace* stroke at half the velocity `grace` seconds early (0.025 s by default), then the stroke, which sounds thicker than one.
 
-```python {run output=code}
+The *snare* drum, the one a drummer keeps between the knees, plays a roll (`rate` is 20 strokes a second by default) and a flam:
+
+```python {run}
 from euterpe.instruments import Snare
 
 snare = Snare()
-for note in snare.roll(0.0, 0.5, velocity=0.2, end=0.8, rate=10.0) + snare.flam(1.0):
-    print(f"{note.time:.3f} s  velocity {note.velocity:.2f}")
+snare.play(snare.roll(0.0, 1.0, velocity=0.2, end=0.8, rate=20.0) + snare.flam(1.5)).take(2.2, "A snare roll growing for 1 s, then a flam")
 ```
 
-The roll's five strokes are 0.1 s apart and grow from 0.2 to 0.8; the flam is a grace stroke at 0.975 s and the stroke at 1 s.
+The roll's twenty strokes grow from 0.2 to 0.8; the flam's grace stroke comes 25 ms before its stroke.
 
 ## The kick
 
-When the beater hits the kick's head, it pushes the head in and stretches it, and a stretched membrane vibrates faster. As the head settles, its pitch falls to its resting tuning. `Kick` models exactly that: a sine whose frequency starts at `tune * sweep` and falls to `tune`, with time constant `drop`, under a decay, plus 4 ms of high-passed noise for the beater's click (chapter 5's `HighPass` on chapter 6's `WhiteNoise`).
+The *kick*, or bass drum, is the large drum on the floor, struck by a beater on a pedal. When the beater hits its head, it pushes the head in and stretches it, and a stretched membrane vibrates faster. As the head settles, its pitch falls to its resting tuning. `Kick` models exactly that: a sine whose frequency starts at `tune * sweep` and falls to `tune`, with time constant `drop`, under a decay, plus 4 ms of high-passed noise for the beater's click (chapter 5's `HighPass` on chapter 6's `WhiteNoise`).
 
 ```python {run}
 from euterpe.instruments import Kick
@@ -39,28 +50,25 @@ kick = Kick(tune=50.0, sweep=3.0, drop=0.04)
 display(kick.play(kick.hit(0.0, velocity=1.0)).take(0.6, "One kick, falling from 150 Hz to 50 Hz"))
 ```
 
-The spectrum's brightest line starts high and bends down to 50 Hz in the first tenth of a second. The ear does not hear the fall as a glide: it is too fast, and it hears a punch instead. Measured, the strongest frequency in the first 20 ms and between 0.1 and 0.3 s:
+The spectrum's brightest line starts high and bends down to 50 Hz in the first tenth of a second. The ear does not hear the fall as a glide: it is too fast, and it hears a punch instead. This is chapter 4's kick, with a beater's click added.
 
-```python {run output=code}
+```python {run echo=false}
+# Check the claim above: the strongest frequency starts near 150 Hz and settles at 50 Hz.
 import numpy as np
 from euterpe.instruments import Kick
 from euterpe.sound.core import RATE, render
 
 def strongest(x):
-    spectrum = np.abs(np.fft.rfft(x * np.hanning(len(x))))
-    return np.fft.rfftfreq(len(x), 1 / RATE)[np.argmax(spectrum)]
+    return np.fft.rfftfreq(len(x), 1 / RATE)[np.argmax(np.abs(np.fft.rfft(x * np.hanning(len(x)))))]
 
 kick = Kick(tune=50.0, variation=0.0)
 x = render(kick.play(kick.hit(0.0, velocity=1.0)), 0.4)
-print(f"first 20 ms: {strongest(x[: RATE // 50]):.0f} Hz")
-print(f"0.1 to 0.3 s: {strongest(x[RATE // 10 : 3 * RATE // 10]):.0f} Hz")
+assert strongest(x[: RATE // 50]) > 100 and abs(strongest(x[RATE // 10 : 3 * RATE // 10]) - 50) < 10
 ```
-
-The first window is only 20 ms long. A window of T seconds holds whole cycles only of multiples of 1 / T Hz, so this one tells frequencies apart only every 1 / 0.02 = 50 Hz: 150 Hz is a rough reading, but it is far above the resting 50 Hz.
 
 ## The snare
 
-The snare's head is a circular membrane. Its modes are not harmonics: over the lowest one, the next ones sit at 1.59, 2.14, 2.30 and 2.65 times its frequency, which is why a drum has no clear pitch. `Snare` gives the head its three lowest modes with chapter 7's `Modal`, and the wires a burst of white noise through a band-pass at 5 kHz with its own decay, at level `snappy`. Its `wires` argument is the wires' time to fall 60 dB, in seconds, and `snappy` their level. Two snares play the same bar below, one tight and bright (tuned high, wires loud and short), one loose and dark (tuned low, the wires soft and longer, the head ringing longer):
+The snare has *wires* stretched under its lower head, which buzz against it. Its head is a circular membrane. Its modes are not harmonics: over the lowest one, the next ones sit at 1.59, 2.14, 2.30 and 2.65 times its frequency, which is why a drum has no clear pitch. `Snare` gives the head its three lowest modes with chapter 7's `Modal`, and the wires a burst of white noise through a band-pass at 5 kHz with its own decay, at level `snappy`. Its `wires` argument is the wires' time to fall 60 dB, in seconds, and `snappy` their level. Two snares play the same bar below, one tight and bright (tuned high, wires loud and short), one loose and dark (tuned low, the wires soft and longer, the head ringing longer):
 
 ```python {run}
 from euterpe.instruments import Kit, Snare
@@ -72,11 +80,11 @@ for kit, name in ((tight, "a tight snare"), (loose, "a loose snare")):
     display(kit.play(kit.pattern(grid, step=60 / 100 / 4, repeat=2)).take(5.0, f"A rock bar with {name}"))
 ```
 
-The bar is written as a grid; the next sections explain it. Every instrument here is changed the same way, by the arguments of its class.
+The bar is written as a grid, one character per sixteenth of a bar; the section on the kit explains it. Every instrument here is changed the same way, by the arguments of its class.
 
 ## Toms
 
-A tom is the same membrane without wires. `Tom` gives it five modes and lets the fundamental drop a little in the first moments, as the kick's does, by less. Tuned to a pitch, it sounds near that pitch, but the inharmonic modes keep it vague, so three toms a fourth and then a fifth apart (196, 147 and 98 Hz in the kit) are heard as high, middle and low rather than as notes. The kit's lowest tom, the floor tom, plays the tom pattern of a 1930s swing standard, with a fill on the high tom every fourth bar:
+A *tom* is the same membrane without wires; a kit has several, from high to low, and the lowest stands on the floor. `Tom` gives it five modes and lets the fundamental drop a little in the first moments, as the kick's does, by less. Tuned to a pitch, it sounds near that pitch, but the inharmonic modes keep it vague, so three toms 5 and then 7 semitones apart (196, 147 and 98 Hz in the kit) are heard as high, middle and low rather than as notes. The kit's lowest tom, the floor tom, plays the tom pattern of a 1930s swing standard, with a *fill*, a short break from the pattern, on the high tom every fourth bar. *Swing* splits each beat in three, a *triplet*, and plays a pair of notes as its first and third parts, long-short. Tempo is counted in beats per minute (bpm):
 
 ```python {run}
 from euterpe.instruments import Kit
@@ -93,7 +101,7 @@ display(kit.play(notes).take(15.5, "Toms: a swing standard's floor-tom beat"))
 
 ## Hands and feet
 
-A hand clap is a burst of noise that the hollow of the hands colours, around 1.2 kHz. One clap of several people is not one burst but several, a few milliseconds apart, since no two people clap at the same instant. `Clap(hands, spread)` makes that: `hands` bursts spread over `spread` seconds, through a band-pass. `Stomp` does the same for feet on wooden boards: several kicks with a short sweep, whose beater click is a knock of wood, 12 ms of noise band-passed around 900 Hz, in a hall with a smooth tail (chapter 8's `ConvolutionReverb`). A first version used the kick's own click, noise high-passed above 1.5 kHz, and a feedback-delay hall: it sounded metallic, a third of its spectrum above 2 kHz, and listeners did not hear feet. Together they play the stomp-stomp-clap of a stadium anthem, at 81 bpm:
+A hand clap is a burst of noise that the hollow of the hands colours, around 1.2 kHz. One clap of several people is not one burst but several, a few milliseconds apart, since no two people clap at the same instant. `Clap(hands, spread)` makes that: `hands` bursts spread over `spread` seconds, through a band-pass. `Stomp` does the same for feet on wooden boards: several kicks with a short sweep, whose beater click is a knock of wood, 12 ms of noise band-passed around 900 Hz, in a hall with a smooth tail (chapter 8's `ConvolutionReverb`). `people` sets how many feet stamp. Together they play the stomp-stomp-clap of a stadium anthem, at 81 bpm, repeated all through the song, an *ostinato*:
 
 ```python {run}
 from euterpe.instruments import Clap, Kit, Stomp
@@ -107,20 +115,18 @@ Neither the stomp nor the clap is part of the kit, yet the kit plays them: a not
 
 ## Metal
 
-The hi-hat's two cymbals vibrate in hundreds of modes at no simple ratios. A drum machine of the early 1980s found a cheap stand-in: six square waves at unrelated frequencies, 205, 304, 370, 523, 540 and 800 Hz, high-passed so only their upper harmonics are left, which beat against each other as metal does. `HiHat` uses that cluster, with some noise. Closed, it decays in `closed` seconds, 0.05 by default; with the `Open()` articulation it rings for `open`, 0.45. One pedal holds both cymbals, so the hi-hat is one resource (chapter 9: the part of an instrument that sounds a note, which a new note on it takes over): a closed stroke on a ringing open one stops it, exactly as the foot does.
+The *hi-hat* is a pair of cymbals on a stand, which a pedal closes against each other. Chapter 4 built one from four inharmonic sines and chapter 6 from noise; its two cymbals vibrate in hundreds of modes at no simple ratios. A drum machine of the early 1980s found a cheap stand-in: six square waves at unrelated frequencies, 205, 304, 370, 523, 540 and 800 Hz, high-passed so only their upper harmonics are left, which beat against each other as metal does. `HiHat` uses that cluster, with some noise. Closed, it decays in `closed` seconds, 0.05 by default; with the `Open()` articulation it rings for `open`, 0.45. One pedal holds both cymbals, so the hi-hat is one resource (chapter 9: the part of an instrument that sounds a note, which a new note on it takes over): a closed stroke on a ringing open one stops it, exactly as the foot does.
 
-```python {run output=code}
+```python {run}
 from euterpe.instruments import HiHat, Open
-from euterpe.sound.core import RATE
 
 hat = HiHat()
-phrase = hat.play(hat.hit(0.0, articulation=Open()) + hat.hit(0.2))
-print(f"the open stroke would ring until {phrase.ends[0] / RATE:.2f} s; it stops at {phrase.stops[0] / RATE:.3f} s")
+hat.play(hat.hit(0.0, articulation=Open()) + hat.hit(1.0, articulation=Open()) + hat.hit(1.2)).take(2.0, "Open, then open choked by a closed stroke")
 ```
 
-The open stroke stops 5 ms after the closed one starts, not at once: a voice that is stopped early fades out over 5 ms, as chapter 9's stolen voices do, so that it does not click.
+The first open stroke rings its 0.45 s; the second is stopped by the closed stroke 0.2 s after it, with chapter 9's 5 ms fade.
 
-A crash or a ride is the opposite: struck again, it keeps ringing under the new stroke, and the wash builds. `Cymbal` builds the metal from three pairs of chapter 6's `FM` at inharmonic ratios, adds high-passed noise for the wash and decays slowly; `Crash` and `Ride` are cymbals with other defaults, the ride with less wash and a bell. Its resource is `None`, so nothing stops it. The ride plays the swing pattern, "ding, ding-a ding", with the hi-hat closed by the foot on beats 2 and 4, and ghost notes on the kick on beats 1 and 3, which jazz drummers call *feathering*: felt more than heard:
+A *crash* is a cymbal struck for an accent, and a *ride* one struck in a steady pattern. Unlike the hi-hat, a cymbal struck again keeps ringing under the new stroke, and the wash builds. `Cymbal` builds the metal from three pairs of chapter 6's `FM` at inharmonic ratios, adds high-passed noise for the wash and decays slowly; `Crash` and `Ride` are cymbals with other defaults, the ride with less wash and a bell. Its resource is `None`, so nothing stops it. The ride plays the swing pattern, "ding, ding-a ding", with the hi-hat closed by the foot on beats 2 and 4, and *ghost notes*, very soft strokes, on the kick on beats 1 and 3, which jazz drummers call *feathering*: felt more than heard:
 
 ```python {run}
 from euterpe.instruments import Kit
@@ -140,7 +146,7 @@ display(kit.play(kit.pattern(swing, step=60 / 140 / 3, repeat=6)).take(11.0, "Th
 
 The grid lasts as long as its longest row, and `repeat` plays it that many times. A grid is notation, read like a guitar tab: the drums themselves stay objects. The kit's `level`, 0.35 by default, scales every drum, so that four drums struck at once at full velocity, a drummer's four limbs, stay under full scale.
 
-Four on the floor, the disco beat: the kick on every beat, the snare on beats 2 and 4, the hi-hat opening between the beats, at 120 bpm:
+Four on the floor (chapter 4), the disco beat: the kick on every beat, the snare on beats 2 and 4, the hi-hat opening between the beats, at 120 bpm:
 
 ```python {run}
 from euterpe.instruments import Kit
@@ -164,7 +170,7 @@ for note, louder in zip(notes, np.linspace(0.35, 0.8, len(notes))):
 display(kit.play(notes).take(16.0, "Ravel, Boléro, the snare ostinato"))
 ```
 
-A rock beat, three bars and a fill: the toms in sixteenths, a flam on the floor tom, and a crash with the kick on the next downbeat. The flam is a technique of the drum, so it joins the grid's notes with `+`:
+A rock beat, three bars and a fill (the hi-hat drops out for the toms; a one-step grid is one hit at `at`): the toms in sixteenths, a flam on the floor tom, and a crash with the kick on the next downbeat. The flam is a technique of the drum, so it joins the grid's notes with `+`:
 
 ```python {run}
 from euterpe.instruments import Kit
@@ -201,9 +207,9 @@ On the spectrum, the bright lines of each stroke stand at near-harmonic spacing,
 
 ## Bars
 
-A bar of wood or metal, free at both ends, vibrates in modes at 1, 2.76, 5.40 and 8.93 times the lowest: inharmonic again. Instrument makers carve the underside of each bar to move its modes. A marimba bar is carved until its second mode is two octaves above the first, a ratio of 4; a xylophone bar until it is an octave and a fifth above, a ratio of 3. A glockenspiel's steel bars are not carved, so they keep the free bar's ratios, which is why it sounds like a bell. A tube under each bar, the *resonator*, makes the fundamental louder and longer.
+A bar of wood or metal, free at both ends, vibrates in chapter 3's inharmonic modes, 1, 2.76, 5.40 and 8.93 times the lowest. Instrument makers carve the underside of each bar to move its modes. A marimba bar is carved until its second mode is two octaves above the first, a ratio of 4; a xylophone bar until it is an octave and a fifth above, a ratio of 3. A glockenspiel's steel bars are not carved, so they keep the free bar's ratios, which is why it sounds like a bell. A tube under each bar (makers call it a resonator; it is not chapter 7's filter) makes the fundamental louder and longer.
 
-`Barred` is the family's instrument: a `Bar` (its mode ratios, decays and amplitudes), a `Mallet` and a decay, with a bar per pitch. As each string of chapter 10 has a tolerance, so has each bar: `Bar.tolerance` defaults to `Tolerance(2.0, 0.05, 0.1)`, so each bar is up to 2 cents out of tune, up to 5 % louder or softer and up to 10 % shorter or longer, fixed flaws of that instrument, as in chapter 10. The tuning does not move from stroke to stroke: a bar does not change pitch when struck again. The `Mallet` sets the sound's brightness: its contact with the bar is a short pulse, 4 ms at `hardness=0` and 0.3 ms at 1, and a shorter pulse holds higher frequencies. The same marimba phrase with a soft and a hard mallet:
+`Barred` is the family's instrument: a `Bar` (its mode ratios, decays and amplitudes), a `Mallet` and a decay, with a bar per pitch. As each string of chapter 10 has a tolerance, so has each bar: `Bar.tolerance` defaults to `Tolerance(2.0, 0.05, 0.1)`, fixed flaws of that instrument, as in chapter 10. The tuning does not move from stroke to stroke: a bar does not change pitch when struck again. The `Mallet`, a stick with a round head of felt, yarn, rubber or metal, sets the sound's brightness: its contact with the bar is a short pulse, 4 ms at `hardness=0` and 0.3 ms at 1, and a shorter pulse holds higher frequencies. The same marimba phrase with a soft and a hard mallet:
 
 ```python {run}
 from euterpe.instruments import Mallet, Marimba
@@ -275,28 +281,23 @@ The glockenspiel's `decay` is 2 s at C4, and shorter up the range: up here a not
 
 ## Showcases
 
-The kit plays the stadium stomp, then four on the floor, then a breakbeat: the pattern of a short drum break from a 1969 soul record, the most sampled drum recording there is. Each section starts where the one before ends:
+The kit plays a *breakbeat*: the pattern of a short drum break from a 1969 soul record, the most sampled drum recording there is, twice, and a crash:
 
 ```python {run}
-from euterpe.instruments import Clap, Kit, Stomp
+from euterpe.instruments import Kit
 
-kit = Kit()
-e, s1, s2 = 60 / 81 / 2, 60 / 120 / 4, 60 / 136 / 4
-notes = kit.pattern({Stomp(): "xx..xx..", Clap(hands=12, spread=0.03, decay=0.25): "..x...x."}, step=e, repeat=4)
-t = 32 * e
-notes += kit.pattern({kit.kick: "x...x...x...x...", kit.snare: "....x.......x...", kit.hihat: "x.o.x.o.x.o.x.o."},
-                     step=s1, at=t, repeat=4)
-t += 4 * 16 * s1
+kit, s2 = Kit(), 60 / 136 / 4
 breakbeat = [
     {kit.ride: "x.x.x.x.x.x.x.x.", kit.snare: "....x..x.x..x..x", kit.kick: "x.x.......xx...."},
     {kit.ride: "x.x.x.x.x.x.x.x.", kit.snare: "....x..x.x..x..x", kit.kick: "x.x.......xx...."},
     {kit.ride: "x.x.x.x.x.x.x.x.", kit.snare: "....x..x.x....x.", kit.kick: "x.x.......x....."},
     {kit.ride: "x.x.x.x.x.x.....", kit.snare: ".x..x..x.x....x.", kit.kick: "..xx......x.....", kit.crash: "..........x....."},
 ]
+notes = []
 for i, grid in enumerate(breakbeat * 2):
-    notes += kit.pattern(grid, step=s2, at=t + i * 16 * s2)
-notes += kit.pattern({kit.crash: "X", kit.kick: "X"}, step=1.0, at=t + 8 * 16 * s2)
-display(kit.play(notes).take(36.5, "The kit: stadium, disco, breakbeat"))
+    notes += kit.pattern(grid, step=s2, at=i * 16 * s2)
+notes += kit.pattern({kit.crash: "X", kit.kick: "X"}, step=1.0, at=8 * 16 * s2)
+kit.play(notes).take(16.5, "The kit: a breakbeat")
 ```
 
 The timpani play the answers of Richard Strauss's *Also sprach Zarathustra* (1896): after each rising call of the brass, here left silent, the timpani strike C and G in turn, then a final roll grows on C:
@@ -317,9 +318,11 @@ notes += timpani.roll(at, 4.0, velocity=0.25, end=1.0, rate=18.0, pitch=C3) + ti
 display(timpani.play(notes).take(28.0, "R. Strauss, Also sprach Zarathustra, the timpani's answers"))
 ```
 
+## Putting it all together
+
 The celesta plays the theme of Tchaikovsky's *Dance of the Sugar Plum Fairy* (1892), the piece that made the instrument famous, over a pizzicato bass from chapter 10 alternating E2 and B2, in bars of two beats. Two players are two phrases, and `+` mixes them:
 
-```python {run}
+```python {run name=finale}
 from euterpe.instruments import Celesta, PizzicatoStrings
 from euterpe.pitch import A4, B2, B4, C5, Cs5, D5, Ds5, E2, E5, Fs5, G5, Gs4
 
@@ -327,33 +330,36 @@ celesta, eighth = Celesta(), 60 / 72 / 2
 theme = [(G5, 1), (E5, 1), (G5, 1), (Fs5, 1), (Ds5, 1), (E5, 1), (None, 2),
          (D5, 1), (D5, 1), (D5, 1), (Cs5, 1), (C5, 1), (C5, 1), (C5, 1), (B4, 1),
          (E5, 1), (C5, 1), (E5, 1), (B4, 1), (Gs4, 1), (A4, 1), (None, 2)]
-notes, t = [], 8 * eighth * 2  # the bass alone first: eight eighths, four bars of two beats
+notes, t = [], 8 * eighth * 2  # the bass alone first: sixteen eighths, four bars of two beats
 for pitch, eighths in theme * 2:
     if pitch is not None:
         notes += celesta.hit(t, 0.7, pitch=pitch)
     t += eighths * eighth
 bass = [(i * eighth, E2 if i % 2 == 0 else B2, eighth * 0.8, 0.6) for i in range(int(t / eighth) + 2)]
-display((celesta.play(notes) + PizzicatoStrings().play(bass)).take(28.5, "Tchaikovsky, Dance of the Sugar Plum Fairy"))
+song = celesta.play(notes) + PizzicatoStrings().play(bass)
+song.take(28.5, "Tchaikovsky, Dance of the Sugar Plum Fairy")
 ```
+
+The kit's drums are noise and sines, and the celesta and the strings are models of real objects. The 1980s had a cheaper way to make all of these sounds, from the few square waves and noise channels of a game console's sound chip: chapter 15. And the timpani, the celesta and the strings belong together in one orchestra, which chapter 16 assembles.
 
 ## Summary
 
-- `Struck` is every instrument hit by a stick, a hand or a mallet: it never sustains, its note's pitch is its tuning, and `hit`, `roll` and `flam` make its notes.
-- A kick is a sine that falls in pitch; a snare is three membrane modes and band-passed noise for the wires; a tom is five membrane modes; a clap or a stomp is several bursts a few milliseconds apart.
+- `Struck` is every instrument hit by a stick, a hand or a mallet: it never sustains, a note without a pitch plays at its tuning, and `hit`, `roll` and `flam` make its notes.
+- The kit's drums are noise, sines and a few membrane modes. A kick is a sine that falls in pitch; a snare is three membrane modes and band-passed noise for the wires; a tom is five membrane modes; a clap or a stomp is several bursts a few milliseconds apart.
 - The hi-hat is six square waves and noise, one resource for its pedal, so a closed stroke chokes an open one; a cymbal is three FM pairs and noise, with no resource, so its hits overlap.
 - `Kit` groups the drums and plays grids of `x X g o .`; a note sounds on the drum that made it.
 - `Timpani` are pitched because the air in the kettle pulls their modes near harmonic; `Barred` instruments are bars whose modes the maker carves, struck by a `Mallet` whose hardness sets the brightness.
 
 ## Exercises
 
-1. In the kick's measuring block, change `sweep` (pass `sweep=1.0` to `Kick`). What does the first window now measure, and how does the kick sound different?
+1. In the block of two snares, change the tight snare's `snappy=1.0` to `snappy=0.0`. What is left of it?
 2. In the disco block, change the hi-hat row to `"x.x.x.x.x.x.x.x."`. What is lost, and why does the open stroke matter to the beat?
 3. A marimba bar is carved so its second mode is at 4 times the first. At C4 (261.6 Hz), where is it? Where would it be on an uncarved bar, with the free bar's ratio?
 4. Write a cowbell as a `Struck` subclass: two square waves at 540 and 800 Hz (two of the hi-hat's six) through a band-pass at 2 kHz, under a decay of about 0.3 s. Play it on the beats of the disco grid.
 
 ### Answers
 
-1. With `sweep=1.0` the pitch starts at the resting tune, so the first window measures about 50 Hz too, within its 50 Hz resolution. The kick loses its punch and sounds like a low sine bump: the fall in pitch is what makes the attack.
+1. Only the head's three membrane modes: a short, dull knock with a vague pitch near 240 Hz, closer to a high tom than to a snare. The wires' burst of band-passed noise is what makes a snare a snare.
 2. Every hi-hat stroke is now closed and short, so the long "tss" between the beats is gone. The open stroke rings until the next closed one chokes it, which fills the off-beat and gives disco its lift.
 3. At 4 × 261.6 = 1046.5 Hz, which is C6, two octaves up, so it reinforces the note. An uncarved bar would put it at 2.76 × 261.6 ≈ 722 Hz, between F5 and F♯5, which clashes with the note and sounds like a bell.
 4. One way, with the units of Part I; its `voice` is a few lines, the rest is the kit as before:
