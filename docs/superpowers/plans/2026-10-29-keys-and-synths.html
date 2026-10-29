@@ -207,7 +207,7 @@ details.task[data-state=done]>summary .s{color:var(--ok)} details.task[data-stat
 
 <h2 id="tasks"><span class="n">·</span>Tasks</h2>
 
-<details class="task" id="task-1" data-state="pending"><summary>1 · Ladder<span class="s"></span><span class="f">euterpe/sound/filters.py, euterpe/sound/__init__.py, tests/test_filters.py</span></summary>
+<details class="task" id="task-1" data-state="done"><summary>1 · Ladder<span class="s"></span><span class="f">euterpe/sound/filters.py, euterpe/sound/__init__.py, tests/test_filters.py</span></summary>
 <p><code>Ladder(src, cutoff=1000.0, resonance=0.0)</code>, a <code>_Filter</code> with <code>_names = ("cutoff", "resonance")</code> and a fourth-order section. The analog model is H = G⁴ / (1 + k G⁴), G = ωc / (s + ωc), k = 4 · resonance; each G goes through the bilinear transform with prewarping, g = tan(π fc / RATE): G(z) = g (1 + z⁻¹) / ((1 + g) + (g − 1) z⁻¹). Resonance is clipped to [0, 0.995]; the passband falls by 1 / (1 + k), as on the analog filter.</p>
 <ol>
 <li>Tests: slope −24 ± 2 dB per octave between 4 and 8 times the cutoff; at resonance 0.9 the peak near the cutoff is at least 10 dB above the level at cutoff / 10; stable (finite, bounded) at 40 Hz and at a cutoff swept by a <code>Sine</code> at resonance 0.99; block-size independence.</li>
@@ -215,7 +215,7 @@ details.task[data-state=done]>summary .s{color:var(--ok)} details.task[data-stat
 </ol>
 <div class="verify">Verify: <code>uv run pytest -q tests/test_filters.py</code> passes.</div></details>
 
-<details class="task" id="task-2" data-state="pending"><summary>2 · Unison and Leslie<span class="s"></span><span class="f">euterpe/sound/osc.py, euterpe/sound/space.py, euterpe/sound/__init__.py, tests/test_osc.py, tests/test_space.py</span></summary>
+<details class="task" id="task-2" data-state="done"><summary>2 · Unison and Leslie<span class="s"></span><span class="f">euterpe/sound/osc.py, euterpe/sound/space.py, euterpe/sound/__init__.py, tests/test_osc.py, tests/test_space.py</span></summary>
 <p><code>Unison(osc=Saw, freq=440.0, voices=7, detune=0.2, width=1.0, seed=0)</code>: voice i at freq · 2^(d_i / 12), d_i spread evenly over ± detune, panned evenly over ± width, start phases drawn from the seed; sum scaled by 1/√voices; stereo. <code>Leslie(src, speed=0.0, slow=(0.8, 0.7), fast=(6.7, 6.0), rise=(1.0, 4.0), crossover=800.0, mix=1.0)</code>: horn and drum rates in Hz for speed 0 and 1, their spin-up times; each rotor's rate follows speed through a one-pole lag of its rise time, its angle integrates the rate; each band is delayed by 1 ms ± a depth that follows the angle (Doppler), scaled by 1 − depth · (1 − cos angle) / 2 (tremolo), and panned by sin angle; output stereo.</p>
 <ol>
 <li>Tests: Unison with one voice equals the oscillator; seven voices have RMS within 2 dB of one; Leslie at speed 1 has a level swing near 6.7 Hz (spectrum of the envelope), at speed 0 near 0.8 Hz; left ≠ right; a step to 1 reaches 90 % of the horn rate within 1.5 s; block-size independence.</li>
@@ -223,14 +223,14 @@ details.task[data-state=done]>summary .s{color:var(--ok)} details.task[data-stat
 </ol>
 <div class="verify">Verify: <code>uv run pytest -q tests/test_osc.py tests/test_space.py</code> passes.</div></details>
 
-<details class="task" id="task-3" data-state="pending"><summary>3 · Glide<span class="s"></span><span class="f">euterpe/instruments/phrase.py, tests/test_phrase.py</span></summary>
+<details class="task" id="task-3" data-state="done"><summary>3 · Glide<span class="s"></span><span class="f">euterpe/instruments/phrase.py, tests/test_phrase.py</span></summary>
 <ol>
 <li><code>_slurred(notes, glide=GLIDE)</code>; <code>Phrase</code> passes <code>getattr(instrument, "glide", GLIDE)</code>.</li>
 <li>Test: an instrument with glide 0.1 reaches the second pitch 0.1 s after the slurred note starts.</li>
 </ol>
 <div class="verify">Verify: <code>uv run pytest -q tests/test_phrase.py</code> passes.</div></details>
 
-<details class="task" id="task-4" data-state="pending"><summary>4 · Organ and electric piano<span class="s"></span><span class="f">euterpe/instruments/keys.py (new), euterpe/instruments/__init__.py, tests/test_keys.py (new)</span></summary>
+<details class="task" id="task-4" data-state="done"><summary>4 · Organ and electric piano<span class="s"></span><span class="f">euterpe/instruments/keys.py (new), euterpe/instruments/__init__.py, tests/test_keys.py (new)</span></summary>
 <p><code>Organ(drawbars="888000000", percussion=None, click=0.3, level=0.3, seed=0)</code>: nine footage ratios (0.5, 1.5, 1, 2, 3, 4, 5, 6, 8), drawbar d at 10^(−3 (8 − d) / 20), 0 silent; a click of high-passed noise over 5 ms; <code>percussion</code> 2 or 3 adds that harmonic decaying in 0.3 s on a note that starts when no other note sounds; polyphony 16; holds while held, releases in 10 ms. <code>ElectricPiano(level=0.4, seed=0)</code>: FM(f, 1, index 1.5 · v decaying in 1 s) plus FM(f, 14, index 3 · v decaying in 50 ms) at a lower level, an amp envelope decaying over about 3 s and releasing in 0.2 s; polyphony 16.</p>
 <ol>
 <li>Tests from spec section 08 for both.</li>
@@ -238,7 +238,7 @@ details.task[data-state=done]>summary .s{color:var(--ok)} details.task[data-stat
 </ol>
 <div class="verify">Verify: <code>uv run pytest -q tests/test_keys.py</code> passes.</div></details>
 
-<details class="task" id="task-5" data-state="pending"><summary>5 · Synth patches<span class="s"></span><span class="f">euterpe/instruments/synths.py (new), euterpe/instruments/__init__.py, tests/test_synths.py (new)</span></summary>
+<details class="task" id="task-5" data-state="done"><summary>5 · Synth patches<span class="s"></span><span class="f">euterpe/instruments/synths.py (new), euterpe/instruments/__init__.py, tests/test_synths.py (new)</span></summary>
 <p>A base <code>Patch(Instrument)</code> builds oscillators → <code>Ladder</code> (cutoff from a filter envelope) → amp <code>ADSR</code>. Presets <code>Lead</code>, <code>Pad</code>, <code>Supersaw</code>, <code>SynthPluck</code>, <code>AcidBass</code> with the parts of spec section 04. <code>AcidBass</code>: polyphony 1, glide 0.06, reads <code>Accent</code> from <code>note.articulation</code> to raise its filter envelope and level.</p>
 <ol>
 <li>Tests: each preset renders a note finite and below full scale; the pluck's energy above 2 kHz falls by 20 dB within 0.3 s; AcidBass glides on <code>Legato</code> and an accent is louder and brighter.</li>
@@ -246,7 +246,7 @@ details.task[data-state=done]>summary .s{color:var(--ok)} details.task[data-stat
 </ol>
 <div class="verify">Verify: <code>uv run pytest -q tests/test_synths.py</code> passes.</div></details>
 
-<details class="task" id="task-6" data-state="pending"><summary>6 · Recognition round and code PR<span class="s"></span><span class="f">.playground clips, PR</span></summary>
+<details class="task" id="task-6" data-state="doing"><summary>6 · Recognition round and code PR<span class="s"></span><span class="f">.playground clips, PR</span></summary>
 <ol>
 <li>Render eight clips of the Toccata fragments: organ slow, organ through the spin-up, electric piano, lead, pad, supersaw, pluck, acid bass over the kick. Check each clip's start and length.</li>
 <li>Send them as one listening card; rework any rejected sound and send it again.</li>
