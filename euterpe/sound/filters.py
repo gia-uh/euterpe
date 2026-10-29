@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Literal
 
 import numpy as np
-from scipy.signal import lfilter, lfiltic
+from scipy.signal import lfilter
 
 from euterpe.sound.core import LN60, RATE, Unit, _after, _arg, _fixed, _signal
 
@@ -218,6 +218,17 @@ class HighShelf(_Gained):
     _kind = "highshelf"
 
 
+def _state(b: np.ndarray, a: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """lfilter's state for coefficients b, a after past inputs x and outputs y (oldest first,
+    one row per sample): what the filter would hold had it always had these coefficients."""
+    order = len(a) - 1
+    zi = np.zeros((order, x.shape[1]))
+    for i in range(order):
+        for j in range(i + 1, order + 1):
+            zi[i] += b[j] * x[i - j] - a[j] * y[i - j]
+    return zi
+
+
 class Ladder(_Filter):
     """Keeps frequencies below cutoff Hz and cuts those above by 24 dB per octave: four
     one-pole low-passes in a row, the output fed back to the input upside down, 4 * resonance
@@ -248,13 +259,13 @@ class Ladder(_Filter):
         self._section = _Section(self.channels, 4)
 
     def _coeffs(self, cutoff: float, resonance: float) -> tuple[np.ndarray, np.ndarray]:
-        g = np.tan(np.pi * np.clip(cutoff, *_CUTOFF) / RATE)
-        k = 4 * float(np.clip(resonance, 0.0, 0.995))
-        num = np.array([g, g]) / (1 + g)  # one stage: g (1 + z^-1) / ((1 + g) + (g - 1) z^-1)
-        den = np.array([1.0, (g - 1) / (1 + g)])
-        b4, a4 = np.poly1d(num) ** 4, np.poly1d(den) ** 4
-        a = a4.coeffs + k * b4.coeffs
-        return b4.coeffs / a[0], a / a[0]
+        g = np.tan(np.pi * min(max(float(cutoff), _CUTOFF[0]), _CUTOFF[1]) / RATE)
+        k = 4 * min(max(float(resonance), 0.0), 0.995)
+        # one stage is g / (1 + g) * (1 + z^-1) / (1 + p z^-1); four of them, by the binomial
+        p = (g - 1) / (1 + g)
+        b = (g / (1 + g)) ** 4 * np.array([1.0, 4.0, 6.0, 4.0, 1.0])
+        a = np.array([1.0, 4 * p, 6 * p**2, 4 * p**3, p**4]) + k * b
+        return b / a[0], a / a[0]
 
     def reset(self) -> None:
         super().reset()
@@ -274,8 +285,7 @@ class Ladder(_Filter):
                 continue
             if (self._done + lo) % _GRID == 0:
                 self._ba = b, a = self._coeffs(*(v[lo] for v in values))
-                self._section.zi = np.stack(
-                    [lfiltic(b, a, self._y[::-1, c], self._x[::-1, c]) for c in range(self.channels)], axis=1)
+                self._section.zi = _state(b, a, self._x, self._y)
             y[lo:hi] = self._section.run(*self._ba, x[lo:hi])
             self._x = np.concatenate([self._x, x[lo:hi]])[-4:]
             self._y = np.concatenate([self._y, y[lo:hi]])[-4:]
