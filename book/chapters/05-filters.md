@@ -35,7 +35,7 @@ display(noise.take(2.0, "White noise"))
 display(low.take(2.0, "The same noise through a low-pass at 500 Hz"))
 ```
 
-The first is a hiss, like air escaping (a cache trial). The second is a dull rumble, like wind heard through a closed window. Both are random; the filter only changed how much of each frequency there is. The second is multiplied by 1.5 instead of 0.3 because the filter removed most of the energy: nearly everything above 500 Hz, which in white noise is 23 500 / 24 000 = 98 % of it.
+The first is a hiss, like air escaping. The second is a dull rumble, like wind heard through a closed window. Both are random; the filter only changed how much of each frequency there is. The second is multiplied by 1.5 instead of 0.3 because the filter removed most of the energy: nearly everything above 500 Hz, which in white noise is 23 500 / 24 000 = 98 % of it.
 
 The plot shows the spectrum of both sounds, in dB, on a logarithmic frequency axis, so each octave takes the same width.
 
