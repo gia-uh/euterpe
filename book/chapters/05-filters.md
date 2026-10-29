@@ -1,6 +1,24 @@
 # Filters and subtractive synthesis
 
-Chapter 3 showed that the timbre of a steady tone is its spectrum: which harmonics it has and how loud each one is. Chapter 4 shaped the level of a note over time, but left its spectrum fixed, and ended on a pluck that did not sound like a string, because in a real string the high harmonics die sooner than the low ones. A *filter* is a unit that changes the level of each frequency in its source: some frequencies pass, others are made quieter. This chapter measures what filters do to a spectrum, uses them to carve tones out of noise and saws, moves them over time with envelopes and slow sines, and ends with a first complete synthesizer voice.
+Chapter 3 showed that the timbre of a steady tone is its spectrum: which harmonics it has and how loud each one is. Chapter 4 shaped the level of a note over time, but left its spectrum fixed, and ended on a pluck that did not sound like a string, because in a real string the high harmonics die sooner than the low ones. A *filter* is a unit that changes the level of each frequency in its source: some frequencies pass, others are made quieter. This chapter measures what filters do to a spectrum, uses them to carve tones out of noise and saws, moves them over time with envelopes and slow sines, and ends on a piece of acid house. This is where it ends up:
+
+```python {run echo=false}
+# The teaser: the start of the finale, built by the code of this chapter's named blocks, which it
+# reads from this file so the two never differ.
+import re
+from pathlib import Path
+
+from euterpe.view import listen
+
+text = Path("chapters/05-filters.md").read_text()
+scope = {}
+for name in ("acid", "finale"):
+    code = re.search(r"```python \{[^}\n]*name=" + name + r"\b[^}\n]*\}\n(.*?)\n```", text, re.S).group(1)
+    exec("\n".join(line for line in code.split("\n") if ".take(" not in line), scope)  # definitions only
+listen(scope["song"], 8.0, "The first 8 s of the chapter's finale")
+```
+
+A squelching bass line under a choir of robots singing "ah" and "oh", with a hiss of hi-hats: every part is a saw or noise from earlier chapters, carved by filters.
 
 ## What a filter does to a spectrum
 
@@ -38,38 +56,20 @@ The noise is flat. The filtered noise keeps the same level up to about 500 Hz, t
 
 The filters in this chapter are *linear*: a sine that goes in comes out as a sine at the same frequency, only louder or quieter, and shifted in time, and a sum of sines that goes in comes out as the sum of what each sine alone would give. A filter acts on each sine separately. Chapter 3 showed that every sound is a sum of sines, so knowing what a filter does to each single frequency tells what it does to any sound, and a filter can be measured one frequency at a time.
 
-`gain_db(filter, freq)` measures one frequency. `filter` is a function that takes a source and returns it filtered; `lambda s: LowPass(s, cutoff=1000.0)` is such a function, written in one line. `gain_db` sends a sine at `freq` through it and returns the *gain*, the peak level out over the peak level in, in dB. It skips the first 0.1 s, while the filter settles. This is all it does:
 
-```python
-def gain_db(filter, freq):
-    dry = render(Sine(freq), 0.5)[4800:]
-    wet = render(filter(Sine(freq)), 0.5)[4800:]
-    return round(float(20 * np.log10(np.abs(wet).max() / np.abs(dry).max())), 1) + 0.0
-```
+`gain_db(filter, freq)`, from `euterpe.book`, measures one frequency. `filter` is a function that takes a source and returns it filtered; `lambda s: LowPass(s, cutoff=1000.0)` is such a function, written in one line. `gain_db` sends a sine at `freq` through it, skips the first 0.1 s while the filter settles, and returns the *gain*, the peak level out over the peak level in, in dB.
 
-The `+ 0.0` turns a rounded −0.0 into 0.0. The same function is in `euterpe.book`, so the blocks of this chapter import it. Here is the low-pass at 1 000 Hz, measured at six frequencies:
+To write down how, call the n-th input sample x[n], the n-th output sample y[n], and n the sample index, so y[n − 1] is the output one sample earlier. `OnePoleLowPass(src, cutoff)` is the simplest low-pass: y[n] = y[n − 1] + k × (x[n] − y[n − 1]). Each output moves a fraction k of the way from the previous output to the new input, with k = 1 − e^(−2π × cutoff / 48 000), so a higher cutoff follows the input more closely. The *order* of a filter is the number of past outputs it feeds back into each new one. `OnePoleLowPass` feeds back one, y[n − 1], so its order is 1. A *biquad* (short for *biquadratic*) feeds back two, y[n − 1] and y[n − 2]; it also uses the last two inputs, but its order is 2. Each order adds 6 dB per octave of slope: above the cutoff, each feedback stage halves the amplitude again for every doubling of the frequency, and halving the amplitude is −6 dB. So `OnePoleLowPass` should fall 6 dB per octave and `LowPass` 12. Here are both, at a cutoff of 1 000 Hz, measured at six frequencies:
 
 ```python {run output=code}
 from euterpe.book import gain_db
-from euterpe.sound import LowPass
-
-lowpass = lambda s: LowPass(s, cutoff=1000.0)
-for f in (250, 500, 1000, 2000, 4000, 8000):
-    print(f, "Hz:", gain_db(lowpass, f), "dB")
-```
-
-The list of gains over every frequency is the filter's *frequency response*. Up to 500 Hz the sine passes almost unchanged. At the cutoff, 1 000 Hz, it is 3 dB down: the cutoff of a filter is, by convention, the frequency where half the power is gone. From there on, each octave up costs about 12 dB: −12.4 at 2 000 Hz, −24.6 at 4 000 Hz, −37.1 at 8 000 Hz. That slope is fixed by how the filter is built.
-
-To write down how, call the n-th input sample x[n], the n-th output sample y[n], and n the sample index, so y[n − 1] is the output one sample earlier. `OnePoleLowPass(src, cutoff)` is the simplest low-pass: y[n] = y[n − 1] + k × (x[n] − y[n − 1]). Each output moves a fraction k of the way from the previous output to the new input, with k = 1 − e^(−2π × cutoff / 48 000), so a higher cutoff follows the input more closely. The *order* of a filter is the number of past outputs it feeds back into each new one. `OnePoleLowPass` feeds back one, y[n − 1], so its order is 1. A *biquad* (short for *biquadratic*) feeds back two, y[n − 1] and y[n − 2]; it also uses the last two inputs, but its order is 2. Each order adds 6 dB per octave of slope: above the cutoff, each feedback stage halves the amplitude again for every doubling of the frequency, and halving the amplitude is −6 dB. So `OnePoleLowPass` falls 6 dB per octave and `LowPass` 12:
-
-```python {run continue output=code}
-from euterpe.sound import OnePoleLowPass
+from euterpe.sound import LowPass, OnePoleLowPass
 
 for f in (250, 500, 1000, 2000, 4000, 8000):
-    print(f, "Hz:", gain_db(lambda s: OnePoleLowPass(s, 1000.0), f), "dB")
+    print(f"{f:5} Hz:  LowPass {gain_db(lambda s: LowPass(s, 1000.0), f):6} dB   OnePoleLowPass {gain_db(lambda s: OnePoleLowPass(s, 1000.0), f):6} dB")
 ```
 
-It is also 3 dB down at its cutoff, but gentler: −7.0 dB one octave above, −12.2 two octaves above, about half the biquad's slope. A gentle slope sounds like a small change of colour; a steep one removes a part of the spectrum.
+The list of gains over every frequency is the filter's *frequency response*. Up to 500 Hz the sine passes almost unchanged. At the cutoff, 1 000 Hz, both are 3 dB down: the cutoff of a filter is, by convention, the frequency where half the power is gone. From there on, each octave up costs the biquad about 12 dB (−12.4, −24.6, −37.1) and the one-pole about 6 (−7.0, −12.2). A gentle slope sounds like a small change of colour; a steep one removes a part of the spectrum.
 
 ## Subtractive synthesis
 
@@ -86,18 +86,8 @@ for cutoff in (2000.0, 600.0, 200.0):
     display(tone.take(1.5, f"The saw through a low-pass at {cutoff:.0f} Hz"))
 ```
 
-The pitch never changes: the first harmonic, 110 Hz, is below every cutoff. The tone goes from buzzy, to warm, to a soft hum close to a sine. At 200 Hz the first harmonic passes almost unchanged and every harmonic above it is cut, more the higher it is. A `LowPass` with the default q has a simple formula for its gain at f Hz: 1 / √(1 + (f / cutoff)⁴). The fourth power is the second order: one octave above the cutoff, (f / cutoff)⁴ = 16, a gain of 1/4, −12 dB. Multiplied by the saw's 1/n, it gives each harmonic's level after the filter:
 
-```python {run output=code}
-import numpy as np
-
-for n in (1, 2, 3, 4):
-    f = 110 * n
-    level = (1 / n) / np.sqrt(1 + (f / 200) ** 4)
-    print("harmonic", n, ":", round(float(20 * np.log10(level)), 1), "dB")
-```
-
-Relative to the first, the second harmonic ends up about 10 dB down and the third about 18 dB down, where in the unfiltered saw they are 6 dB (1/2) and 9.5 dB (1/3) down. The plot shows each harmonic's level, measured.
+The pitch never changes: the first harmonic, 110 Hz, is below every cutoff. The tone goes from buzzy, to warm, to a soft hum close to a sine. A `LowPass` with the default q has a simple formula for its gain at f Hz: 1 / √(1 + (f / cutoff)⁴). The fourth power is the second order: one octave above the cutoff, (f / cutoff)⁴ = 16, a gain of 1/4, −12 dB. Multiplied by the saw's 1/n, at 200 Hz it leaves the second harmonic about 10 dB below the first and the third about 18 dB below, where in the unfiltered saw they are 6 dB (1/2) and 9.5 dB (1/3) down. The plot shows each harmonic's level, measured.
 
 ```python {run echo=false}
 from euterpe.sound import LowPass, Saw
@@ -117,16 +107,7 @@ Each stem is one harmonic; the first 50, up to 5 500 Hz, are enough to show wher
 
 The second parameter of `LowPass`, `q`, shapes the response near the cutoff. In a low-pass or high-pass, a sine exactly at the cutoff comes out q times as large as it went in. The default, q = 0.707, is 1/√2: the amplitude at which half the power is gone, because power goes as amplitude squared and (1/√2)² = 1/2. So the 3 dB down at the cutoff of the first measurement and the rule "the gain at the cutoff is q" are the same fact. A larger q makes a peak at the cutoff, 20 × log10(q) dB high: frequencies near it come out louder than they went in. The filter is said to *resonate*. The name q comes from electronics, where it is the *quality factor* of a resonant circuit.
 
-```python {run output=code}
-from euterpe.book import gain_db
-from euterpe.sound import LowPass
-
-for q in (0.707, 4.0, 12.0):
-    gains = [gain_db(lambda s: LowPass(s, cutoff=800.0, q=q), f) for f in (400, 800, 1600)]
-    print("q", q, ":", gains, "dB at 400, 800 and 1600 Hz")
-```
-
-At q = 4 a sine at the cutoff comes out 12.0 dB louder (20 × log10 4 = 12.0); at q = 12, 21.6 dB louder. Away from the cutoff q matters less: one octave below, the gain is within 3 dB of flat. One octave above, a larger q gives a little more, −9.7 dB instead of −12.3, because the peak does not end abruptly: it falls off gradually on both sides, and frequencies just above the cutoff still sit on that slope before the filter's 12 dB per octave takes over. The larger q is, the narrower the peak. In a band-pass, q sets the width of the band instead: the band is cutoff / q Hz wide, measured between the two frequencies where the gain is 3 dB below the centre, so a band-pass at 1 000 Hz with q = 10 keeps a band 100 Hz wide.
+At q = 4 a sine at the cutoff comes out 12 dB louder (20 × log10 4 = 12.0); at q = 12, 21.6 dB louder. Away from the cutoff q matters less, and the larger q is, the narrower the peak, as the response plot below shows. In a band-pass, q sets the width of the band instead: the band is cutoff / q Hz wide, measured between the two frequencies where the gain is 3 dB below the centre, so a band-pass at 1 000 Hz with q = 10 keeps a band 100 Hz wide.
 
 On a saw, a resonant low-pass makes the harmonic nearest the cutoff stand out, and the ear hears it as a second, whistling pitch on top of the note:
 
@@ -139,17 +120,9 @@ for q, gain in ((0.707, 0.3), (4.0, 0.23), (12.0, 0.17)):
     display(tones[q].take(1.5, f"A saw through a low-pass at 800 Hz, q {q}"))
 ```
 
-The peak adds energy, so a larger q makes the note louder. The gains 0.3, 0.23 and 0.17 compensate, so that the three differ in tone and not in loudness. `lint_audio` measures their loudness in LUFS, as in chapter 2:
+The peak adds energy, so a larger q makes the note louder. The gains 0.3, 0.23 and 0.17 compensate, so that the three differ in tone and not in loudness.
 
-```python {run continue output=code}
-from euterpe.lint import lint_audio
-from euterpe.sound import render
-
-for q, tone in tones.items():
-    print("q", q, ":", [f.message for f in lint_audio(render(tone, 1.5)).findings if f.rule == "A-LUFS"])
-```
-
-The three are within half a decibel of each other. At q = 12 the whistle is near 770 Hz, the seventh harmonic of 110 Hz, the one closest to the cutoff.
+At q = 12 the whistle is near 770 Hz, the seventh harmonic of 110 Hz, the one closest to the cutoff.
 
 ```python {run echo=false}
 from euterpe.sound import LowPass, Sine
@@ -171,7 +144,7 @@ response(
 - `BandPass` keeps a band around `cutoff`, at 0 dB in its centre, and falls on both sides.
 - `Notch` removes a narrow band around `cutoff` and keeps everything else.
 
-Here are the four on the same noise, all at 1 000 Hz with q = 2, so the band-pass keeps, and the notch removes, a band about 500 Hz wide. Each has its own gain so that the four play at about the same loudness: the low-pass and the band-pass keep only a small part of the noise's energy, so they need more gain (0.8 and 1.4); the high-pass and the notch keep most of it, so they need less (0.2). The second block prints the loudness of each.
+Here are the four on the same noise, all at 1 000 Hz with q = 2, so the band-pass keeps, and the notch removes, a band about 500 Hz wide. Each has its own gain so that the four play at about the same loudness: the low-pass and the band-pass keep only a small part of the noise's energy, so they need more gain (0.8 and 1.4); the high-pass and the notch keep most of it, so they need less (0.2).
 
 ```python {run}
 from euterpe.sound import ADSR, BandPass, HighPass, LowPass, Notch, WhiteNoise
@@ -183,26 +156,10 @@ for kind, gain in ((LowPass, 0.8), (HighPass, 0.2), (BandPass, 1.4), (Notch, 0.2
     display(tones[name].take(1.5, f"Noise through a {name} at 1000 Hz"))
 ```
 
-```python {run continue output=code}
-from euterpe.lint import lint_audio
-from euterpe.sound import render
-
-for kind, tone in tones.items():
-    print(kind, [f.message for f in lint_audio(render(tone, 1.5)).findings if f.rule == "A-LUFS"])
-```
 
 The low-pass rumbles, the high-pass hisses, the band-pass is a noise with a vague pitch near 1 000 Hz, like breath through a tube. The notch sounds almost like the unfiltered noise: it removes a band 500 Hz wide out of 24 000 Hz, and the ear barely misses it. A notch is a repair tool more than a sound: it removes one bad frequency, such as a 50 Hz hum from the mains, and leaves the rest.
 
-A high-pass also fixes the side effect chapter 4 found: a pulse whose duty moves has a DC offset, a component near 0 Hz. A high-pass's gain falls to exactly 0 at 0 Hz, so a constant offset is removed completely. Here the offset is not quite constant: the duty moves over one second, so the offset moves with it, slowly. Slow means close to 0 Hz, well below 20 Hz, about the lowest frequency the ear hears, so a high-pass at 20 Hz removes it too. A `OnePoleHighPass` has the gain 1 / √(1 + (cutoff / f)²) at f Hz, which is 0 at f = 0, 1/√2 (−3 dB) at the cutoff, and close to 1 above it:
-
-```python {run output=code}
-import numpy as np
-
-for f in (1, 5, 20, 110):
-    print(f, "Hz:", round(float(20 * np.log10(1 / np.sqrt(1 + (20 / f) ** 2))), 2), "dB")
-```
-
-At 110 Hz, the note below, it takes away 0.14 dB, which no one can hear. The same pulse as in chapter 4, linted before and after the high-pass:
+A high-pass also fixes the side effect chapter 4 found: a pulse whose duty moves has a DC offset, a component near 0 Hz. A high-pass's gain falls to exactly 0 at 0 Hz, so a constant offset is removed completely. Here the offset is not quite constant: the duty moves over one second, so the offset moves with it, slowly. Slow means close to 0 Hz, well below 20 Hz, about the lowest frequency the ear hears, so a high-pass at 20 Hz removes it too. A `OnePoleHighPass` has the gain 1 / √(1 + (cutoff / f)²) at f Hz, which is 0 at f = 0, 1/√2 (−3 dB) at the cutoff, and close to 1 above it: at 110 Hz, the note below, it takes away 0.14 dB, which no one can hear. The same pulse as in chapter 4, linted before and after the high-pass:
 
 ```python {run output=code}
 from euterpe.lint import lint_audio
@@ -234,9 +191,35 @@ display(tone.take(1.5, "A saw whose low-pass falls from 4200 to 200 Hz"))
 
 The note starts bright and darkens within half a second, with a short "yow" as the resonant peak slides down through the harmonics. This is the effect chapter 4 was missing: the high harmonics die before the low ones, as in a plucked string.
 
+
+Retrigger that sweep on every note of a fast phrase and it becomes the sound of *acid house*, the dance music of the late 1980s built on one small bass synthesizer with a resonant low-pass. Here a bar of four beats is split into sixteen steps, an eighth of a second each at 120 beats a minute, and `PATTERN` gives each step's note in semitones above A1, 55 Hz. Each note gets its own sweep from 2 750 Hz down to 250 Hz in 0.15 s, with q = 8:
+
+```python {run name=acid}
+from euterpe.instruments import play
+from euterpe.sound import ADSR, LowPass, Saw
+
+STEP = 0.125  # seconds: a sixteenth of a bar at 120 beats a minute
+PATTERN = [0, 0, 12, 0, 0, 10, 0, 12, 0, 0, 7, 0, 3, 0, 12, 10]  # steps above A1, 55 Hz
+
+
+def acid(n):
+    cutoff = ADSR(attack=0.003, decay=0.15, sustain=0.0, gate=n.duration, curve=0.7) * 2500 + 250
+    level = ADSR(attack=0.003, decay=0.1, sustain=0.6, release=0.03, gate=n.duration)
+    return LowPass(Saw(n.freq), cutoff=cutoff, q=8.0) * level * 0.2
+
+
+def line(bars):
+    return play(acid, [(STEP * i, 55 * 2 ** (PATTERN[i % 16] / 12), STEP * 0.8) for i in range(16 * bars)])
+
+
+line(2).take(4.2, "An acid line: the swept low-pass retriggered on every step")
+```
+
+The resonant peak "squelches" through the harmonics on every step. The line sits at 55 and 110 Hz, yet it is heard on small speakers that cannot play 55 Hz at all: the harmonics at 110, 165, 220 Hz and up are 55 Hz apart, and the ear infers the pitch from that spacing even when the first harmonic is missing. This is called the *missing fundamental*.
+
 Then a slow sine. `Sine(1.5) * 700 + 1000` swings between 300 and 1 700 Hz, one and a half times a second. On a resonant low-pass, it gives the sound of a guitarist's *wah-wah* pedal, which moves a resonant filter with the foot:
 
-```python {run}
+```python {run continue}
 from euterpe.sound import ADSR, LowPass, Saw, Sine
 from euterpe.view import listen
 
@@ -262,7 +245,7 @@ A different family of filters is built from one delayed copy of the signal. `Com
 
 Evenly spaced peaks at multiples of one frequency are exactly the harmonics of chapter 3. So a comb on noise makes a pitched note out of a sound that has no pitch:
 
-```python {run}
+```python {run continue}
 from euterpe.sound import ADSR, Comb, LowPass, WhiteNoise
 
 def comb_note(feedback, gain):
@@ -275,19 +258,11 @@ display(comb_note(0.98, 0.08).take(2.0, "The same comb, feedback 0.98"))
 
 With feedback 0.5 the noise has a faint pitch in it. With 0.98 the peaks are 1 / 0.02 = 50 times the input, and narrow, and the noise turns into a buzzing note at 220 Hz. That is also why the second note needs a gain of 0.08 instead of 0.5: the comb makes it much louder. The low-pass before the comb removes the harsh high peaks. The delay is a whole number of samples: 48 000 / 220 = 218.2, rounded to 218, so the note is at 48 000 / 218 = 220.2 Hz. Chapter 7 builds a plucked string from this loop, with a filter inside it and a fractional delay that makes the pitch exact.
 
-`Allpass(src, delay, gain)` is a comb with a second, forward path that cancels its peaks and dips: y[n] = −gain × x[n] + x[n − D] + gain × y[n − D]. Every frequency comes out at the level it went in:
+`Allpass(src, delay, gain)` is a comb with a second, forward path that cancels its peaks and dips: y[n] = −gain × x[n] + x[n − D] + gain × y[n − D]. Every frequency comes out at the level it went in.
 
-```python {run output=code}
-from euterpe.book import gain_db
-from euterpe.sound import Allpass
+The clearest way to see it is to send in a single sample of 1, an *impulse*, and read what comes out every D samples. `Segments` draws straight lines through `(time, level)` points, so a line from 1 at 0 s to 0 one sample later is an impulse. The delay of 3 ms is D = 144 samples:
 
-for f in (200, 1000, 5000):
-    print(f, "Hz:", gain_db(lambda s: Allpass(s, delay=0.003, gain=0.7), f), "dB")
-```
-
-The clearest way to see why is to send in a single sample of 1, an *impulse*, and read what comes out every D samples. `Segments` draws straight lines through `(time, level)` points, so a line from 1 at 0 s to 0 one sample later is an impulse. The delay of 3 ms is D = 144 samples:
-
-```python {run output=code}
+```python {run continue output=code}
 import numpy as np
 
 from euterpe.sound import Allpass, Segments, render
@@ -298,9 +273,9 @@ print([round(float(v), 3) for v in y[::144][:6]])
 print("energy out:", round(float((y ** 2).sum()), 3))
 ```
 
-The impulse comes out at once as −0.7 (the −gain × x[n] path), then as an echo of 1 − 0.7² = 0.51 after 3 ms, and each later echo is 0.7 times the one before. The energies add up to 0.49 + 0.51² × (1 + 0.49 + 0.49² + …) = 0.49 + 0.51 = 1, the energy of the impulse that went in; the sum printed is 1.0. The same holds at every frequency, which is what the gains above measured. What an allpass changes is time: the energy comes out spread over a dense ring of echoes, each frequency delayed by its own amount. Chapter 3 called this the phase of each component: the allpass changes only phases. On a steady tone the ear does not hear phase, so an allpass is almost inaudible; on a click it smears the attack into a short ring. The example below is four clicks a quarter second apart. Each is made with `Segments` from `(time, level)` points joined by straight lines, where two points at the same time make a jump: 3 ms at +0.5, then 3 ms at −0.5, so that its average is 0 and it has no DC offset. Chapter 8 chains allpasses to make reverb.
+The impulse comes out at once as −0.7 (the −gain × x[n] path), then as an echo of 1 − 0.7² = 0.51 after 3 ms, and each later echo is 0.7 times the one before. The energies add up to 0.49 + 0.51² × (1 + 0.49 + 0.49² + …) = 0.49 + 0.51 = 1, the energy of the impulse that went in; the sum printed is 1.0. The same holds at every frequency: `gain_db` reads 0 dB for this allpass at any frequency you try. What an allpass changes is time: the energy comes out spread over a dense ring of echoes, each frequency delayed by its own amount. Chapter 3 called this the phase of each component: the allpass changes only phases. On a steady tone the ear does not hear phase, so an allpass is almost inaudible; on a click it smears the attack into a short ring. The example below is four clicks a quarter second apart. Each is made with `Segments` from `(time, level)` points joined by straight lines, where two points at the same time make a jump: 3 ms at +0.5, then 3 ms at −0.5, so that its average is 0 and it has no DC offset. Chapter 8 chains allpasses to make reverb.
 
-```python {run}
+```python {run continue}
 from euterpe.sound import Allpass, Segments
 
 def clicks():
@@ -329,7 +304,7 @@ The human voice is a subtractive synthesizer. The vocal folds in the throat buzz
 
 Each band has q = 8, so it is a few hundred Hz wide at most, and the three are mixed at 1, 0.5 and 0.25, so the higher formants are 6 and 12 dB quieter. Everything outside the bands is cut, so `Formant` needs a source with many harmonics, a saw or noise, to have anything to shape. The same saw at 110 Hz through each of them:
 
-```python {run}
+```python {run continue}
 from euterpe.sound import ADSR, Formant, Saw
 
 for vowel in "aeiou":
@@ -338,37 +313,35 @@ for vowel in "aeiou":
 
 Listen to them in a row: a buzzing voice says "ah, eh, ee, aw, oo". The pitch is the same in all five; only the bands changed. "ee" has its first formant very low, at 270 Hz, and its second high, at 2 290 Hz; "oo" has both low, at 300 and 870 Hz, so it is the darkest.
 
-```python {run echo=false}
-from euterpe.sound import Formant, Saw
-from euterpe.view import spectrum
+## Putting it all together
 
-spectrum(
-    Formant(Saw(110.0), "i").take(1.0), Formant(Saw(110.0), "u").take(1.0),
-    f0=110.0, harmonics=39, upto=4400, labels=["vowel i", "vowel u"],
-    caption="The harmonics of a saw at 110 Hz through the formants of i and of u",
-)
+Two more parts join the acid line. The choir is two saws 0.5 % apart, which drift in and out of step: two sines a little apart in frequency add when in step and cancel half a cycle later, so their sum rises and falls slowly. This slow rise and fall is called *beating*, and with every harmonic beating at its own rate the tone seems to move. The choir plays a chord per bar, A minor then F (chapter 4's chords), through `Formant`, singing "a" on one bar and "o" on the next. The hi-hats are white noise through a high-pass at 8 kHz, a 40 ms tick on every off-beat; each has its own seed, so no two are the same noise. Twelve bars, 24 seconds:
+
+```python {run continue name=finale}
+from euterpe.sound import Formant, HighPass, WhiteNoise
+
+CHORDS = [(0, 3, 7), (-4, 0, 3)]  # A minor and F: steps above A3
+VOWELS = "ao"
+
+
+def choir(n):
+    vowel = VOWELS[int(n.time // (16 * STEP)) % 2]
+    return Formant(Saw(n.freq) + Saw(n.freq * 1.005), vowel) * ADSR(attack=0.3, sustain=1.0, release=0.4, gate=n.duration) * 0.25
+
+
+def hat(n):
+    env = ADSR(attack=0.001, decay=0.04, sustain=0.0, release=0.0, gate=0.05, curve=0.8)
+    return HighPass(WhiteNoise(seed=round(n.time / STEP)), cutoff=8000.0) * env * 0.8
+
+
+BARS = 12
+voices = play(choir, [(16 * STEP * b, 220 * 2 ** (s / 12), 16 * STEP) for b in range(BARS) for s in CHORDS[b % 2]])
+hats = play(hat, [(STEP * (4 * i + 2), 8000.0, 0.05) for i in range(4 * BARS)])
+song = line(BARS) + voices + hats
+song.take(24.5, "Acid line, robot choir and hi-hats: three filters at work")
 ```
 
-Each line is one harmonic of 110 Hz. The harmonics are the same in both pictures; the formants decide which of them are loud.
-
-## A first subtractive voice
-
-All the parts are now in place for the classic voice of an analogue synthesizer: an oscillator rich in harmonics, a low-pass whose cutoff an envelope moves, and a second envelope for the level. Two saws slightly out of tune, 110 and 110.6 Hz, make the source fuller. Two sines 0.6 Hz apart drift in and out of step: in step they add, half a cycle apart they cancel, so their sum rises and falls 0.6 times a second. This slow rise and fall is called *beating*. The n-th harmonics of the two saws are n × 0.6 Hz apart, so the second harmonic beats 1.2 times a second, the tenth 6 times. With every harmonic beating at its own rate, the tone seems to move. The filter envelope opens the low-pass quickly and lets it fall to a sustain level, so each note starts bright and settles into a darker tone; the amplitude envelope holds the note and releases it.
-
-```python {run}
-from euterpe.sound import ADSR, LowPass, Saw
-
-def voice(freq, gate=0.9):
-    source = Saw(freq) + Saw(freq * 1.0055)
-    cutoff = ADSR(attack=0.01, decay=0.35, sustain=0.25, release=0.3, gate=gate, curve=0.6) * 3000 + 250
-    filtered = LowPass(source, cutoff=cutoff, q=2.5)
-    return filtered * ADSR(attack=0.005, decay=0.2, sustain=0.8, release=0.3, gate=gate) * 0.18
-
-display(voice(110.0).take(1.5, "A subtractive voice at 110 Hz"))
-display(voice(55.0).take(1.5, "The same voice an octave lower, a bass"))
-```
-
-Every number in `voice` changes the sound. The filter's `decay` sets how long the bright start lasts; its `sustain` sets how dark the held note is; `q` sets how much the resonant peak sings as it falls; `* 3000 + 250` sets the range the cutoff sweeps. A synthesizer's front panel is mostly these knobs. The same function at 55 Hz is a bass: the low-pass at its sustain, 0.25 × 3 000 + 250 = 1 000 Hz, keeps the first 18 harmonics (1 000 / 55 = 18.2). That is why it can be heard on small speakers that cannot play 55 Hz itself. The harmonics at 110, 165, 220 Hz and up are 55 Hz apart, and the ear infers the pitch from that spacing even when the first harmonic is missing; this is called the *missing fundamental*.
+Every number in `acid` is a knob on a synthesizer's front panel: the filter envelope's `decay` sets how long each squelch lasts, `q` how much it sings, `* 2500 + 250` the range it sweeps. But every source in this piece is a saw or white noise. Chapter 6 brings three new raw materials: tones made by moving one sine's frequency with another (FM), noises of other colours, and wavetables.
 
 ## Summary
 
@@ -378,20 +351,20 @@ Every number in `voice` changes the sound. The filter's `decay` sets how long th
 - `LowPass`, `HighPass`, `BandPass` and `Notch`, each `(src, cutoff, q)`, are second-order filters, biquads. The low-pass and high-pass are 3 dB down at `cutoff` and fall 12 dB per octave beyond it. `OnePoleLowPass(src, cutoff)` and `OnePoleHighPass(src, cutoff)` fall 6 dB per octave.
 - `q` above 0.707 adds a resonant peak at the cutoff, 20 × log10(q) dB high. In a band-pass it sets the width, about cutoff / q Hz.
 - Subtractive synthesis starts from a source with many harmonics (a saw, noise) and removes some with filters. The cutoff sets brightness.
-- A cutoff can be moved by an envelope (a bright start that darkens) or an LFO (a wah). A biquad reads a moving cutoff or q once every 64 samples.
+- A cutoff can be moved by an envelope (a bright start that darkens, retriggered on each note for acid house) or an LFO (a wah). A biquad reads a moving cutoff or q once every 64 samples.
 - `Comb(src, delay, feedback)` has peaks at every multiple of 1 / delay Hz, so it puts a pitch into noise. `Allpass(src, delay, gain)` keeps every level and changes only the timing.
 - Vowels are formants, bands that the vocal tract boosts. `Formant(src, vowel)` puts the formants of five vowels on any source.
 - A high-pass at 20 Hz removes a DC offset.
 
 ## Exercises
 
-1. In the subtractive voice, change the filter envelope's `sustain=0.25` to `sustain=1.0`. What happens to the tone after its start, and why?
+1. In `acid`, change the filter envelope's `sustain=0.0` to `sustain=1.0`. What happens to the line, and why?
 2. In the wah, change `Sine(1.5)` to `Sine(6.0)`. What does the effect sound like now?
 3. In the comb note, change `delay=1 / 220` to `delay=1 / 330`. What note do you hear, and how far is it from 330 Hz, in cents? (48 000 / 330 = 145.45 samples; from chapter 2, the distance from f1 to f2 is 1200 × log₂(f2 / f1) cents.)
 
 ### Answers
 
-1. The cutoff stays at 3 250 Hz for the whole note, so there is no bright start that settles: the note is bright throughout, as bright as the saws through a low-pass with almost nothing cut. The sweep at the start disappears because the decay now falls from 1 to 1.
+1. The cutoff stays at 2 750 Hz for every step, so there is no squelch: each note is equally bright and buzzy, and the line loses what made it acid. The sweep disappears because the decay now falls from 1 to 1.
 2. The peak sweeps up and down six times a second instead of one and a half. It is too fast to hear as a pedal being rocked: pitch stays put while the brightness of the tone wobbles six times a second, a rapid warble rather than a wah.
 3. A note near E4, 330 Hz. The delay rounds to 145 samples, so the note is at 48 000 / 145 = 331.0 Hz, 1.0 Hz sharp, 1200 × log₂(331.0 / 330) = 5 cents (a twentieth of a semitone): close, but not exact, which is why chapter 7 adds a fractional delay.
 
