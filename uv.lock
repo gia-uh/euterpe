@@ -289,7 +289,7 @@ provides-extras = ["view"]
 [package.metadata.requires-dev]
 book = [
     { name = "matplotlib", specifier = ">=3.9" },
-    { name = "scriptorium", git = "https://github.com/apiad/scriptorium?rev=v0.11.0" },
+    { name = "scriptorium", git = "https://github.com/apiad/scriptorium?rev=v0.12.0" },
 ]
 dev = [
     { name = "ipykernel", specifier = ">=7.4.0" },
@@ -1423,8 +1423,8 @@ wheels = [
 
 [[package]]
 name = "scriptorium"
-version = "0.11.0"
-source = { git = "https://github.com/apiad/scriptorium?rev=v0.11.0#68f08d823bc9c19c3710941079e0e59d6edee7e0" }
+version = "0.12.0"
+source = { git = "https://github.com/apiad/scriptorium?rev=v0.12.0#4d5c4a0c525a059518044d4506bb956096836051" }
 dependencies = [
     { name = "markdown-it-py" },
     { name = "mdit-py-plugins" },

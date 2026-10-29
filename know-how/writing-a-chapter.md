@@ -48,8 +48,10 @@ Blocks that share variables chain with `{run continue}`: every block after the f
 
 ```bash
 cd book
-rm -rf build site .scriptorium   # the freeze cache replays block output without rewriting files
+rm -rf build site .scriptorium   # only after a change to euterpe/: the cache cannot see the library
 uv run scriptorium render scriptorium.yaml --only site
 ```
+
+The freeze cache in `.scriptorium` keeps each chapter's block output, and the files in `build`, until the chapter's text changes; then every block of that chapter runs again. CI keeps both between builds (`.github/workflows/book.yml`) and starts empty when `euterpe/` or `uv.lock` changes.
 
 Serve `book/site` over HTTP and open the chapter at 1440 px and 390 px wide: the players must play, and nothing may be wider than the phone.
