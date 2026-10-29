@@ -71,11 +71,11 @@ class Accent(Articulation):
 
 @dataclass
 class PalmMute(Articulation):
-    """The picking hand's palm resting on the strings by the bridge: a plucked string keeps
-    only damping of its vibration each trip, so it dies within a fraction of a second, and the
-    pluck is brightness times as bright. An instrument without strings ignores it."""
+    """The picking hand's palm resting on the strings by the bridge: a plucked string falls
+    60 dB within decay seconds, whatever its pitch, and the pluck is brightness times as
+    bright. An instrument without strings ignores it."""
 
-    damping: float = 0.9
+    decay: float = 0.6
     brightness: float = 0.4
 
 

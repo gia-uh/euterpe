@@ -91,3 +91,12 @@ def test_a_cabinet_draws_its_response():
     from euterpe.sound.core import Const
 
     assert Cabinet(Const(0.0)).response(caption="A guitar cabinet").svg()
+
+
+def test_a_cabinets_size_is_a_number():
+    import pytest
+    from euterpe.sound import Cabinet
+    from euterpe.sound.core import Const
+
+    with pytest.raises(TypeError):
+        Cabinet(Const(0.0), size=Const(1.0))

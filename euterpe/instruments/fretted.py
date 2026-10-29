@@ -25,7 +25,7 @@ from euterpe.instruments.plucked import (
     _string_of,
 )
 from euterpe.pitch import A1, A2, B3, D2, D3, E1, E2, E4, G2, G3, Pitch
-from euterpe.sound import ADSR, Pluck, Segments, Sine
+from euterpe.sound import Segments, Sine
 from euterpe.sound.core import RATE, Unit
 
 
@@ -261,7 +261,12 @@ class Electric(Fretted):
     """A solid-body fretted instrument: the string has no soundboard to colour it, and a Pickup
     hears it instead, at a point that sits further along a fretted string (the fraction of the
     sounding string grows as the fret shortens it). Meant to go through an Amp and a Cabinet.
-    pickup=None hears the bare string."""
+    pickup=None hears the bare string.
+
+    Limit: the strings of Plucked; the pickup sits at one fixed point and hears no other string.
+    """
+
+    FEEDBACK = (0.5, 0.3)  # a held string's level after the swell, and its harmonic's
 
     def __init__(self, tuning: Sequence[Pitch] | None = None, capo: int = 0, exciter: Exciter = Plectrum(),
                  string: String = Steel(damping=0.998), pickup: Pickup | None = Bridge(), let_ring: bool = True,
@@ -269,14 +274,20 @@ class Electric(Fretted):
         super().__init__(tuning, capo, exciter, string, None, let_ring, mute, level, seed)
         self.pickup = pickup
 
-    FEEDBACK = (0.5, 0.3)  # a held string's level after the swell, and its harmonic's
-
-    def fraction(self, string: int, fret: int) -> float:
-        """Where the pickup sits along string stopped at fret, as a fraction of the part that
-        sounds, at most 0.5 (past the middle the comb repeats)."""
+    def fraction(self, string: int, freq: float) -> float:
+        """Where the pickup sits along string sounding at freq Hz, as a fraction of the part that
+        sounds, at most 0.5 (past the middle the comb repeats). The sounding part is shorter than
+        the open string, at the nut, by the ratio of their frequencies."""
         if self.pickup is None:
             return 0.0
-        return min(0.5, self.pickup.position * 2 ** ((fret + self.capo) / 12))
+        return min(0.5, self.pickup.position * freq / self.tuning[len(self.tuning) - string].freq)
+
+    def _string_for(self, note: Note) -> int:
+        """The note's string, or else the highest string whose open pitch is not above it."""
+        if isinstance(note.resource, int) and 1 <= note.resource <= len(self.tuning):
+            return note.resource
+        below = [s for s in range(1, len(self.tuning) + 1) if self._open(s).freq <= note.freq]
+        return min(below) if below else len(self.tuning)
 
     def feedback(self, string: int, fret: int, at: float, length: float, harmonic: int = 2,
                  velocity: float = 0.8) -> list[Note]:
@@ -289,19 +300,14 @@ class Electric(Fretted):
     def voice(self, note: Note) -> Unit:
         traits = self.traits(_string_of(self, note))
         vary = self.vary(note)
-        string = self.pluck(note, note.freq, vary, traits)
         fb = note.articulation if isinstance(note.articulation, Feedback) else None
+        string = self.pluck(note, note.freq, vary, traits, damping=0.99995 if fb else None)
         if fb is not None:  # the string held at its level, its harmonic swelling over it
-            string = Pluck(note.freq, damping=0.99995, brightness=self.exciter.brightness,
-                           position=self.exciter.position, seed=int(note.rng.integers(2**31)))
             fade = Segments([(0.0, 1.0), (fb.onset, 1.0), (fb.onset + fb.rise, self.FEEDBACK[0])])
             swell = Segments([(0.0, 0.0), (fb.onset, 0.0), (fb.onset + fb.rise, self.FEEDBACK[1])])
             string = string * fade + Sine(note.freq * fb.harmonic) * swell
-            string = string * ADSR(attack=0.0, decay=0.0, sustain=1.0, release=self.mute, gate=note.duration)
         if self.pickup is not None:
-            s = note.resource if isinstance(note.resource, int) and 1 <= note.resource <= len(self.tuning) else None
-            fret = (self._fret(_pitch(note.pitch), s) or 0) if s is not None else 0
-            string = self.pickup(string, note.freq, self.fraction(s or 1, fret))
+            string = self.pickup(string, note.freq, self.fraction(self._string_for(note), note.freq))
         return self.finish(note, string, vary[2] * (1 + traits[1]))
 
 

@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from euterpe.instruments.core import Instrument, Note, PalmMute, Staccato
+from euterpe.instruments.core import Feedback, Instrument, Note, PalmMute, Staccato
 from euterpe.pitch import A7, C1, C2, C6, E6, G2, G7, Pitch
 from euterpe.sound import ADSR, Body, LowPass, Pluck
 from euterpe.sound.core import RATE, Unit
@@ -169,7 +169,7 @@ class _Pickup(Unit):
 
     def reset(self) -> None:
         super().reset()
-        self._line = np.zeros(self.delay, np.float32)
+        self._line = np.zeros((self.delay,) + ((2,) if self.channels == 2 else ()), np.float32)
 
     def block(self, n: int) -> np.ndarray:
         x = self.src.block(n)
@@ -273,13 +273,15 @@ class Plucked(Instrument):
         return (float(a), float(b), float(c))
 
     def pluck(self, note: Note, freq: float, vary: tuple[float, float, float] = (1.0, 1.0, 1.0),
-              traits: tuple[float, float, float] = (0.0, 0.0, 0.0)) -> Unit:
-        """The bare string for note at freq, with the string's flaws, before the finger and the body."""
+              traits: tuple[float, float, float] = (0.0, 0.0, 0.0), damping: float | None = None) -> Unit:
+        """The bare string for note at freq, with the string's flaws, before the finger and the body.
+        damping, when given, replaces the string's loss per trip."""
         cents, _, decay = traits
-        damping = min(0.9999, 1 - (1 - self.string.damping) * (1 + decay))
+        if damping is None:
+            damping = min(0.9999, 1 - (1 - self.string.damping) * (1 + decay))
         brightness = self.exciter.brightness * (0.5 + 0.5 * note.velocity) * vary[1]
         if isinstance(note.articulation, PalmMute):
-            damping = min(damping, note.articulation.damping)
+            damping = min(damping, 10 ** (-3 / (note.articulation.decay * freq)))  # 60 dB in decay s
             brightness *= note.articulation.brightness
         return Pluck(freq * 2 ** (cents / 1200), damping=damping,
                      brightness=min(1.0, brightness),
@@ -291,8 +293,9 @@ class Plucked(Instrument):
         return self.finish(note, self.pluck(note, note.freq, vary, traits), vary[2] * (1 + traits[1]))
 
     def finish(self, note: Note, string: Unit, force: float = 1.0) -> Unit:
-        """The finger's mute when asked, then the body, then the note's gain."""
-        if not self.let_ring or isinstance(note.articulation, Staccato):
+        """The finger's mute when asked (and always for a Feedback note, held only for its
+        length), then the body, then the note's gain."""
+        if not self.let_ring or isinstance(note.articulation, (Staccato, Feedback)):
             string = string * ADSR(attack=0.0, decay=0.0, sustain=1.0, release=self.mute, gate=note.duration)
         if self.body is not None:
             string = self.body(string)

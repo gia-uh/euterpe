@@ -87,6 +87,8 @@ class Cabinet(_Chain):
     def __init__(self, src: Unit, size: float = 1.0):
         self.src = src
         self.channels = src.channels
+        if isinstance(size, Unit):
+            raise TypeError("Cabinet's size sets its filters when it is built, so it takes a number, not a Unit")
         self.size = float(size)
         self.reset()
 

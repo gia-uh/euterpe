@@ -107,7 +107,7 @@ def _rbj(kind: str, cutoff: float, q: float, gain_db: float = 0.0) -> tuple[np.n
             b = [1 + alpha * A, -2 * cos, 1 - alpha * A]
             a = np.array([1 + alpha / A, -2 * cos, 1 - alpha / A])
         else:
-            s = 1 if kind == "lowshelf" else -1  # the high shelf is the low one with cos negated
+            s = 1 if kind == "lowshelf" else -1  # the high shelf flips the sign of the (A - 1) terms
             r = 2 * np.sqrt(A) * alpha
             b = [A * ((A + 1) - s * (A - 1) * cos + r), 2 * s * A * ((A - 1) - s * (A + 1) * cos),
                  A * ((A + 1) - s * (A - 1) * cos - r)]
