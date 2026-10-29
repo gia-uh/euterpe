@@ -13,6 +13,7 @@ from euterpe.instruments.core import (
 )
 from euterpe.instruments.fretted import BassGuitar, Electric, ElectricBass, ElectricGuitar, Fretted, Guitar, Shape
 from euterpe.instruments.keys import ElectricPiano, Organ
+from euterpe.instruments.synths import AcidBass, Lead, Pad, Patch, Supersaw, SynthPluck
 from euterpe.instruments.mallets import Bar, Barred, Celesta, Glockenspiel, Marimba, Xylophone
 from euterpe.instruments.percussion import Clap, Crash, Cymbal, HiHat, Kick, Kit, Mallet, Open, Ride, Snare, Stomp, Struck, Timpani, Tom
 from euterpe.instruments.phrase import Phrase
@@ -52,6 +53,12 @@ __all__ = [
     "Xylophone",
     "Marimba",
     "Organ",
+    "Patch",
+    "Lead",
+    "Pad",
+    "Supersaw",
+    "SynthPluck",
+    "AcidBass",
     "ElectricPiano",
     "Glockenspiel",
     "Celesta",
