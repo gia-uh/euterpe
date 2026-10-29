@@ -157,8 +157,9 @@ class AcidBass(Patch):
     filter_env = (0.002, 0.25, 0.0, 0.05)
     amp_env = (0.002, 0.0, 1.0, 0.01)
 
-    def __init__(self, drive: float = 3.0, level: float = 0.5, seed: int = 0):
-        self.drive, self.level, self.seed = float(drive), float(level), seed
+    def __init__(self, resonance: float = 0.85, drive: float = 3.0, level: float = 0.5, seed: int = 0):
+        """resonance: the ladder's, from 0 (a plain sweep) to 1 (the edge of ringing)."""
+        self.resonance, self.drive, self.level, self.seed = float(resonance), float(drive), float(level), seed
 
     def contour(self, note: Note) -> tuple[float, float]:
         sweep, level = self.sweep, self.level * 0.7

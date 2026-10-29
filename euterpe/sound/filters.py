@@ -220,13 +220,14 @@ class HighShelf(_Gained):
 
 def _state(b: np.ndarray, a: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
     """lfilter's state for coefficients b, a after past inputs x and outputs y (oldest first,
-    one row per sample): what the filter would hold had it always had these coefficients."""
+    one row per sample): what the filter would hold had it always had these coefficients.
+    Row i is the sum over k of b[i + 1 + k] x[-1 - k] - a[i + 1 + k] y[-1 - k]."""
     order = len(a) - 1
-    zi = np.zeros((order, x.shape[1]))
-    for i in range(order):
-        for j in range(i + 1, order + 1):
-            zi[i] += b[j] * x[i - j] - a[j] * y[i - j]
-    return zi
+    idx = np.arange(order)[:, None] + np.arange(order)[None, :] + 1
+    inside = idx <= order
+    idx = np.minimum(idx, order)
+    tb, ta = np.where(inside, b[idx], 0.0), np.where(inside, a[idx], 0.0)
+    return tb @ x[::-1] - ta @ y[::-1]
 
 
 class Ladder(_Filter):
@@ -240,10 +241,13 @@ class Ladder(_Filter):
     cutoff by 1 + 4 * resonance, as on the analog filter, so a resonant ladder sounds thinner.
     It is the linear model, computed as one fourth-order filter; the analog one also saturates,
     which a Saturator before it adds. cutoff is clipped to [1, 23 000] Hz and resonance to
-    [0, 0.995], below the edge where it would ring forever.
+    [0, 0.995], below the edge where it would ring forever. A moving cutoff is read every
+    2.7 ms, and the filter restarts there from its last four inputs and outputs, which keeps
+    it stable under a fast sweep.
     """
 
     _names = ("cutoff", "resonance")
+    _STEP = 128  # a moving cutoff or resonance is read every 128 samples (2.7 ms), counted from the start
 
     @property
     def duration(self) -> float | None:
@@ -271,20 +275,23 @@ class Ladder(_Filter):
         super().reset()
         self._x = np.zeros((4, self.channels))  # the last four inputs and outputs: a moving
         self._y = np.zeros((4, self.channels))  # cutoff restarts the filter from them
+        self._now: tuple[float, ...] | None = None
 
     def block(self, n: int) -> np.ndarray:
         if not self._moving:
             return super().block(n)
         x = _as_frames(self.src.block(n))
         values = [_signal(getattr(self, k), n).astype(np.float64) for k in self._names]
-        first = (-self._done) % _GRID
-        cuts = [0, *range(first, n, _GRID), n]
+        first = (-self._done) % self._STEP
+        cuts = [0, *range(first, n, self._STEP), n]
         y = np.empty_like(x)
         for lo, hi in zip(cuts, cuts[1:]):
             if lo == hi:
                 continue
-            if (self._done + lo) % _GRID == 0:
-                self._ba = b, a = self._coeffs(*(v[lo] for v in values))
+            now = tuple(float(v[lo]) for v in values)
+            if (self._done + lo) % self._STEP == 0 and now != self._now:  # still parameters keep running
+                self._now = now
+                self._ba = b, a = self._coeffs(*now)
                 self._section.zi = _state(b, a, self._x, self._y)
             y[lo:hi] = self._section.run(*self._ba, x[lo:hi])
             self._x = np.concatenate([self._x, x[lo:hi]])[-4:]
