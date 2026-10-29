@@ -28,7 +28,7 @@ dev = [
     "ipykernel>=7.4.0",
 ]  # matplotlib: tests of euterpe.view
 book = [
-    "scriptorium @ git+https://github.com/apiad/scriptorium",
+    "scriptorium @ git+https://github.com/apiad/scriptorium@v0.11.0",
     "matplotlib>=3.9",
 ]
 
