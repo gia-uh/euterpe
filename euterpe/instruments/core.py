@@ -80,6 +80,17 @@ class PalmMute(Articulation):
 
 
 @dataclass
+class Feedback(Articulation):
+    """A note an amplifier holds: the string, driven by its own sound from the speaker, does not
+    die, and after onset seconds the partial at harmonic times its frequency swells over rise
+    seconds until it is the loudest. Read by Electric instruments; written by their feedback()."""
+
+    harmonic: int = 2
+    onset: float = 0.8
+    rise: float = 1.5
+
+
+@dataclass
 class Legato(Articulation):
     """Joined to the note before it: a monophonic instrument slurs into it in one breath or
     bow stroke instead of starting again."""

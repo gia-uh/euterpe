@@ -82,3 +82,44 @@ def test_the_same_seed_gives_the_same_samples():
         a = render(make(seed=4).play([Note(0.0, A2, 0.5)]), 0.5)
         b = render(make(seed=4).play([Note(0.0, A2, 0.5)]), 0.5)
         assert np.array_equal(a, b)
+
+
+def _level(x, t0, t1):
+    seg = x[int(t0 * RATE):int(t1 * RATE)].astype(np.float64)
+    return 20 * np.log10(np.sqrt(np.mean(seg ** 2)) + 1e-12)
+
+
+def test_feedback_holds():
+    from euterpe.instruments import ElectricGuitar
+
+    g = ElectricGuitar()
+    x = render(g.play(g.feedback(3, 4, 0.0, 4.0)), 4.0)
+    assert abs(_level(x, 2.9, 3.1) - _level(x, 0.4, 0.6)) <= 6
+
+
+def test_feedback_blooms_into_its_harmonic():
+    from euterpe.instruments import ElectricGuitar
+
+    g = ElectricGuitar()
+    note = g.feedback(3, 4, 0.0, 4.0)
+    f0 = note[0].freq
+    x = render(g.play(note), 4.0)[int(3.5 * RATE):int(4.0 * RATE)]
+    partials = {k: _harmonic_db(x, f0, k) for k in range(1, 7)}
+    assert max(partials, key=partials.get) == 2
+
+
+def test_feedback_ends_with_its_note():
+    from euterpe.instruments import ElectricGuitar
+
+    g = ElectricGuitar()
+    assert g.play(g.feedback(3, 4, 0.0, 2.0)).duration < 2.5
+
+
+def test_a_later_note_takes_the_string():
+    from euterpe.instruments import ElectricGuitar
+
+    g = ElectricGuitar()
+    f0 = g.feedback(3, 4, 0.0, 4.0)[0].freq
+    alone = render(g.play(g.feedback(3, 4, 0.0, 4.0)), 4.0)[int(3.0 * RATE):int(3.5 * RATE)]
+    taken = render(g.play(g.feedback(3, 4, 0.0, 4.0) + g.pick(3, 0, 1.0, 0.2)), 4.0)[int(3.0 * RATE):int(3.5 * RATE)]
+    assert _harmonic_db(taken, f0, 2) < _harmonic_db(alone, f0, 2) - 20
