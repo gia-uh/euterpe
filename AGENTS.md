@@ -32,8 +32,10 @@ Euterpe is a Python library for composing music by writing code. It has four lay
 
 ```bash
 uv sync --group dev
-uv run pytest -q
+uv run pytest -q -n auto
 ```
+
+No test takes more than 5 s in one process (`uv run pytest -q --durations=10` lists the slowest). Render the shortest stretch that shows the fact: a block-size check at block 1 covers a few hundredths of a second, and a peak check renders the hit, not its tail.
 
 Work lands through an issue, a branch and a pull request; CI must be green before merge.
 

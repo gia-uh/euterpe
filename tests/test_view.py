@@ -163,13 +163,12 @@ def test_figure_wraps_a_drawing_in_the_house_style():
 
 
 def test_a_notebook_shows_svg_and_audio():
-    nbformat = pytest.importorskip("nbformat")
-    from nbclient import NotebookClient
+    # IPython's own formatter, as a notebook kernel runs it on a cell's last value
+    formatters = pytest.importorskip("IPython.core.formatters")
+    from euterpe.sound import Pluck
 
-    nb = nbformat.v4.new_notebook(cells=[nbformat.v4.new_code_cell("from euterpe.sound import Pluck\nPluck(220)")])
-    NotebookClient(nb, timeout=120, kernel_name="python3").execute()
-    html = nb.cells[0].outputs[0]["data"]["text/html"]
-    assert "<svg" in html and "<audio" in html
+    data, _ = formatters.DisplayFormatter().format(Pluck(220).take(0.2))
+    assert "<svg" in data["text/html"] and "<audio" in data["text/html"]
 
 
 def test_row_panels_do_not_overlap():

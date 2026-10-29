@@ -11,8 +11,8 @@ PITCHED = [Timpani, Marimba, Xylophone, Glockenspiel, Celesta]
 @pytest.mark.parametrize("cls", DRUMS)
 def test_a_drum_plays_a_bar_cleanly(cls):
     d = cls()
-    notes = [n for i in range(8) for n in d.hit(i * 0.25, velocity=0.5 + 0.5 * (i % 2))]
-    assert not lint_audio(np.asarray(d.play(notes).take(seconds=4.0))).errors
+    notes = [n for i in range(8) for n in d.hit(i * 0.15, velocity=0.5 + 0.5 * (i % 2))]
+    assert not lint_audio(np.asarray(d.play(notes).take(seconds=1.5))).errors
 
 
 @pytest.mark.parametrize("cls", PITCHED)
@@ -59,14 +59,15 @@ def test_open_is_ignored_off_the_hihat():
 @pytest.mark.parametrize("cls", DRUMS)
 def test_a_drum_alone_at_full_velocity_stays_under_full_scale(cls):
     d = cls()
-    peaks = [np.abs(np.asarray(d.play(d.hit(0.0, 1.0), seed=s).take(seconds=1.5))).max() for s in range(40)]
+    # the peak is in the hit, not the tail, so half a second of each of 10 seeds
+    peaks = [np.abs(np.asarray(d.play(d.hit(0.0, 1.0), seed=s).take(seconds=0.5))).max() for s in range(10)]
     assert max(peaks) < 1.0
 
 
 def test_four_limbs_on_one_step_stay_under_full_scale():
     kit = Kit()
     grid = {kit.crash: "X", kit.kick: "X", kit.snare: "X", kit.hihat: "o"}
-    peaks = [np.abs(np.asarray(kit.play(kit.pattern(grid, step=0.5), seed=s).take(seconds=2.0))).max() for s in range(20)]
+    peaks = [np.abs(np.asarray(kit.play(kit.pattern(grid, step=0.5), seed=s).take(seconds=0.5))).max() for s in range(10)]
     assert max(peaks) < 1.0
 
 

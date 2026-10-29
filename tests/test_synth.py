@@ -52,7 +52,7 @@ def test_additive_with_a_modulated_freq_is_the_same_in_any_block_size():
     # partial 2 crosses 24 000 Hz six times a second, so a mask set per block would show here
     unit = Additive(Sine(3.0) * 4_000 + 10_000, [(1, 0.5), (2, 0.25)])
     whole = render(unit, 0.5)
-    assert np.array_equal(whole, render(unit, 0.5, block=1))
+    assert np.array_equal(whole[:4_800], render(unit, 0.1, block=1))  # crosses at 0.028 s
     assert np.array_equal(whole, render(unit, 0.5, block=37))
 
 
