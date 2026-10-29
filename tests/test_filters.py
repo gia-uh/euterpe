@@ -128,3 +128,45 @@ def test_comb_and_allpass_take_numbers_only():
         Comb(Sine(), 0.01, Sine(1.0))
     with pytest.raises(TypeError, match="Allpass.delay must be a number, not a Unit"):
         Allpass(Sine(), Sine(1.0) * 0.001 + 0.002, 0.5)
+
+
+def _gain_db(make, hz):
+    """The level a filter gives a sine at hz, in dB against the sine itself, after it settles."""
+    x = render(Sine(hz) * 0.5, 0.5)[RATE_HALF:]
+    y = render(make(Sine(hz) * 0.5), 0.5)[RATE_HALF:]
+    return 20 * np.log10(np.sqrt(np.mean(y.astype(np.float64) ** 2)) / np.sqrt(np.mean(x.astype(np.float64) ** 2)))
+
+
+RATE_HALF = 12_000  # skip the first quarter second, while the filter settles
+
+
+def test_peak_reaches_its_gain_at_cutoff():
+    from euterpe.sound.filters import Peak
+
+    assert abs(_gain_db(lambda s: Peak(s, 1000.0, gain=6.0), 1000.0) - 6.0) < 0.5
+    assert abs(_gain_db(lambda s: Peak(s, 1000.0, gain=6.0), 100.0)) < 0.5
+    assert abs(_gain_db(lambda s: Peak(s, 1000.0, gain=6.0), 10_000.0)) < 0.5
+
+
+def test_shelves_lift_their_side():
+    from euterpe.sound.filters import HighShelf, LowShelf
+
+    assert abs(_gain_db(lambda s: LowShelf(s, 200.0, gain=6.0), 30.0) - 6.0) < 0.5
+    assert abs(_gain_db(lambda s: LowShelf(s, 200.0, gain=6.0), 5000.0)) < 0.5
+    assert abs(_gain_db(lambda s: HighShelf(s, 3000.0, gain=-6.0), 15_000.0) + 6.0) < 0.5
+    assert abs(_gain_db(lambda s: HighShelf(s, 3000.0, gain=-6.0), 100.0)) < 0.5
+
+
+def test_zero_gain_is_identity():
+    from euterpe.sound.filters import HighShelf, LowShelf, Peak
+
+    x = render(Saw(220.0) * 0.5, 0.2)
+    for f in (Peak, LowShelf, HighShelf):
+        assert np.max(np.abs(render(f(Saw(220.0) * 0.5, 800.0, gain=0.0), 0.2) - x)) < 1e-5
+
+
+def test_a_moving_gain_renders():
+    from euterpe.sound.filters import Peak
+
+    y = render(Peak(Saw(110.0) * 0.5, 800.0, gain=Segments([(0.0, -12.0), (0.5, 12.0)])), 0.5)
+    assert np.all(np.isfinite(y))
