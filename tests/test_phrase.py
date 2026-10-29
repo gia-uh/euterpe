@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from euterpe.instruments import Instrument, Legato, Note
+from euterpe.instruments import Instrument, Legato, Note, play
 from euterpe.pitch import A4, C4, E4, G4
 from euterpe.sound import ADSR, Pan, Sine
 from euterpe.sound.core import RATE
@@ -85,3 +85,11 @@ def test_a_voice_that_never_ends_fades_at_the_note_end():
     p = Drone().play([(0.0, A4, 0.5)])
     x = np.asarray(p.take())
     assert np.abs(x[-5:]).max() < 0.01
+
+
+def test_a_plain_function_is_a_voice():
+    p = play(lambda n: Sine(n.freq) * ADSR(release=0.01, gate=n.duration) * 0.2,
+             [(0.0, C4, 0.5), (0.0, E4, 0.5), (0.0, G4, 0.5), (0.5, A4, 0.5)])
+    assert sounding(p, 0.1) == 3 and p.starts[3] == round(0.5 * RATE)
+    x = np.asarray(p.take(1.2))
+    assert np.abs(x[: round(0.4 * RATE)]).max() > 0.3 and np.abs(x[round(1.1 * RATE):]).max() == 0
