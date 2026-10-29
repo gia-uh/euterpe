@@ -147,14 +147,26 @@ class Instrument:
         return self.play([Note(0.0, pitch, duration, velocity, articulation)])
 
 
+class _Voiced:
+    """A plain function used as an instrument: it voices each note, and any number sound at once."""
+
+    polyphony = math.inf
+
+    def __init__(self, voice):
+        self.voice = voice
+
+
 def play(instrument, events: Iterable, seed: int = 0) -> Phrase:
-    """Play events on any object with voice(note) and polyphony, inheriting or not.
+    """Play events on any object with voice(note) and polyphony, inheriting or not, or on a
+    plain function from a note to its unit, such as lambda n: Sine(n.freq) * ADSR(gate=n.duration).
 
     Each note gets its own random generator, derived from seed in time order, so the same
     seed gives the same samples.
     """
     from euterpe.instruments.phrase import Phrase
 
+    if not hasattr(instrument, "voice"):
+        instrument = _Voiced(instrument)
     notes, controls = [], []
     for e in events:
         if isinstance(e, Control):
