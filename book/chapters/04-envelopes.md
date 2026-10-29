@@ -15,10 +15,10 @@ scope = {}
 for name in ("kick", "floor", "pump", "finale"):
     code = re.search(r"```python \{[^}\n]*name=" + name + r"\b[^}\n]*\}\n(.*?)\n```", text, re.S).group(1)
     exec("\n".join(line for line in code.split("\n") if ".take(" not in line), scope)  # definitions only
-listen(scope["song"], 8.0, "The first 8 s of the chapter's finale")
+listen(scope["song"], 8.5, "The first 8 s of the chapter's finale")
 ```
 
-A dance groove: a kick drum on every beat, chords that duck out of its way, a bass and a hi-hat between the kicks. Every part is a plain wave from chapters 1 to 3; what makes each one a drum, a pluck or a pad is its envelope.
+A dance groove: a kick drum on every beat, chords that get quieter each time the kick hits, a bass and a hi-hat between the kicks. Every part is a plain wave from chapters 1 to 3; what makes each one a drum, a pluck or a pad is its envelope.
 
 ## A hard start clicks
 
@@ -98,7 +98,7 @@ Instruments fall into two groups by their envelope.
 
 In a *percussive* instrument a single strike or pluck puts energy in, and the sound then dies away whatever the player does: piano, guitar, harp, drums, bells. Its envelope has a short attack, a long decay and a sustain of 0. In the examples below the gate ends after the decay is over, so the release has nothing left to do. In a *sustained* instrument the player feeds energy in for as long as the note lasts, with a bow, breath or an electric motor: violin, flute, organ. Its envelope has a sustain level above 0 and holds it until the gate ends.
 
-The same saw at 220 Hz sounds like four different instruments under four envelopes. A short attack (2 ms) starts a note with a firm edge, a long one (0.6 s) swells in; a short decay to sustain 0 is a tap, a long one a pluck; a sustain of 1 holds the note like an organ; a long release lets it ring on after the key comes up.
+The same saw at 220 Hz sounds like four different instruments under four envelopes: a pluck (2 ms attack, a long 0.8 s decay to sustain 0), a tap (the same with a 0.12 s decay), an organ (sustain 1, the note held until the key comes up) and a bowed swell (a 0.6 s attack and a long release that lets it ring on).
 
 ```python {run}
 from euterpe.sound import ADSR, Saw
@@ -233,14 +233,14 @@ The ear does not hear a constant, but it shifts the whole wave up or down, so on
 
 ### Following an envelope
 
-`EnvelopeFollower(src, attack=0.005, release=0.1)` works the other way round: it measures the envelope of a sound that already exists. Its output is the size of the source's peaks, updated at every sample. When the source gets louder, the output rises towards the new peaks with a time scale of `attack` seconds; when the source gets quieter, it falls with a time scale of `release` seconds. A *time scale* here is the time the output takes to cover about 63 % (1 − 1/e) of the way to a new, steady target, the way the voltage on a capacitor charging through a resistor (an RC circuit) does; after three time scales it has covered 95 %.
+`EnvelopeFollower(src, attack=0.005, release=0.1)` works the other way round: it measures the envelope of a sound that already exists. Its output is the size of the source's peaks, updated at every sample. When the source gets louder, the output rises towards the new peaks with a time scale of `attack` seconds; when the source gets quieter, it falls with a time scale of `release` seconds. A *time scale* here is the time the output takes to cover about 63 % (1 − 1/e) of the way to a new, steady target, the way a cup of coffee cools towards room temperature; after three time scales it has covered 95 %.
 
-Producers use a follower to make one sound make room for another, a technique called *ducking*, or *side-chaining*, because the level of one sound, fed in from the side, controls the gain of another. Below, four chords are multiplied by `1 - follower`: units can be subtracted, and negated with `-unit`, with numbers or units on either side, just as they can be added and multiplied. The follower listens to the kicks. A chord is three notes played together; `CHORDS` lists each as steps above A3, as in chapter 3's hymn: A minor (0, 3 and 7 steps, a *minor chord*, darker than the major one), F, C and G, the four chords of countless pop songs. Each note is two saws 0.3 % apart, which beat slowly and sound fuller, under an organ envelope that holds for the whole bar.
+Producers use a follower to make one sound make room for another, a technique called *ducking*, or *side-chaining*, because the level of one sound, fed in from the side, controls the gain of another. Below, four chords are multiplied by `1 - follower`: units can be subtracted, and negated with `-unit`, with numbers or units on either side, just as they can be added and multiplied. The follower listens to the kicks. A chord is three notes played together; `CHORDS` lists each as steps above A3, as in chapter 3's hymn: A minor (0, 3 and 7 steps, a *minor chord*, darker than the major one), F, C and G, the four chords of countless pop songs. Each note is two saws 0.3 % apart, which drift in and out of step less than once a second and sound fuller, under an organ envelope that holds for the whole bar.
 
 ```python {run continue name=pump}
 from euterpe.sound import EnvelopeFollower, Saw
 
-CHORDS = [(0, 3, 7), (-4, 0, 3), (3, 7, 10), (-2, 2, 5)]  # A minor, F, C, G: steps above A3
+CHORDS = [(0, 3, 7), (-4, 0, 3), (3, 7, 10), (-2, 2, 5)]  # A minor, F, C, G: steps from A3, negative below; the first is the root
 
 
 def pad(n):
@@ -267,11 +267,11 @@ lowest = render(duck, 8.0).min()
 print(round(float(lowest), 3), round(float(20 * np.log10(lowest)), 1), "dB")
 ```
 
-In the second player the chords drop to 0.4 of their level, about 8 dB, on every kick, and swell back up between kicks: they *pump*, the sound of French house and of much dance music since. Chapter 8's compressor measures level the same way, with an RMS detector instead of peaks.
+In the second player the chords drop to about half their level, about 6 dB, on every kick, and swell back up between kicks: they *pump*, the sound of French house and of much dance music since. Chapter 8's compressor measures level the same way, with an RMS detector instead of peaks.
 
 ## Putting it all together
 
-Two more parts complete the groove, both on the *off-beats*, halfway between two kicks. The hi-hat is four inharmonic partials high up, as in chapter 3's metal bar, under a 50 ms percussive envelope: a short metallic tick. The bass is a saw on the root of each chord, an octave below it, plucked with a 0.3 s decay. Twelve bars, 24 seconds:
+Two more parts complete the groove, both on the *off-beats*, halfway between two kicks. The hi-hat is four *inharmonic* partials high up (not whole multiples of one frequency, like chapter 3's metal bar, but at new ratios chosen to sound like a small cymbal), under a 50 ms percussive envelope: a short metallic tick. The bass is a saw on the root of each chord (the first number of its tuple), an octave below it, plucked with a 0.3 s decay. Twelve bars, 24 seconds:
 
 ```python {run continue name=finale}
 from euterpe.sound import Additive
@@ -279,7 +279,7 @@ from euterpe.sound import Additive
 
 def hat(n):
     env = ADSR(attack=0.001, decay=0.05, sustain=0.0, release=0.0, gate=0.1, curve=0.8)
-    return Additive(3000.0, [(1, 1.0), (1.47, 0.8), (1.83, 0.7), (2.31, 0.6)]) * env * 0.2
+    return Additive(n.freq, [(1, 1.0), (1.47, 0.8), (1.83, 0.7), (2.31, 0.6)]) * env * 0.2
 
 
 def bass(n):
