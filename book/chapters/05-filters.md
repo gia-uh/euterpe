@@ -18,7 +18,7 @@ for name in ("acid", "finale"):
 listen(scope["song"], 8.0, "The first 8 s of the chapter's finale")
 ```
 
-A squelching bass line under a choir of robots singing "ah" and "oh", with a hiss of hi-hats: every part is a saw or noise from earlier chapters, carved by filters.
+A squelching bass line under a choir of robots singing "ah" and "aw", with a hiss of hi-hats: every part is a saw or noise from earlier chapters, carved by filters.
 
 ## What a filter does to a spectrum
 
@@ -69,7 +69,7 @@ for f in (250, 500, 1000, 2000, 4000, 8000):
     print(f"{f:5} Hz:  LowPass {gain_db(lambda s: LowPass(s, 1000.0), f):6} dB   OnePoleLowPass {gain_db(lambda s: OnePoleLowPass(s, 1000.0), f):6} dB")
 ```
 
-The list of gains over every frequency is the filter's *frequency response*. Up to 500 Hz the sine passes almost unchanged. At the cutoff, 1 000 Hz, both are 3 dB down: the cutoff of a filter is, by convention, the frequency where half the power is gone. From there on, each octave up costs the biquad about 12 dB (−12.4, −24.6, −37.1) and the one-pole about 6 (−7.0, −12.2). A gentle slope sounds like a small change of colour; a steep one removes a part of the spectrum.
+The list of gains over every frequency is the filter's *frequency response*. Up to 500 Hz the sine passes almost unchanged. At the cutoff, 1 000 Hz, both are 3 dB down: the cutoff of a filter is, by convention, the frequency where half the power is gone. From there on, each octave up costs the biquad about 12 dB (−12.4, −24.6, −37.1) and the one-pole less, approaching 6 dB per octave further up (−7.0, −12.2). A gentle slope sounds like a small change of colour; a steep one removes a part of the spectrum.
 
 ## Subtractive synthesis
 
@@ -157,7 +157,7 @@ for kind, gain in ((LowPass, 0.8), (HighPass, 0.2), (BandPass, 1.4), (Notch, 0.2
 ```
 
 
-The low-pass rumbles, the high-pass hisses, the band-pass is a noise with a vague pitch near 1 000 Hz, like breath through a tube. The notch sounds almost like the unfiltered noise: it removes a band 500 Hz wide out of 24 000 Hz, and the ear barely misses it. A notch is a repair tool more than a sound: it removes one bad frequency, such as a 50 Hz hum from the mains, and leaves the rest.
+The low-pass rumbles, the high-pass hisses, the band-pass is a noise with a vague pitch near 1 000 Hz, like breath through a tube. The notch sounds almost like the unfiltered noise: only the centre of its band is removed completely, and a narrow gap in a sound that has every frequency is barely missed. A notch is a repair tool more than a sound: it removes one bad frequency, such as a 50 Hz hum from the mains, and leaves the rest.
 
 A high-pass also fixes the side effect chapter 4 found: a pulse whose duty moves has a DC offset, a component near 0 Hz. A high-pass's gain falls to exactly 0 at 0 Hz, so a constant offset is removed completely. Here the offset is not quite constant: the duty moves over one second, so the offset moves with it, slowly. Slow means close to 0 Hz, well below 20 Hz, about the lowest frequency the ear hears, so a high-pass at 20 Hz removes it too. A `OnePoleHighPass` has the gain 1 / √(1 + (cutoff / f)²) at f Hz, which is 0 at f = 0, 1/√2 (−3 dB) at the cutoff, and close to 1 above it: at 110 Hz, the note below, it takes away 0.14 dB, which no one can hear. The same pulse as in chapter 4, linted before and after the high-pass:
 
@@ -199,7 +199,7 @@ from euterpe.instruments import play
 from euterpe.sound import ADSR, LowPass, Saw
 
 STEP = 0.125  # seconds: a sixteenth of a bar at 120 beats a minute
-PATTERN = [0, 0, 12, 0, 0, 10, 0, 12, 0, 0, 7, 0, 3, 0, 12, 10]  # steps above A1, 55 Hz
+PATTERN = [0, 0, 12, 0, 0, 10, 0, 12, 0, 0, 7, 0, 3, 0, 12, 10]  # semitones above A1, 55 Hz
 
 
 def acid(n):
@@ -215,7 +215,7 @@ def line(bars):
 line(2).take(4.2, "An acid line: the swept low-pass retriggered on every step")
 ```
 
-The resonant peak "squelches" through the harmonics on every step. The line sits at 55 and 110 Hz, yet it is heard on small speakers that cannot play 55 Hz at all: the harmonics at 110, 165, 220 Hz and up are 55 Hz apart, and the ear infers the pitch from that spacing even when the first harmonic is missing. This is called the *missing fundamental*.
+The resonant peak "squelches" through the harmonics on every step. The line sits mostly at 55 Hz, with jumps up to 110 Hz, yet it is heard on small speakers that cannot play 55 Hz at all: the harmonics at 110, 165, 220 Hz and up are 55 Hz apart, and the ear infers the pitch from that spacing even when the first harmonic is missing. This is called the *missing fundamental*.
 
 Then a slow sine. `Sine(1.5) * 700 + 1000` swings between 300 and 1 700 Hz, one and a half times a second. On a resonant low-pass, it gives the sound of a guitarist's *wah-wah* pedal, which moves a resonant filter with the foot:
 
@@ -237,7 +237,7 @@ tone.take(3.0).spectrogram(
 )
 ```
 
-The picture is a *spectrogram*: time runs left to right, frequency bottom to top, and darker ink is a higher level. Each horizontal line is one harmonic of 110 Hz. The dark band that rises and falls is the resonant peak, inking the harmonics it passes.
+In the spectrogram (chapter 1) each horizontal line is one harmonic of 110 Hz. The dark band that rises and falls is the resonant peak, inking the harmonics it passes.
 
 ## Filters made of delays
 
@@ -273,7 +273,7 @@ print([round(float(v), 3) for v in y[::144][:6]])
 print("energy out:", round(float((y ** 2).sum()), 3))
 ```
 
-The impulse comes out at once as −0.7 (the −gain × x[n] path), then as an echo of 1 − 0.7² = 0.51 after 3 ms, and each later echo is 0.7 times the one before. The energies add up to 0.49 + 0.51² × (1 + 0.49 + 0.49² + …) = 0.49 + 0.51 = 1, the energy of the impulse that went in; the sum printed is 1.0. The same holds at every frequency: `gain_db` reads 0 dB for this allpass at any frequency you try. What an allpass changes is time: the energy comes out spread over a dense ring of echoes, each frequency delayed by its own amount. Chapter 3 called this the phase of each component: the allpass changes only phases. On a steady tone the ear does not hear phase, so an allpass is almost inaudible; on a click it smears the attack into a short ring. The example below is four clicks a quarter second apart. Each is made with `Segments` from `(time, level)` points joined by straight lines, where two points at the same time make a jump: 3 ms at +0.5, then 3 ms at −0.5, so that its average is 0 and it has no DC offset. Chapter 8 chains allpasses to make reverb.
+The impulse comes out at once as −0.7 (the −gain × x[n] path), then as an echo of 1 − 0.7² = 0.51 after 3 ms, and each later echo is 0.7 times the one before. The energies add up to 0.49 + 0.51² × (1 + 0.49 + 0.49² + …) = 0.49 + 0.51 = 1, the energy of the impulse that went in; the sum printed is 1.0. The same holds at every frequency: `gain_db` reads 0 dB for this allpass at any frequency you try. What an allpass changes is time: the energy comes out spread over a short ring of echoes every 3 ms, each frequency delayed by its own amount. Chapter 3 called this the phase of each component: the allpass changes only phases. On a steady tone the ear does not hear phase, so an allpass is almost inaudible; on a click it smears the attack into a short ring. The example below is four clicks a quarter second apart. Each is made with `Segments` from `(time, level)` points joined by straight lines, where two points at the same time make a jump: 3 ms at +0.5, then 3 ms at −0.5, so that its average is 0 and it has no DC offset. Chapter 8 chains allpasses to make reverb.
 
 ```python {run continue}
 from euterpe.sound import Allpass, Segments
@@ -315,12 +315,12 @@ Listen to them in a row: a buzzing voice says "ah, eh, ee, aw, oo". The pitch is
 
 ## Putting it all together
 
-Two more parts join the acid line. The choir is two saws 0.5 % apart, which drift in and out of step: two sines a little apart in frequency add when in step and cancel half a cycle later, so their sum rises and falls slowly. This slow rise and fall is called *beating*, and with every harmonic beating at its own rate the tone seems to move. The choir plays a chord per bar, A minor then F (chapter 4's chords), through `Formant`, singing "a" on one bar and "o" on the next. The hi-hats are white noise through a high-pass at 8 kHz, a 40 ms tick on every off-beat; each has its own seed, so no two are the same noise. Twelve bars, 24 seconds:
+Two more parts join the acid line. The choir is two saws 0.5 % apart, which drift in and out of step: two sines a little apart in frequency add when in step and cancel half a cycle later, so their sum rises and falls slowly. This slow rise and fall is called *beating*, and with every harmonic beating at its own rate the tone seems to move. The choir plays a chord per bar, A minor then F (chapter 4's chords), through `Formant`, singing "a" on one bar and "o" on the next. The hi-hats are white noise through a high-pass at 8 kHz, a 40 ms tick on every off-beat (its note's frequency is unused: a hat has no pitch); each has its own seed, so no two are the same noise. Twelve bars, 24 seconds:
 
 ```python {run continue name=finale}
 from euterpe.sound import Formant, HighPass, WhiteNoise
 
-CHORDS = [(0, 3, 7), (-4, 0, 3)]  # A minor and F: steps above A3
+CHORDS = [(0, 3, 7), (-4, 0, 3)]  # A minor and F: semitones from A3
 VOWELS = "ao"
 
 
@@ -338,7 +338,7 @@ BARS = 12
 voices = play(choir, [(16 * STEP * b, 220 * 2 ** (s / 12), 16 * STEP) for b in range(BARS) for s in CHORDS[b % 2]])
 hats = play(hat, [(STEP * (4 * i + 2), 8000.0, 0.05) for i in range(4 * BARS)])
 song = line(BARS) + voices + hats
-song.take(24.5, "Acid line, robot choir and hi-hats: three filters at work")
+song.take(24.5, "Acid line, robot choir and hi-hats: three parts, each a filtered saw or noise")
 ```
 
 Every number in `acid` is a knob on a synthesizer's front panel: the filter envelope's `decay` sets how long each squelch lasts, `q` how much it sings, `* 2500 + 250` the range it sweeps. But every source in this piece is a saw or white noise. Chapter 6 brings three new raw materials: tones made by moving one sine's frequency with another (FM), noises of other colours, and wavetables.
