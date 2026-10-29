@@ -10,12 +10,20 @@ from euterpe.sound.shape import Saturator
 
 
 class _Chain(Unit):
-    """A unit that is a fixed chain of other units, built in __init__ as self._chain."""
+    """A unit that is a fixed chain of other units, which _build makes from its attributes.
+    The chain is rebuilt on every reset, so a view may swap the source for a probe."""
 
     _chain: Unit
 
+    def _build(self) -> Unit:
+        raise NotImplementedError
+
     def inputs(self) -> list[Unit]:
-        return [self._chain]
+        return [v for k, v in vars(self).items() if isinstance(v, Unit) and k != "_chain"]
+
+    def reset(self) -> None:
+        super().reset()
+        self._chain = self._build()
 
     @property
     def duration(self) -> float | None:
@@ -48,10 +56,13 @@ class Amp(_Chain):
         self.channels = src.channels
         self.gain, self.bass, self.mid, self.treble, self.level = (
             _arg(gain), _arg(bass), _arg(mid), _arg(treble), _arg(level))
-        x = Saturator(HighPass(src, 100.0), drive=self.gain, bias=0.1)
+        self.reset()
+
+    def _build(self) -> Unit:
+        x = Saturator(HighPass(self.src, 100.0), drive=self.gain, bias=0.1)
         x = HighShelf(Peak(LowShelf(x, 200.0, gain=self.bass), 800.0, q=0.7, gain=self.mid), 3000.0,
                       gain=self.treble)
-        self._chain = x * self.level
+        return x * self.level
 
 
 class Cabinet(_Chain):
@@ -67,10 +78,19 @@ class Cabinet(_Chain):
     the cone, and its speaker breaks up at high volume.
     """
 
+    def response(self, **kw):
+        """This cabinet's gain over frequency, as a view."""
+        from euterpe.view import response
+
+        return response(self, **kw)
+
     def __init__(self, src: Unit, size: float = 1.0):
         self.src = src
         self.channels = src.channels
         self.size = float(size)
-        x = HighPass(src, 80.0 / self.size)
+        self.reset()
+
+    def _build(self) -> Unit:
+        x = HighPass(self.src, 80.0 / self.size)
         x = Peak(Peak(x, 110.0 / self.size, q=1.5, gain=4.0), 2500.0, q=1.2, gain=3.0)
-        self._chain = LowPass(LowPass(x, 5000.0), 5000.0)
+        return LowPass(LowPass(x, 5000.0), 5000.0)

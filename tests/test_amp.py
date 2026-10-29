@@ -84,3 +84,10 @@ def test_amp_and_cabinet_render_the_same_in_any_block_size():
     a = render(make(), 0.3)
     b = render(make(), 0.3, block=97)
     assert np.array_equal(a, b)
+
+
+def test_a_cabinet_draws_its_response():
+    from euterpe.sound import Cabinet
+    from euterpe.sound.core import Const
+
+    assert Cabinet(Const(0.0)).response(caption="A guitar cabinet").svg()
