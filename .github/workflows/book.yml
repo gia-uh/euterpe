@@ -21,6 +21,9 @@ jobs:
         with: { enable-cache: true, python-version: "3.12" }
       - run: uv sync --group book
       - run: uv run scriptorium render book/scriptorium.yaml --only site
+      - name: no block failed
+        # scriptorium prints a failing block's traceback on the page instead of failing the build
+        run: "! grep -l 'Traceback (most recent call last)' book/site/*.html"
       - uses: actions/upload-pages-artifact@v3
         with: { path: book/site }
   deploy:
