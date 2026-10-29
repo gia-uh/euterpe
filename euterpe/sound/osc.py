@@ -156,3 +156,62 @@ class Triangle(_Stepped):
         out = np.where(t < 0.5, 4.0 * t - 1.0, 3.0 - 4.0 * t)
         # the slope changes by +8 per cycle at the bottom (phase 0), by -8 at the top (0.5)
         return out + 8.0 * dt * (_blamp(t, dt) - _blamp((t - 0.5) % 1.0, dt))
+
+
+class _Fed(Unit):
+    """A frequency handed in by the unit that owns it, times ratio: lets one pull of a
+    parameter drive several oscillators."""
+
+    channels = 1
+
+    def __init__(self, ratio: float):
+        self.ratio, self.values = ratio, np.zeros(0)
+
+    def block(self, n: int) -> np.ndarray:
+        return (self.values[:n] * self.ratio).astype(np.float32)
+
+
+class Unison(Unit):
+    """voices copies of an oscillator, detuned evenly across plus and minus detune semitones
+    and spread evenly across the stereo field, width 1 from hard left to hard right.
+
+    Each copy puts its harmonics a little off the others', so every harmonic becomes a cluster
+    of close lines that beat against each other: the tone thickens and shimmers, and the beating
+    is faster for higher harmonics. Each copy starts at a random point of its cycle, drawn from
+    seed, as unsynchronised oscillators do. The sum is scaled by 1 / sqrt(voices), so its level
+    stays near one copy's. Stereo; one voice is the plain oscillator in the middle.
+    """
+
+    channels = 2
+
+    def __init__(self, osc: type = Saw, freq: float | Unit = 440.0, voices: int = 7, detune: float = 0.2,
+                 width: float = 1.0, seed: int = 0):
+        """osc: an oscillator class taking freq as its first argument; detune in semitones."""
+        if voices < 1:
+            raise ValueError(f"Unison needs at least one voice, got {voices}")
+        self.osc, self.freq, self.voices = osc, _arg(freq), int(voices)
+        self.detune, self.width, self.seed = float(detune), float(width), int(seed)
+        spread = np.linspace(-1.0, 1.0, self.voices) if self.voices > 1 else np.zeros(1)
+        self._feeds = [_Fed(2 ** (self.detune * s / 12)) for s in spread]
+        self._copies = [osc(f) for f in self._feeds]
+        theta = (np.clip(spread * self.width, -1.0, 1.0) + 1) * np.pi / 4
+        self._gains = np.stack([np.cos(theta), np.sin(theta)], axis=1) * np.sqrt(2) / np.sqrt(self.voices)
+        self.reset()
+
+    def inputs(self) -> list[Unit]:
+        return [self.freq] if isinstance(self.freq, Unit) else []
+
+    def reset(self) -> None:
+        super().reset()
+        starts = np.random.default_rng(self.seed).random(self.voices) if self.voices > 1 else np.zeros(1)
+        for c, p in zip(self._copies, starts):
+            c.reset()
+            c._acc = int(p * _ONE)
+
+    def block(self, n: int) -> np.ndarray:
+        freq = _signal(self.freq, n).astype(np.float64)
+        out = np.zeros((n, 2), np.float64)
+        for feed, c, g in zip(self._feeds, self._copies, self._gains):
+            feed.values = freq
+            out += c.block(n).astype(np.float64)[:, None] * g
+        return out.astype(np.float32)

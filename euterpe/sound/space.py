@@ -472,3 +472,79 @@ class Width(Unit):
         mid = (x[:, 0] + x[:, 1]) / 2
         side = (x[:, 0] - x[:, 1]) / 2 * _p64(self.width, n)
         return np.stack([mid + side, mid - side], axis=1).astype(np.float32)
+
+
+class Leslie(Unit):
+    """A rotating speaker: a horn for the highs and a drum for the lows, each spinning, heard
+    by two microphones on opposite sides.
+
+    The source is split at crossover Hz. As a rotor turns, its mouth moves towards one
+    microphone and away from the other, so each hears the pitch rise and fall (the Doppler
+    effect, a moving delay as in a chorus) and the level swell and dip (tremolo), half a turn
+    apart from the other: every line of the spectrum gains sidebands at the rotor's rate and
+    the sound swirls between the speakers. speed 0 spins the rotors at their slow rates
+    (horn, drum) in Hz, 1 at their fast rates, and a unit between them blends; each rotor
+    reaches a new speed over its rise seconds, the heavy drum slower than the horn, as the
+    motors and belts of the real cabinet do. Stereo.
+
+    Limits: the cabinet's own resonances and the horn's beaming are not modelled.
+    """
+
+    channels = 2
+    _HORN = (0.00045, 0.5)  # delay swing in seconds, tremolo depth: a horn of about 15 cm
+    _DRUM = (0.0003, 0.3)
+
+    @property
+    def duration(self) -> float | None:
+        return _after(self.src.duration, 0.005)
+
+    def __init__(self, src: Unit, speed: float | Unit = 0.0, slow: tuple[float, float] = (0.8, 0.7),
+                 fast: tuple[float, float] = (6.7, 5.8), rise: tuple[float, float] = (1.0, 4.0),
+                 crossover: float = 800.0, mix: float | Unit = 1.0):
+        """slow, fast: (horn, drum) rates in Hz; rise: (horn, drum) seconds to change speed."""
+        _numbers("Leslie", crossover=crossover)
+        self.src, self.speed, self.mix = src, _arg(speed), _arg(mix)
+        self.slow, self.fast, self.rise = tuple(map(float, slow)), tuple(map(float, fast)), tuple(map(float, rise))
+        self.crossover = float(crossover)
+        from euterpe.sound.filters import _rbj
+
+        self._lp = _rbj("lowpass", self.crossover, 0.707)
+        self._cap = int(0.002 * RATE) + 4
+        self.reset()
+
+    def reset(self) -> None:
+        super().reset()
+        s = _fixed(self.speed, 0.0)
+        self._rate = np.array([self.slow[i] + (self.fast[i] - self.slow[i]) * s for i in range(2)])
+        self._angle = np.zeros(2)  # cycles
+        self._zi = np.zeros(2)
+        self._tail = np.zeros((self._cap, 2))  # the last samples of the drum and horn bands
+
+    def block(self, n: int) -> np.ndarray:
+        x = self.src.block(n).astype(np.float64)
+        if x.ndim == 2:
+            x = x.mean(axis=1)
+        low, self._zi = lfilter(*self._lp, x, zi=self._zi)
+        bands = np.stack([low, x - low], axis=1)
+        buf = np.concatenate([self._tail, bands])
+        self._tail = buf[-self._cap:]
+        here = self._cap + np.arange(n)
+        speed = _p64(self.speed, n)
+        out = np.zeros((n, 2))
+        for i, (swing, depth) in enumerate((self._DRUM, self._HORN)):
+            r = 1 - i  # rise, slow and fast are given (horn, drum)
+            target = self.slow[r] + (self.fast[r] - self.slow[r]) * speed
+            c = 1 - np.exp(-1 / (self.rise[r] * RATE / 5))  # within 1 % of the target after rise seconds
+            rate, zf = lfilter([c], [1.0, c - 1], target, zi=[(1 - c) * self._rate[r]])
+            self._rate[r] = rate[-1]
+            angle = self._angle[r] + np.cumsum(rate) / RATE
+            self._angle[r] = angle[-1] % 1.0
+            for ch, offset in enumerate((0.0, 0.5)):
+                turn = 2 * np.pi * (angle + offset)
+                at = here - (swing * (1 + np.sin(turn)) * RATE + 1)
+                k = np.floor(at).astype(np.int64)
+                frac = at - k
+                band = (1 - frac) * buf[k, i] + frac * buf[k + 1, i]
+                out[:, ch] += band * (1 - depth * (1 - np.cos(turn)) / 2)
+        mix = _p64(self.mix, n)[:, None]
+        return ((1 - mix) * x[:, None] + mix * out).astype(np.float32)

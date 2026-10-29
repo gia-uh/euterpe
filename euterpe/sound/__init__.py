@@ -20,7 +20,7 @@ from euterpe.sound.filters import (
     OnePoleLowPass,
 )
 from euterpe.sound.noise import BrownNoise, LFSRNoise, PinkNoise, Wavetable, WhiteNoise
-from euterpe.sound.osc import Saw, Sine, Square, Triangle
+from euterpe.sound.osc import Saw, Sine, Square, Triangle, Unison
 from euterpe.sound.amp import Amp, Cabinet
 from euterpe.sound.shape import BitCrush, Compressor, Gate, HardClip, Limiter, Saturator, SoftClip, Tanh
 from euterpe.sound.space import (
@@ -28,6 +28,7 @@ from euterpe.sound.space import (
     ConvolutionReverb,
     Delay,
     FDNReverb,
+    Leslie,
     Flanger,
     Pan,
     Phaser,
@@ -55,6 +56,7 @@ __all__ = [
     "Delay",
     "EnvelopeFollower",
     "FDNReverb",
+    "Leslie",
     "Flanger",
     "FM",
     "Formant",
@@ -81,6 +83,7 @@ __all__ = [
     "RATE",
     "Saturator",
     "Saw",
+    "Unison",
     "Segments",
     "Sine",
     "SoftClip",
