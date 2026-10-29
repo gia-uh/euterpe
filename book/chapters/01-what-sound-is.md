@@ -1,6 +1,21 @@
 # What sound is
 
-A sound is a change in air pressure that reaches your ear. This chapter follows that change from the air into a computer: how it is measured, how many numbers a second of sound takes, what goes wrong when there are too few, and how coarse each number can be before you hear it.
+A sound is a change in air pressure that reaches your ear. This chapter follows that change from the air into a computer: how it is measured, how many numbers a second of sound takes, what goes wrong when there are too few, and how coarse each number can be before you hear it. This is where it ends up:
+
+```python {run echo=false}
+# The teaser: the start of the finale, built by the code of this chapter's last section, which it
+# reads from this file so the two never differ.
+import re
+from pathlib import Path
+
+from euterpe.view import listen
+
+text = Path("chapters/01-what-sound-is.md").read_text()
+exec(re.search(r"```python \{[^}\n]*name=finale\b[^}\n]*\}\n(.*?)\n```", text, re.S).group(1))
+listen(song, 8.0, "The first 8 s of the chapter's finale")
+```
+
+Three sounds at once: a low buzz, a crude siren and a high tone with ghost tones sliding against it. Each comes from something that goes wrong when sound becomes numbers, and by the end of the chapter you will know which, and how to make it.
 
 ## Pressure over time
 
@@ -19,7 +34,7 @@ tone = Sine(440.0) * 0.5
 display(tone.take(2.0, "A sine wave at 440 Hz"))
 ```
 
-The drawing has two panels. The left one is the whole sound, its outline from the quietest to the loudest moment: for a steady sine, a flat band. The right one is its spectrum, how strong the sound is at each frequency, which chapter 3 explains: here a single peak at 440 Hz. Press play and a red line runs across the outline to show where the sound is, while the spectrum follows what is sounding at that moment; a click on the outline jumps there. Every sound plays at the same loudness, whatever level it was made at, so the volume can stay where it is; chapter 2 shows the few places where the level itself is the lesson. The book shows every sound this way. When a drawing would only repeat the one before it, a block uses `listen` from `euterpe.view` instead, which gives the player alone. A notebook shows the last line of a cell by itself, and `display(...)` shows any other line, as the book does.
+The left panel is the whole sound's outline, a flat band for a steady sine; the right one is its spectrum, how strong the sound is at each frequency (chapter 3), here a single peak at 440 Hz. Every sound plays at the same loudness, whatever level it was made at, so the volume can stay where it is; chapter 2 shows the few places where the level itself is the lesson. When a drawing would only repeat the one before it, a block uses `listen` from `euterpe.view` instead, which gives the player alone.
 
 A tone held at one steady frequency in a piece of music is a *note*. This one is the note musicians call A, the one orchestras tune to (chapter 2 explains note names). A sine is the plainest tone there is: it sounds like a tuning fork or a soft whistle. Every other sound in this book is built from sines, or analysed as a sum of them, so it is worth knowing well.
 
@@ -28,7 +43,7 @@ One cycle at 440 Hz lasts 1/440 of a second, about 2.27 milliseconds. In that ti
 ```python {run echo=false}
 from euterpe.sound import Sine
 
-(Sine(440.0) * 0.5).take(0.005).waveform(caption="The first 5 ms of the 440 Hz sine: a little over two cycles")
+(Sine(440.0) * 0.5).take(0.005).waveform(samples=True, caption="The first 5 ms of the 440 Hz sine: a little over two cycles, and its 240 samples")
 ```
 
 The vertical axis is not in pascals. Inside a computer a sound is a number between −1 and 1, and the loudspeaker and its volume knob decide how many pascals that becomes. That is why a value of 1 is called *full scale*: it means the most the file can hold, not a pressure. The largest value a wave reaches is its *amplitude*: the sine above has amplitude 0.5, half of full scale.
@@ -60,15 +75,7 @@ print(0.5 * np.sin(2 * np.pi * 440.0 * n / 48_000))
 
 The last digit can differ, because a 32-bit float keeps only about 7 significant digits and numpy computes here with 64-bit floats.
 
-Between two samples there is nothing: the file does not say what the pressure was in between. Zoomed in to the first millisecond, the dots are all that is stored.
-
-```python {run echo=false}
-from euterpe.sound import Sine
-
-(Sine(440.0) * 0.5).take(0.001).waveform(samples=True, caption="The first millisecond: 48 samples of the 440 Hz sine")
-```
-
-At 440 Hz there are 48 000 / 440, about 109 samples per cycle. The minimum is a little more than 2 samples per cycle, and the next section shows why. Below that, the samples no longer pin down the wave.
+Between two samples there is nothing: the file does not say what the pressure was in between. The dots in the plot above are all that is stored. At 440 Hz there are 48 000 / 440, about 109 samples per cycle. The minimum is a little more than 2 samples per cycle, and the next section shows why. Below that, the samples no longer pin down the wave.
 
 ## The Nyquist limit
 
@@ -121,13 +128,9 @@ In samples per cycle, the rule is the same. A frequency f gets 48 000 / f sample
 
 ### What playback puts between the samples
 
-If 44 000 Hz and 4 000 Hz have the same samples, why does a loudspeaker play 4 000 Hz? The answer uses a fact that chapter 3 shows: any wave that repeats is a sum of sines, and any other sound can be built from sines too. So a wave can be described by which frequencies it contains, and a wave that "contains nothing above 24 000 Hz" is one built only from sines below 24 000 Hz.
+If 44 000 Hz and 4 000 Hz have the same samples, why does a loudspeaker play 4 000 Hz? Any sound is a sum of sines (chapter 3 shows it), so it can be described by the frequencies it contains. The *converter* of the sound card, which turns the samples into a smoothly varying voltage, draws through them the one wave that contains nothing above 24 000 Hz: it uses a *filter*, a process that keeps some frequencies and removes others, here everything above 24 000 Hz. Through the samples of the 44 000 Hz sine, that wave is the 4 000 Hz one, so that is what you hear.
 
-The *sound card* is the part of a computer that drives the loudspeaker, and its *converter* turns the list of samples into a voltage that varies smoothly. It draws through the samples the one smooth wave that contains nothing above 24 000 Hz. It does that with a *filter*, a process that weakens some frequencies and keeps others: this one keeps everything below 24 000 Hz and removes everything above. Through the samples of the 44 000 Hz sine, the only wave below 24 000 Hz is the 4 000 Hz one, so that is what you hear.
-
-Why is there exactly one such wave? For a single sine, the last section showed it: of all the frequencies that share its samples, one lies below 24 000 Hz. The *Nyquist–Shannon sampling theorem* says the same holds for any sum of sines: through a list of samples passes exactly one wave built only from sines below half the sample rate. This chapter takes the theorem as given; it is proved later in the book.
-
-This does not contradict "between two samples there is nothing". The file stores nothing there. Playback fills the gaps under one assumption: the sound had nothing above half the sample rate. When that holds, the fill is exact and the original wave comes back. When it does not hold, playback assumes it anyway, and a wave above the limit comes out as its partner below. Real converters come close to this ideal filter, not all the way.
+That there is exactly one such wave, for any sum of sines, is the *Nyquist–Shannon sampling theorem*; this chapter takes it as given. So the file stores nothing between samples, and playback fills the gaps under one assumption: the sound had nothing above half the sample rate. When that holds, the original wave comes back exactly. When it does not, a wave above the limit comes out as its partner below.
 
 Euterpe's *oscillators*, the units that make a repeating wave (`Sine` and the `Saw` below, with more in later chapters), guard against this at the source: asked for a frequency at or above 24 000 Hz, they output silence. The check is on the frequency you pass in and nothing else. `Saw(10_000.0)` is allowed, although most of what it contains lies above 24 000 Hz, as the next section shows.
 
@@ -215,18 +218,18 @@ Each sample is a number, and a file stores it with a fixed number of bits. With 
 
 A 32-bit float is finite too, so the samples Euterpe computes are already quantised, though far more finely than any file stores them. When `render(..., to="tone.wav")` writes a WAV file, an uncompressed file of samples, it stores 24-bit integers: each sample is multiplied by 8 388 608 (`2 ** 23`), rounded to a whole number and stored in 3 bytes. 24-bit signed integers go from −8 388 608 to 8 388 607, so a sample of exactly 1 is stored as 8 388 607. The largest error is half the step, 1/16 777 216 of full scale, far below hearing.
 
-`BitCrush` rounds each sample to `2 ** bits - 1` levels spread evenly between −1 and 1. That is one level fewer than the bits allow, so that the levels are symmetric and 0 is one of them: silence stays silent. With one level fewer there is one gap fewer, so its step is 2 / (2**bits − 2): 1 at 2 bits, where the levels are −1, 0 and 1. Here is the 440 Hz sine with 16, 6, 4 and 2 bits:
+`BitCrush` rounds each sample to `2 ** bits - 1` levels spread evenly between −1 and 1. That is one level fewer than the bits allow, so that the levels are symmetric and 0 is one of them: silence stays silent. With one level fewer there is one gap fewer, so its step is 2 / (2**bits − 2): 1 at 2 bits, where the levels are −1, 0 and 1. Here is the 440 Hz sine with 6, 4 and 2 bits:
 
 ```python {run}
 from euterpe.sound import BitCrush, Sine
 
-for bits in (16, 6, 4, 2):
+for bits in (6, 4, 2):
     display((BitCrush(Sine(440.0), bits=bits) * 0.5).take(2.0, f"The 440 Hz sine with {bits} bits"))
 ```
 
 `BitCrush` acts on the full-scale sine, and `* 0.5` scales after. The order matters, because the levels stay between −1 and 1 whatever the input. At 2 bits they are −1, 0 and 1, and every sample of a half-scale sine is nearer to 0 than to either end: `BitCrush(Sine(440.0) * 0.5, bits=2)` rounds every sample to 0 and plays silence. Crushing first uses all the levels; scaling after turns them into −0.5, 0 and 0.5.
 
-At 16 bits it sounds like the sine at the top of the chapter. At 6 bits a faint hiss sits under the tone. At 4 bits the tone is harsh. At 2 bits the wave has three levels, −0.5, 0 and 0.5, but it spends two thirds of each cycle at 0.5 or −0.5 and only a third at 0, so it sounds close to a *square wave*, a wave that jumps between two values and spends half of each cycle at each. The plot shows one cycle of each, before the scaling:
+At 6 bits a faint hiss sits under the tone. At 4 bits the tone is harsh. At 2 bits the wave has three levels, −0.5, 0 and 0.5, but it spends two thirds of each cycle at 0.5 or −0.5 and only a third at 0, so it sounds close to a *square wave*, a wave that jumps between two values and spends half of each cycle at each. The plot shows one cycle of each, before the scaling:
 
 ```python {run echo=false}
 from euterpe.sound import BitCrush, Sine
@@ -240,6 +243,31 @@ waveform(
 ```
 
 Rounding changes the shape of the wave, so it adds frequencies that were not there. At 440 Hz a cycle is 48 000 / 440 = 109.09 samples, so the samples land at different points of the wave in each cycle. At 6 bits the error is small and depends on where each sample lands, so it does not repeat in a short pattern: its energy spreads thinly over many frequencies, heard as *hiss*, like a radio between stations. At 2 bits the error is as large as the wave and follows its shape in every cycle. An error that repeats with every cycle is made of harmonics of 440 Hz, heard as a *buzz* at the note's own *pitch*: the perceived height of a sound, set by its frequency.
+
+## Putting it all together
+
+The teaser at the top plays both flaws of sampling on purpose, three sounds at once for 24 seconds, the noises of an early video game:
+
+```python {run name=finale}
+from euterpe.sound import BitCrush, Saw, Sine
+
+hum = BitCrush(Sine(110.0), bits=2) * 0.15
+ghosts = Saw(Sine(1 / 24, phase=0.75) * 4_000 + 12_000, antialias=False) * 0.1
+siren = BitCrush(Sine(Sine(0.5) * 150 + 650), bits=3, downsample=6) * 0.2
+song = hum + ghosts + siren
+```
+
+```python {run continue}
+from euterpe.view import listen
+
+listen(song, 24.0, "Sampling's two flaws, played on purpose")
+```
+
+- `hum` is a sine at 110 Hz, the A two octaves below 440, rounded to 2 bits: the buzz of the last section, an error that repeats with every cycle.
+- `ghosts` is a saw with no correction whose frequency rises from 8 000 to 16 000 Hz and comes back over 24 seconds. Its harmonics fold back from 24 000 Hz, so while the note climbs, most ghost tones fall, and when it turns, they turn.
+- `siren` is a sine whose frequency is itself a slow sine: it swings between 500 and 800 Hz twice a second. `downsample=6` keeps every 6th sample and holds it for the next 5, a sample rate of 8 000 Hz, and `bits=3` rounds what is left to 7 levels. The early video game consoles worked with numbers this coarse, and they sounded like this.
+
+`+` sums the three units sample by sample; their gains, 0.15, 0.1 and 0.2, keep the sum below full scale. Every sound here is one pitch held or one slide, and none of them is a tune: which frequencies make notes that belong together, and how loud each must be to be heard, is chapter 2.
 
 ## Summary
 
