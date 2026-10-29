@@ -29,7 +29,7 @@ dev = [
     "pytest-xdist>=3.8.0",
 ]  # matplotlib: tests of euterpe.view
 book = [
-    "scriptorium @ git+https://github.com/apiad/scriptorium@v0.11.0",
+    "scriptorium @ git+https://github.com/apiad/scriptorium@b58e1cc4d33a57c6046d4dcc8229b928c864c79c",
     "matplotlib>=3.9",
 ]
 

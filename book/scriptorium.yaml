@@ -2,7 +2,9 @@
 # directory; the sounds and figures it writes land in build/.
 theme: book
 base-url: https://uhgia.org/euterpe/
-execute: {timeout: 120}
+# freeze: file caches each chapter's blocks on the whole chapter's text: a teaser
+# runs code it reads from its own chapter, and the level check reads every sound so far.
+execute: {timeout: 120, freeze: file}
 
 vars:
   title: "Euterpe"
