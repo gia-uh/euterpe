@@ -70,6 +70,16 @@ class Accent(Articulation):
 
 
 @dataclass
+class PalmMute(Articulation):
+    """The picking hand's palm resting on the strings by the bridge: a plucked string keeps
+    only damping of its vibration each trip, so it dies within a fraction of a second, and the
+    pluck is brightness times as bright. An instrument without strings ignores it."""
+
+    damping: float = 0.9
+    brightness: float = 0.4
+
+
+@dataclass
 class Legato(Articulation):
     """Joined to the note before it: a monophonic instrument slurs into it in one breath or
     bow stroke instead of starting again."""

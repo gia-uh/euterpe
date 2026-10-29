@@ -11,17 +11,21 @@ from typing import ClassVar
 from euterpe.instruments.core import Control, Note
 from euterpe.instruments.plucked import (
     BassBody,
+    Bridge,
     Exciter,
     Finger,
     GuitarBody,
+    Neck,
+    Pickup,
     Plectrum,
     Plucked,
     Soundboard,
     Steel,
     String,
+    _string_of,
 )
 from euterpe.pitch import A1, A2, B3, D2, D3, E1, E2, E4, G2, G3, Pitch
-from euterpe.sound.core import RATE
+from euterpe.sound.core import RATE, Unit
 
 
 @dataclass(frozen=True, init=False)
@@ -250,3 +254,68 @@ class BassGuitar(Fretted):
                  body: Soundboard | None = BassBody(), let_ring: bool = False, mute: float = 0.06,
                  level: float = 1.1, seed: int = 0):
         super().__init__(tuning, capo, exciter, string, body, let_ring, mute, level, seed)
+
+
+class Electric(Fretted):
+    """A solid-body fretted instrument: the string has no soundboard to colour it, and a Pickup
+    hears it instead, at a point that sits further along a fretted string (the fraction of the
+    sounding string grows as the fret shortens it). Meant to go through an Amp and a Cabinet.
+    pickup=None hears the bare string."""
+
+    def __init__(self, tuning: Sequence[Pitch] | None = None, capo: int = 0, exciter: Exciter = Plectrum(),
+                 string: String = Steel(damping=0.998), pickup: Pickup | None = Bridge(), let_ring: bool = True,
+                 mute: float = 0.08, level: float = 0.5, seed: int = 0):
+        super().__init__(tuning, capo, exciter, string, None, let_ring, mute, level, seed)
+        self.pickup = pickup
+
+    def fraction(self, string: int, fret: int) -> float:
+        """Where the pickup sits along string stopped at fret, as a fraction of the part that
+        sounds, at most 0.5 (past the middle the comb repeats)."""
+        if self.pickup is None:
+            return 0.0
+        return min(0.5, self.pickup.position * 2 ** ((fret + self.capo) / 12))
+
+    def voice(self, note: Note) -> Unit:
+        traits = self.traits(_string_of(self, note))
+        vary = self.vary(note)
+        string = self.pluck(note, note.freq, vary, traits)
+        if self.pickup is not None:
+            s = note.resource if isinstance(note.resource, int) and 1 <= note.resource <= len(self.tuning) else None
+            fret = (self._fret(_pitch(note.pitch), s) or 0) if s is not None else 0
+            string = self.pickup(string, note.freq, self.fraction(s or 1, fret))
+        return self.finish(note, string, vary[2] * (1 + traits[1]))
+
+
+class ElectricGuitar(Electric):
+    """A solid-body electric guitar: six steel strings tuned E2 A2 D3 G3 B3 E4, 22 frets, played
+    with a plectrum, heard through the bridge pickup. By itself it sounds thin and dry, with no
+    box to give it body; through Amp and Cabinet it becomes the electric guitar.
+
+    Techniques: those of Guitar, strum and pick; PalmMute on a note for the muted chug.
+
+    Limit: the strings of Guitar, with the same missing bends, slides and fret noise; one pickup
+    at a time; the pickup hears the string at one point, where a real coil hears a short stretch.
+    """
+
+    tuning = (E2, A2, D3, G3, B3, E4)
+    frets = 22
+    polyphony = 6
+
+
+class ElectricBass(Electric):
+    """A solid-body electric bass: four strings tuned E1 A1 D2 G2, 20 frets, played with the
+    fingers, heard through the neck pickup, each note damped when the next is due as BassGuitar
+    does. Under distorted guitars it carries the fundamental the amp's bend thins out.
+
+    Limit: the strings of BassGuitar, without their stiffness or the finger's thump.
+    """
+
+    tuning = (E1, A1, D2, G2)
+    frets = 20
+    polyphony = 4
+
+    def __init__(self, tuning: Sequence[Pitch] | None = None, capo: int = 0,
+                 exciter: Exciter = Finger(position=0.15, brightness=0.5, variation=0.15),
+                 string: String = Steel(damping=0.95), pickup: Pickup | None = Neck(), let_ring: bool = False,
+                 mute: float = 0.06, level: float = 1.0, seed: int = 0):
+        super().__init__(tuning, capo, exciter, string, pickup, let_ring, mute, level, seed)
