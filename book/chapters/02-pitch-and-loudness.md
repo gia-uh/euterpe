@@ -16,7 +16,7 @@ for name in ("tune", "finale"):
 listen(song, 10.0, "The first 10 s of the chapter's finale")
 ```
 
-A song you probably know, sung as a round by three different waves. Its notes are computed from one number and one rule, the subject of the first half; the three waves are made equally loud with the measurement of the second half.
+A song you probably know, sung as a round by three different waves. A *round* is a tune sung by voices that start it at staggered times. Its notes are computed from one frequency, 220 Hz, and one rule, the subject of the first half; the three waves are made equally loud with the measurement of the second half.
 
 ## Octaves: pitch follows ratios
 
@@ -30,7 +30,7 @@ from euterpe.sound import Sine, Square
 display((Sine(Square(1.0) * 110 + 330) * 0.5).take(4.0, "440 Hz and 220 Hz in turn"))
 ```
 
-The two tones sound like the same note, one higher than the other. The higher one has exactly twice the frequency. This distance, a ratio of 2, is called an *octave*, and it is the reason the same note name repeats: every note shares its name with the notes at twice and half its frequency.
+(The player's caption measures loudness in LUFS, defined in the second half of this chapter; every player brings its sound to the same loudness.) The two tones sound like the same note, one higher than the other. The higher one has exactly twice the frequency. This distance, a ratio of 2, is called an *octave*, and it is the reason the same note name repeats: every note shares its name with the notes at twice and half its frequency.
 
 Now keep the difference the same, 220 Hz, but move up: 1 980 Hz and 1 760 Hz. Then keep the ratio instead: 3 520 Hz and 1 760 Hz.
 
@@ -124,7 +124,7 @@ def notes(start):
 play(lambda n: Sine(n.freq) * 0.5, notes(0)).take(16.0, "Frère Jacques on a sine, in equal steps from A3")
 ```
 
-`play` (from `euterpe.instruments`) takes a function that makes the sound of one note and a list of notes, each a start time, a frequency and a duration. It starts that sound at each note's time and fades it out over 5 ms at its end; the function reads the note's frequency as `n.freq`. Chapter 9 looks inside it. Most moves of the tune are one or two steps; its last line drops 5 steps below the first note and comes back.
+`play` (from `euterpe.instruments`) takes a function that makes the sound of one note and a list of notes, each a start time, a frequency and a duration. It starts that sound at each note's time and fades it out over 5 ms at its end; `play` turns each `(time, frequency, duration)` tuple into a note with `.time`, `.freq` and `.duration`, so the function reads the note's frequency as `n.freq`. Chapter 9 looks inside it. Most moves of the tune are one or two steps; its last line drops 5 steps below the first note and comes back.
 
 ## Amplitude and decibels
 
@@ -132,9 +132,9 @@ The amplitude of a sound is how far its samples swing from 0. Loudness follows a
 
 20 × log₁₀(a / a₀) dB.
 
-Audio software takes full scale, 1.0, as the reference, and writes the result as dBFS, decibels relative to full scale. Full scale is 0 dBFS, and every level below it is negative:
+Audio software takes full scale, 1.0, as the reference, and writes the result as dBFS, decibels relative to full scale. Full scale is 0 dBFS, and every level below it is negative.
 
-Half the amplitude is 20 × log₁₀(0.5) = −6.02 dB, a tenth is −20 dB and a thousandth −60 dB. But −6 dB does not sound half as loud. A sound must drop by about 10 dB, to about a third of the amplitude, before most listeners hear it as half as loud. Here is the 440 Hz sine, halved twice:
+Half the amplitude is 20 × log₁₀(0.5) = −6.02 dB, a tenth is −20 dB and a thousandth −60 dB. But −6 dB does not sound half as loud. A sound must drop by about 10 dB, to about a third of the amplitude, before most listeners hear it as half as loud. Here is the 440 Hz sine, halved twice. Every other player in this book brings its sound to the same loudness; these three pass `normalize=False`, which plays each at the level it was made at, since the level is what they show:
 
 ```python {run continue}
 from euterpe.sound import Sine
@@ -143,8 +143,6 @@ from euterpe.view import listen
 for gain in (0.5, 0.25, 0.125):
     display(listen(Sine(440.0) * gain, 1.5, f"The 440 Hz sine at gain {gain}", normalize=False))
 ```
-
-Every other player in this book brings its sound to the same loudness. These three pass `normalize=False`, which plays each at the level it was made at, since the level is what they show.
 
 Each player is 6 dB quieter than the one before it, and each drop sounds about as large as the last.
 
@@ -265,7 +263,7 @@ The square still sounds brighter and buzzier than the sine, because it has harmo
 
 ## Putting it all together
 
-A *round* is a song sung by several voices that start the same tune at different times, each one entering when the one before it reaches the end of a line. *Frère Jacques* is the classic one: every two bars a new voice enters, and the lines fit on top of each other. Here three voices sing it, each a different wave from the last section, and each gain comes from its loudness: the square at 0.34, as just measured, and the triangle, which measured 1.7 dB below the sine, at 0.5 × 10^(1.7/20) = 0.61.
+A *round* is a song sung by several voices that start the same tune at different times, each one entering when the one before it reaches the end of a line. *Frère Jacques* is the classic one: every 4 seconds (8 beats, one line of the song sung twice) a new voice enters, and the lines fit on top of each other. Here three voices sing it, each a different wave from the last section, and each gain comes from its loudness: the square at 0.34, as just measured, and the triangle, which measured 1.7 dB below the sine, at 0.5 × 10^(1.7/20) = 0.61. Those were measured at 220 Hz; the tune runs from 165 to 370 Hz, where the weighting changes the three by about the same amount.
 
 ```python {run continue name=finale}
 from euterpe.sound import Square, Triangle
@@ -291,13 +289,13 @@ Listen for each voice entering: the triangle sounds like a softer, rounder sine,
 
 1. In the first example, change `Square(1.0) * 110 + 330` so that the two tones are 440 Hz and 660 Hz. Their ratio is 3/2, an interval called a *fifth*. Then raise A4 by 7 steps in the semitone example: how far, in cents, is equal temperament's fifth from 660 Hz? Use the cents formula from the table of note names.
 2. In the `lint_audio` example, change the gain from `0.25` to `0.1`. Predict `A-PEAK` and `A-LUFS` before you run it. Then try `2.0`: which rules fire, and with what severity?
-3. In the last example, replace `Square` with `Saw` and find the gain that makes it as loud as the sine, using the measurements of the four waves. Check your answer with `lint_audio`.
+3. In the example that matches the square to the sine (gain 0.34), replace `Square` with `Saw` and find the gain that makes it as loud as the sine, using the measurements of the four waves. Check your answer with `lint_audio`.
 
 ### Answers
 
-1. `Square(1.0) * 110 + 550` alternates 660 and 440 Hz. Seven steps above A4 is 659.26 Hz, and `1200 * np.log2(660 / 659.26)` is about 1.96 cents: equal temperament's fifth is 2 cents narrow, too little for most listeners to hear.
-2. At gain 0.1, `A-PEAK` is −20.0 dBFS, 8 dB below −12.0, and `A-LUFS` drops by the same 8 dB, to −23.7 LUFS. At gain 2.0 the samples reach 2, so `A-CLIP` fires as an error and `A-TRUEPEAK` as a warning: the peak is above full scale, between the samples as well as on them.
-3. The saw measures −11.2 LUFS and the sine −10.0, so the saw needs 1.2 dB more: 0.5 × 10^(1.2/20) ≈ 0.58. `Saw(220.0) * 0.58` measures −9.9 LUFS, within 0.1 dB of the sine.
+1. `Square(1.0) * 110 + 550` alternates 660 and 440 Hz. Seven steps above A4 is 659.26 Hz, and `1200 * np.log2(660 / 659.26)` is about 1.94 cents: equal temperament's fifth is 2 cents narrow, too little for most listeners to hear.
+2. At gain 0.1, `A-PEAK` is −20.0 dBFS, 8 dB below −12.0, and `A-LUFS` drops by the same 8 dB, to −23.7 LUFS. At gain 2.0 the samples reach 2, so `A-CLIP` fires as an error. Two warnings come with it: `A-TRUEPEAK`, the *true peak*, the highest point of the smooth wave playback draws between the samples (chapter 1), measured in dBTP and flagged above −1, and `A-TAIL`, which chapter 4 explains.
+3. The saw measures −11.2 LUFS and the sine −10.0, so the saw needs about 1.2 dB more: 0.5 × 10^(1.2/20) ≈ 0.57. `Saw(220.0) * 0.57` measures −10.1 LUFS, within 0.1 dB of the sine.
 
 ```python {run echo=false}
 # Level check: lint every sound in build/audio, this chapter's and any written before it.
