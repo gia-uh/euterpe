@@ -1,6 +1,6 @@
 # FM, noise and wavetables
 
-Chapter 3 built tones by adding sines, one per partial. Chapter 5 started from a source with many harmonics and filtered some away. This chapter adds three more ways to make a sound. *Frequency modulation* (FM) gets many partials out of two sines. *Noise* is sound with no pitch, and drums are mostly noise. A *wavetable* stores one cycle of any shape and plays it over and over. Chapter 7 adds a fourth way, physical models, which compute what a vibrating object does. This is where it ends up:
+Chapter 3 built tones by adding sines, one per partial. Chapter 5 started from a source with many harmonics and filtered some away. This chapter adds three more ways to make a sound. *Frequency modulation* (FM) gets many partials out of two sines. *Noise* is sound with no pitch, and drums are mostly noise. A *wavetable* stores one cycle of any shape and plays it over and over. Chapter 7 adds one more way, physical models, which compute what a vibrating object does. This is where it ends up:
 
 ```python {run echo=false}
 # The teaser: the end of the finale, built by the code of this chapter's named blocks, which it
@@ -16,10 +16,10 @@ scope = {}
 for name in ("bell", "epiano", "hat", "snare", "finale"):
     code = re.search(r"```python \{[^}\n]*name=" + name + r"\b[^}\n]*\}\n(.*?)\n```", text, re.S).group(1)
     exec("\n".join(line for line in code.split("\n") if ".take(" not in line), scope)
-display(Clip(render(scope["song"], 21.5)[round(12.5 * RATE):], caption="The end of the chapter's finale"))
+display(Clip(render(scope["song"], 23.0)[round(13.0 * RATE):], caption="The end of the chapter's finale"))
 ```
 
-A drum machine, an electric piano and a bell, the sound of a 1980s ballad. None of it is a recording: every part is two sines or a burst of noise, the three ways of making sound in this chapter.
+A drum machine, an electric piano and a bell, the sound of a 1980s ballad. None of it is a recording: every part is FM, a sine with a falling pitch, or filtered noise: two of this chapter's three ways of making sound.
 
 ## Frequency modulation
 
@@ -104,13 +104,13 @@ display(bell.take(4.0, "An FM bell: ratio 1.4, the index falling from 10 to 0"))
 ```
 
 
-The same idea with ratio 1 and a quick fall of the index gives the electric-piano sound of many 1980s ballads. The index starts at 2.8, falls to 0.3 within half a second and stays there, so each note starts with a bright bark and settles into a nearly pure tone. Here it plays chapter 4's four chords, A minor, F, C and G, struck on the first and third beat of each bar at 90 beats a minute, a ballad's tempo:
+The same idea with ratio 1 and a quick fall of the index gives the electric-piano sound of many 1980s ballads. The index starts at 2.8, falls to 0.3 within half a second and stays there, so each note starts with a bright bark and settles into a nearly pure tone. Here it *comps*, accompanies, with chapter 4's four chords, A minor, F, C and G, struck on the first and third beat of each bar at 90 beats a minute, a ballad's tempo:
 
 ```python {run continue name=epiano}
 from euterpe.instruments import play
 
 BEAT = 60 / 90  # seconds
-CHORDS = [(0, 3, 7), (-4, 0, 3), (3, 7, 10), (-2, 2, 5)]  # A minor, F, C, G: steps above A3
+CHORDS = [(0, 3, 7), (-4, 0, 3), (3, 7, 10), (-2, 2, 5)]  # A minor, F, C, G: steps from A3, negative below
 
 
 def epiano(n):
@@ -127,7 +127,7 @@ def comping(bars):
 comping(4).take(11.5, "An FM electric piano: A minor, F, C and G")
 ```
 
-`comping` strikes each bar's chord twice, as a pianist accompanying a singer does, which is called *comping*. Every note gets its own `epiano`, with its own envelopes.
+`comping` strikes each bar's chord twice, as a pianist accompanying a singer does: that is what *comping* means. Every note gets its own `epiano`, with its own envelopes.
 
 ### Feedback
 
@@ -147,7 +147,7 @@ A modulator that leans to one side also pushes the carrier off-centre, so feedba
 
 Chapter 5 used `WhiteNoise`, whose spectrum is flat: each band 100 Hz wide holds the same energy, on average, from 0 to 24 000 Hz. The ear does not hear in bands of equal width, though. It hears in octaves, and each octave is twice as wide as the one below it: 4 000 to 8 000 Hz is 4 000 Hz wide, 250 to 500 Hz only 250. So white noise puts more energy in each octave than in the one below, twice as much, 3 dB more, and it sounds bright, like hiss.
 
-Two other noises are named after colours of light. The level per Hz of `PinkNoise(seed)` falls 3 dB per octave, which exactly cancels the doubling width: every octave holds the same energy. `BrownNoise(seed)` falls 6 dB per octave. It is not named after the colour but after Robert Brown, who described the random motion of pollen grains in water: each sample is the last one plus a small random step, the way a grain wanders.
+Pink noise is named after a colour of light; brown only sounds like one. The level per Hz of `PinkNoise(seed)` falls 3 dB per octave, which exactly cancels the doubling width: every octave holds the same energy. `BrownNoise(seed)` falls 6 dB per octave. It is not named after the colour but after Robert Brown, who described the random motion of pollen grains in water: each sample is the last one plus a small random step, the way a grain wanders.
 
 ```python {run continue}
 from euterpe.sound import ADSR, BrownNoise, OnePoleHighPass, PinkNoise, WhiteNoise
@@ -265,7 +265,7 @@ Remove `skin` and the snare loses its body: it becomes a hiss with no weight. Re
 
 ## Putting it all together
 
-A *drum machine* plays stored drum sounds on a grid of steps, the same sound every time. The ballads of the 1980s put one under an FM electric piano. Here the kick of chapter 4 falls on beats 1 and 3, the snare on 2 and 4, the closed hi-hat on every half beat, and the piano comps the four chords. On the first beat of the fourth and the eighth bar, the FM bell rings an A, two octaves above the chords' A3. Eight bars, 21 seconds:
+A *drum machine* plays stored drum sounds on a grid of steps, the same sound every time. The ballads of the 1980s put one under an FM electric piano. Here chapter 4's kick, copied at a lower level so the piano sits on top, falls on beats 1 and 3, the snare on 2 and 4, the closed hi-hat on every half beat, and the piano comps the four chords. On the first beat of the fourth and the eighth bar, the FM bell rings an A, two octaves above the chords' A3. Eight bars and the last bell's ring, 23 seconds:
 
 ```python {run continue name=finale}
 def kick(n):
@@ -283,10 +283,10 @@ drums = (play(kick, [(t, 50.0, BEAT) for t in beats[0::2]])
          + play(lambda n: snare(), [(t, 180.0, BEAT) for t in beats[1::2]])
          + play(lambda n: hat(0.05) * 0.4, [(t + h * BEAT / 2, 7000.0, 0.1) for t in beats for h in (0, 1)]))
 song = drums + comping(BARS) + play(bells, [(4 * BEAT * 3, 880.0, 4.0), (4 * BEAT * 7, 880.0, 4.0)])
-song.take(21.5, "A 1980s ballad: drum machine, FM electric piano and an FM bell")
+song.take(23.0, "A 1980s ballad: drum machine, FM electric piano and an FM bell")
 ```
 
-`lambda n: snare()` turns the snare above, which takes no note, into a voice that ignores its note; `hat(0.05) * 0.4` is the closed hat, quieter. Listen to the bell: FM computes it from a formula, a ratio and an index that falls, and it sounds like a bell, but only like one kind of bell, and nothing in the formula says what a bell is. Chapter 7 builds instruments the other way, by simulating the object: a string that vibrates, a bell with its modes.
+`lambda n: snare()` turns the snare above, which takes no note, into a voice that ignores its note; `hat(0.05) * 0.4` is the closed hat, quieter. Listen to the bell: FM computes it from a formula, a ratio and an index that falls, and it sounds like a bell, but only like one kind of bell, and nothing in the formula says what a bell is. Chapter 7 builds instruments the other way, by simulating the object: a string that vibrates, a bell with its own ways of vibrating.
 
 ## Summary
 
