@@ -1,6 +1,24 @@
 # Anatomy of an instrument
 
-Part I built sounds: a sine, a filter, a plucked string, each a unit that makes one sound when it is rendered. Music needs many sounds, one after another and on top of each other, each with its own pitch, start, length and loudness. An *instrument* is the object that turns that list into sound. It knows how one note sounds, how many notes it can play at once, what happens when a new note arrives while others still ring, and which notes it cannot play at all. This chapter builds one by hand from a sine and an envelope, then looks at each of those jobs in turn.
+Part I built sounds: a sine, a filter, a plucked string, each a unit that makes one sound when it is rendered. Music needs many sounds, one after another and on top of each other, each with its own pitch, start, length and loudness. An *instrument* is the object that turns that list into sound. It knows how one note sounds, how many notes it can play at once, what happens when a new note arrives while others still ring, and which notes it cannot play at all. This chapter builds one by hand from a sine and an envelope, then looks at each of those jobs in turn. This is where it ends up:
+
+```python {run echo=false}
+# The teaser: the start of the finale, built by the code of this chapter's named blocks, which it
+# reads from this file so the two never differ. The blocks' own players and prints are skipped.
+import re
+from pathlib import Path
+
+from euterpe.view import listen
+
+text = Path("chapters/09-anatomy-of-an-instrument.md").read_text()
+scope = {"print": lambda *args, **kwargs: None}
+for name in ("theremin", "ode", "voices", "finale"):
+    code = re.search(r"```python \{[^}\n]*name=" + name + r"\b[^}\n]*\}\n(.*?)\n```", text, re.S).group(1)
+    exec("\n".join(line for line in code.split("\n") if ".take(" not in line), scope)
+listen(scope["song"], 9.0, "The first 9 s of the chapter's finale")
+```
+
+Beethoven's *Ode to Joy*, sung by a theremin over chords on three more theremins, in a hall. Everything in it is a sine and an envelope from Part I; what is new is the instrument, the object that turns a list of notes into sound.
 
 ## Pitches and notes
 
@@ -21,7 +39,7 @@ A *note* is a pitch with a time: when it starts, in seconds; how long it is held
 
 An instrument is a class with one method, `voice(note)`, which returns the unit that sounds one note. A *theremin* is an electronic instrument from the 1920s, played without touching it: one hand moves the pitch, the other the volume, and its tone is close to a pure sine with a slight wobble. The class below gives it three things. `polyphony = 1`: *polyphony* is how many notes an instrument can sound at once, and a theremin sounds one. `playable = (C4, C7)`, the range this one is given (real theremins vary), and `comfortable = (C4, C6)`, the part of it where it plays well (the end of the chapter uses both). And a voice: a sine whose frequency moves 1 % up and down five times a second, the *vibrato* of chapter 6, made with an LFO (chapter 5). `Sine(self.vibrato)` swings between −1 and 1, so `Sine(self.vibrato) * 0.01 + 1.0` swings between 0.99 and 1.01, and multiplying the note's frequency by it moves the pitch 1 % each way. An `ADSR` (chapter 4) shapes the sound: it rises in 0.15 s, falls in its default 0.1 s decay to its default sustain of 0.7, holds there for `gate`, the time the note is held, and fades over 0.4 s after it. The final `* 0.5` keeps the peak at half of full scale, as every example in this book stays below it.
 
-```python {run}
+```python {run name=theremin}
 from euterpe.instruments import Instrument
 from euterpe.pitch import A4, C4, C6, C7
 from euterpe.sound import ADSR, Sine
@@ -47,7 +65,7 @@ display(Theremin().note(A4, 2.0).take(caption="A theremin plays A4 for 2 s"))
 
 `play` takes a whole list. Below are the first four *bars* of the *Ode to Joy* from Beethoven's Ninth Symphony. A *beat* is the pulse you would tap your foot to, here one every 0.5 s; a bar groups four beats; most notes here last one beat, which musicians call a *quarter note*. `lengths` gives each note's length in beats, and each note is held for 0.45 s of every 0.5 s beat:
 
-```python {run continue}
+```python {run continue name=ode}
 from euterpe.pitch import C4, D4, E4, F4, G4
 
 ode = [E4, E4, F4, G4, G4, F4, E4, D4, C4, C4, D4, E4, E4, D4, D4]
@@ -67,10 +85,13 @@ The result of `play` is a `Phrase`: one unit that starts each note's voice at it
 
 Each note that sounds needs its own copy of the voice: its own sine, its own envelope, its own place in time. A copy that is sounding is a *voice*, and `polyphony` is how many voices the instrument has. A piano can sound all 88 strings at once; a flute, a trumpet or a singer plays one note at a time. When a note arrives and all the voices are busy, one has to stop. The `Phrase` stops the oldest, and it does not cut it: a cut drops the wave from wherever it is to 0 between two samples, and chapter 4 showed that such a step is heard as a click. The stopped voice fades out over 5 ms, 240 samples at 48 000 samples a second, instead. This already happened in the first *Ode to Joy*: each note's 0.4 s release was still sounding when the next note started, and the theremin has one voice, so each new note stopped the last with this fade.
 
-The instrument below is the theremin with three voices. `starts` and `stops` say, in samples, when each voice of a phrase starts and stops. A C major chord, C4, E4 and G4, each held 2 s, starts one note every 0.1 s, and a fourth note, C5, arrives at 0.3 s:
+A guitar has six strings, so it plays at most six notes, but that is not the whole rule either. Each note sounds on one string, and a string plays one note at a time: a new note on a string that is ringing stops the old one, even when five strings are free. The note's *resource* is the part of the instrument that sounds it, a string, a key or a drum head, and `Note(time, pitch, duration, velocity, resource=...)` names it. The `Phrase` stops a voice when a new note takes its resource, before it counts voices.
 
-```python {run continue output=code}
-from euterpe.pitch import C5, E4, G4
+The block below tests both rules. `Trio` is the theremin with three voices; it plays a C major chord, C4, E4 and G4, each held 2 s and started 0.1 s apart, and a fourth note, C5, at 0.3 s. `PluckedString` is chapter 7's `Pluck` as an instrument, with six voices; it plays two notes on string 1 and one on string 2. `starts` and `stops` say, in samples, when each voice of a phrase starts and stops:
+
+```python {run continue output=code name=voices}
+from euterpe.instruments import Note, PluckedString
+from euterpe.pitch import B3, C5, E4, G4
 from euterpe.sound.core import RATE
 
 
@@ -78,32 +99,14 @@ class Trio(Theremin):
     polyphony = 3
 
 
-phrase = Trio().play([(0.0, C4, 2.0), (0.1, E4, 2.0), (0.2, G4, 2.0), (0.3, C5, 2.0)])
-for note, start, stop in zip(phrase.notes, phrase.starts, phrase.stops):
-    # !r prints the pitch's name (C4); :4 pads it to 4 characters
-    print(f"{note.pitch!r:4} sounds from {start / RATE:.3f} s to {stop / RATE:.3f} s")
+chord = Trio().play([(0.0, C4, 2.0), (0.1, E4, 2.0), (0.2, G4, 2.0), (0.3, C5, 2.0)])
+strings = PluckedString().play([Note(0.0, E4, 1.0, resource=1), Note(0.0, B3, 1.0, resource=2), Note(0.5, G4, 1.0, resource=1)])
+for phrase in (chord, strings):
+    for note, start, stop in zip(phrase.notes, phrase.starts, phrase.stops):
+        print(f"{note.pitch!r:3} (resource {note.resource}) sounds from {start / RATE:.3f} s to {stop / RATE:.3f} s")
 ```
 
-C4, the oldest, stops at 0.305 s: the 0.3 s at which C5 arrives, plus the 5 ms fade. The others ring their full 2 s plus the 0.4 s release. A note that is stolen too early is a sign that the music asks more voices of the instrument than it has; the range rules at the end of the chapter warn about it before anything is rendered.
-
-### Resources
-
-A guitar has six strings, so it plays at most six notes, but that is not the whole rule. Each note sounds on one string, and a string plays one note at a time: a new note on a string that is ringing stops the old one, even when five strings are free. The note's *resource* is the part of the instrument that sounds it, a string, a key or a drum head, and `Note(time, pitch, duration, velocity, resource=...)` names it. The `Phrase` stops a voice when a new note takes its resource, before it counts voices.
-
-`PluckedString` is chapter 7's `Pluck` as an instrument, with six voices. Below, two notes are played on string 1 and one on string 2:
-
-```python {run continue output=code}
-from euterpe.instruments import Note, PluckedString
-from euterpe.pitch import E4, G4, B3
-from euterpe.sound.core import RATE
-
-guitar = PluckedString()
-phrase = guitar.play([Note(0.0, E4, 1.0, resource=1), Note(0.0, B3, 1.0, resource=2), Note(0.5, G4, 1.0, resource=1)])
-for note, stop in zip(phrase.notes, phrase.stops):
-    print(f"{note.pitch!r:3} on string {note.resource}: stops at {stop / RATE:.3f} s")
-```
-
-E4 stops at 0.505 s, when G4 takes string 1, although the instrument had four voices free. B3 rings its whole second on its own string, and then `PluckedString`'s finger mutes it in 0.08 s, at 1.080 s. Chapter 10's guitar fills in the strings itself, from chord shapes or from plain pitches.
+On the trio, C4, the oldest, stops at 0.305 s: the 0.3 s at which C5 arrives, plus the 5 ms fade. The others ring their full 2 s plus the 0.4 s release. On the strings, E4 stops at 0.505 s, when G4 takes string 1, although the instrument had four voices free; B3 rings its whole second on its own string, and then `PluckedString`'s finger mutes it in 0.08 s. A note that is stolen too early is a sign that the music asks more of the instrument than it has; the range rules at the end of the chapter warn about it before anything is rendered. Chapter 10's guitar fills in the strings itself, from chord shapes or from plain pitches.
 
 ### Slurs
 
@@ -155,10 +158,36 @@ with warnings.catch_warnings(record=True) as caught:
     phrase = Theremin().play([(0.0, A4, 1.0), (1.0, D6, 1.0), (2.0, B7, 0.5)])
 print("play warns:", caught[0].message)
 print(lint_notes(phrase).to_text())
-print(lint_notes(Trio().play([(0.0, C4, 2.0), (0.1, E4, 2.0), (0.2, G4, 2.0), (0.3, C5, 2.0)])).to_text())
+print(lint_notes(chord).to_text())
 ```
 
-D6 (1 s) and B7 (0.5 s) lie above C6, so 1.5 s of the 2.5 s of notes are outside the comfortable range: 60 %, more than a quarter. The last line lints the chord of the three-voice theremin from "Voices": four notes are written to sound at once, and the instrument has three. The command `euterpe lint` of chapter 2, given `piece.py:fn`, runs the same rules first when `fn` returns a phrase, then the audio rules on what it renders, and exits with 1 on an error. A program that writes music, such as an AI agent, hears about the impossible note before anyone listens to it.
+D6 (1 s) and B7 (0.5 s) lie above C6, so 1.5 s of the 2.5 s of notes are outside the comfortable range: 60 %, more than a quarter. The last line lints the chord of the three-voice theremin from "Voices": four notes are written to sound at once, and the instrument has three. The same checks run from the shell. `euterpe lint tone.mp3` prints chapter 2's audio report for a file; `euterpe lint piece.py:fn --seconds 2` calls the Python function `fn`, runs the notes rules first when it returns a phrase, then the audio rules on what it renders, and exits with status 1 on an error, so a script or a test can stop there. `euterpe render piece.py:fn -o piece.mp3 --seconds 2` writes it to a file. A program that writes music, such as an AI agent, hears about the impossible note before anyone listens to it.
+
+## Putting it all together
+
+The *Ode to Joy* has a second line, the same as the first but for its ending, which comes home to C. Here are both, an octave up on the theremin, slurred within each bar; each bar starts a new note, with an `Accent`, as a singer takes a breath. Under them, the trio plays one chord per bar, C major (C4, E4, G4) or G major (D4, G4, B4), the two chords the tune needs, softly. The two phrases are units, so they add, and chapter 8's hall takes their sum. At 0.6 s a beat, eight bars:
+
+```python {run continue name=finale}
+from euterpe.instruments import Accent
+from euterpe.pitch import B4
+from euterpe.sound import FDNReverb
+
+BEAT = 0.6
+line2 = ode[:12] + [D4, C4, C4]
+tune, b = [], 0.0  # b counts beats from the start
+for pitch, beats in zip(ode + line2, lengths + lengths):
+    joined = (b + beats) % 4 != 0  # the next note is in the same bar: slur into it
+    held = BEAT * beats + (0.05 if joined else -0.05)
+    tune.append(Note(BEAT * b, pitch + 12, held, 0.6, None if b % 4 else Accent()))
+    b += beats
+C, G = (C4, E4, G4), (D4, G4, B4)
+chords = [(4 * BEAT * bar, pitch, 4 * BEAT, 0.3) for bar, chord in enumerate([C, G, C, G, C, G, C, C]) for pitch in chord]
+song = FDNReverb(Theremin().play(tune) + Trio().play(chords), decay=2.0, size=0.8, mix=0.3)
+song.take(22.0, "Ode to Joy, arranged: slurred theremin, a trio of chords and a hall")
+```
+
+`b % 4` is 0 on the first beat of each bar, so the accent goes on every downbeat; there the previous note ends 0.05 s early, so the slur breaks (an accent on a slurred note would be lost, since a slur is one voice with one velocity). Every voice here is a sine with vibrato, so the melody and the chords blur into one colour, an electronic organ more than a band. The next chapter's instruments have strings, fingers and wooden bodies, and each sounds like a different object.
+
 
 ## Summary
 
@@ -166,12 +195,12 @@ D6 (1 s) and B7 (0.5 s) lie above C6, so 1.5 s of the 2.5 s of notes are outside
 - A note is `(time, pitch, duration, velocity)` in seconds, or a `Note`, which can also carry an articulation and a resource.
 - An instrument is a class with `voice(note)`, which returns the unit for one note, and `polyphony`, `playable` and `comfortable`. `play(notes)` returns a `Phrase`, a unit; `note(pitch, duration)` plays one note.
 - A new note on a busy resource stops the old note there; past the polyphony the oldest voice stops; a stopped voice fades over 5 ms. With one voice, overlapping notes slur.
-- `lint_notes` checks a phrase against its instrument's ranges and voices before it renders.
+- `lint_notes` checks a phrase against its instrument's ranges and voices before it renders; `euterpe lint` and `euterpe render` do the same, and render, from the shell.
 
 ## Exercises
 
 1. Make the theremin's vibrato wider: change `0.01` to `0.03` in its voice. How many cents up and down does the pitch now move? (Chapter 2: a ratio r is 1200 × log₂(r) cents.)
-2. In the chord block, change `polyphony = 3` to `polyphony = 2`. Which notes stop, and when?
+2. In the block that tests the voices, change `polyphony = 3` to `polyphony = 2`. Which notes stop, and when?
 3. In the slurred *Ode to Joy*, change `+ 0.05` to `- 0.05`. Why does the melody start every note again?
 
 ### Answers
