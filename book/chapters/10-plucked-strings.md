@@ -15,7 +15,7 @@ text = Path("chapters/10-plucked-strings.md").read_text()
 scope = {}
 code = re.search(r"```python \{[^}\n]*name=finale\b[^}\n]*\}\n(.*?)\n```", text, re.S).group(1)
 exec("\n".join(line for line in code.split("\n") if ".take(" not in line), scope)
-display(Clip(render(scope["song"], 33.0)[24 * RATE:], caption="The last pass of the chapter's finale"))
+display(Clip(render(scope["song"], 35.0)[24 * RATE:], caption="The fourth pass: bass ground, harp arpeggios, pizzicato line and guitar strums"))
 ```
 
 Pachelbel's Canon, with all four instruments of this chapter playing at once in one hall: the bass guitar, the harp, the plucked strings and the guitar.
@@ -68,7 +68,7 @@ A bigger box has lower modes. `BassBody` puts its air mode at 70 Hz, and `Violin
 
 ## The exciter
 
-Chapter 7 showed what the pluck point does: plucking at 1/n of the string's length removes every n-th harmonic. A finger is soft and plucks away from the bridge; a pick is hard and plucks near it. Here is one *strummed* A chord (a pick swept across the strings), with a pick near the bridge, at `position=0.06`, and the same chord at the middle of the string, `position=0.5`. `Shape(None, 0, 2, 2, 2, 0)` says which *fret* each string is pressed at, from the thickest string to the thinnest, and `strum` sweeps them; the section on the guitar explains both; `variation=0.0` keeps every pluck exactly at its position (the section after this one explains variation):
+Chapter 7 showed what the pluck point does: plucking at 1/n of the string's length removes every n-th harmonic. The *bridge* is where the strings are fixed to the body, and `position` is measured from it, 0.5 at the middle of the string. A finger is soft and plucks away from the bridge; a pick is hard and plucks near it. Here is one *strummed* A chord (a pick swept across the strings), with a pick near the bridge, at `position=0.06`, and the same chord at the middle of the string, `position=0.5`. `Shape(None, 0, 2, 2, 2, 0)` says which *fret* each string is pressed at, from the thickest string to the thinnest, and `strum` sweeps them; the section on the guitar explains both; `variation=0.0` keeps every pluck exactly at its position (the section after this one explains variation):
 
 ```python {run}
 from euterpe.instruments import Guitar, Plectrum, Shape
@@ -129,7 +129,7 @@ Listen first to the repeated B4s. Without variation they are four copies of one 
 
 ## The guitar
 
-`Guitar` is a `Plucked` with six steel strings tuned E2 A2 D3 G3 B3 E4, 19 frets and a pick. Strings are numbered from the highest-pitched: string 1 is E4 and string 6 is E2. The frets are metal strips across the neck; pressing a string just behind one shortens it, and each fret raises its note by a semitone. The *nut* is the ridge at the end of the neck where the open strings start. A hand position is a *shape*: one fret per string, from string 6 to string 1, `None` where a guitar book writes x. `Shape(None, 0, 2, 2, 2, 0)` is the A chord, x02220. A chord named by a letter alone, such as A, is major (chapter 3); a *minor* one, such as Em, takes 3 and 7 steps above its root instead of 4 and 7. Three methods turn a guitar's way of playing into notes:
+`Guitar` is a `Plucked` with six steel strings tuned E2 A2 D3 G3 B3 E4, 19 frets and a pick. Strings are numbered from the highest-pitched: string 1 is E4 and string 6 is E2. The frets are metal strips across the neck; pressing a string just behind one shortens it, and each fret raises its note by a semitone. The *nut* is the ridge at the end of the neck where the open strings start. A hand position is a *shape*: one fret per string, from string 6 to string 1, `None` where a guitar book writes x. `Shape(None, 0, 2, 2, 2, 0)` is the A chord, x02220. A chord named by a letter alone, such as A, is major (chapter 3); a *minor* one, such as Bm, takes 3 and 7 semitones above its root instead of 4 and 7. Three methods turn a guitar's way of playing into notes:
 
 - `strum(chord, at, length)` plays every string of a chord, 12 ms apart, from the lowest to the highest (a *down* strum), or from the highest down with `up=True`; `strings=3` plays only the three highest-pitched strings of the chord, as an up-strum often does;
 - `pick(string, fret, at, length)` plays one string, as a *tab* (guitar notation by string and fret) writes it;
@@ -163,7 +163,7 @@ A plucked string keeps ringing after its note's written length, until it dies, t
 
 ## The bass guitar
 
-`BassGuitar` has four strings tuned E1 A1 D2 G2, an octave below the guitar's lowest four, and is played with the fingers. A low string makes few trips a second: at 41 Hz, its lowest E, a guitar's damping of 0.997 would let each note ring for over a minute, and every note would run into the next. So the bass's string loses 5 % a trip, the finger stops each note at its written end (`let_ring=False`), as bass players do, and the finger varies each pluck by 15 %, more than the default. It is still the least convincing of the four: a real bass string is thick and stiff, so its upper harmonics are slightly sharp, and the finger's thump at the attack carries much of what the ear recognises; `Pluck` has neither.
+`BassGuitar`, an acoustic bass guitar, has four strings tuned E1 A1 D2 G2, an octave below the guitar's lowest four, and is played with the fingers. A low string makes few trips a second: at 41 Hz, its lowest E, a guitar's damping of 0.997 would let each note ring for close to a minute, and every note would run into the next: the finger mutes a note in 60 ms, but a string still loud when muted leaves a smear under the next attack. So the bass's string loses 5 % a trip, the finger stops each note at its written end (`let_ring=False`), as bass players do, and the finger varies each pluck by 15 %, more than the default. It is still the least convincing of the four: a real bass string is thick and stiff, so its upper harmonics are slightly sharp, and the finger's thump at the attack carries much of what the ear recognises; `Pluck` has neither.
 
 ```python {run echo=false}
 # Check the claim above: at damping 0.95 each note of a line stands well above the last one's tail.
@@ -238,12 +238,12 @@ chords = [[C4, E4, G4, C5, E5], [C4, D4, A4, D5, F5], [B3, D4, G4, D5, F5], [C4,
 sixteenth = 60 / 66 / 4
 notes = [((16 * bar + 8 * half + k) * sixteenth, chord[i], 1.0, 0.8 if k == 0 else 0.7)
          for bar, chord in enumerate(chords) for half in range(2) for k, i in enumerate([0, 1, 2, 3, 4, 2, 3, 4])]
-display(Harp().play(notes).take(caption="Bach, Prelude in C major BWV 846, bars 1 to 8, on the harp"))
+display(Harp().play(notes).take(31.0, "Bach, Prelude in C major BWV 846, bars 1 to 8, on the harp"))
 ```
 
 ## Putting it all together
 
-Johann Pachelbel's Canon in D (about 1700) is built to be layered. Its bass, the *ground*, repeats eight notes for the whole piece, one chord per note: D, A, B minor, F♯ minor, G, D, G, A. Each pass adds a part over it. Here the bass guitar plays the ground four times, each note as two eighths; the harp joins on the second pass with an arpeggio of each chord; the plucked strings join on the third with the Canon's famous line, one note per chord; and the guitar strums the chords on the fourth. Everything sounds in one hall, chapter 8's `FDNReverb`. A chord per second, 32 seconds and the hall's tail:
+Johann Pachelbel's Canon in D (about 1700) is built to be layered. A *bar* here is four beats, at 60 beats a minute. Its bass, the *ground*, repeats eight notes for the whole piece, one chord per note: D, A, B minor, F♯ minor, G, D, G, A. Each pass adds a part over it. Here the bass guitar plays the ground four times, each note as two eighths; the harp joins on the second pass with an arpeggio of each chord; the plucked strings join on the third with the Canon's famous line, one note per chord; and the guitar strums the chords on the fourth. Everything sounds in one hall, chapter 8's `FDNReverb`. A chord per second, 32 seconds and the hall's tail:
 
 ```python {run name=finale}
 from euterpe.instruments import BassGuitar, Guitar, Harp, PizzicatoStrings, Shape
@@ -287,7 +287,7 @@ song.take(35.0, "Pachelbel's Canon for plucked quartet: bass, harp, pizzicato an
 
 1. The tail of each chord now rings for seconds into the next one, so when D changes to A, the D's notes still sound under the A's, and the arpeggios blur into a wash. Some notes clash for a moment (D against C♯, F♯ against E) before the old chord fades; that is why a player in a big church plays slower.
 2. With `seed=8` every string draws new flaws, so string 1 changes: it is another guitar of the same make. Run twice with `seed=7`, the flaws are the same both times, because they are drawn from the seed and the string's number, not anew.
-3. Each note now keeps 99.8 % of its vibration on each trip, so at these low frequencies it rings for over a minute and is still almost as loud as at its start when the next note comes. The finger still stops each note at its written end, but the notes run into each other and the line loses its edges.
+3. Each note now keeps 99.8 % of its vibration on each trip, so at these low frequencies it is still almost as loud as at its start when the next note comes. The finger mutes each note at its written end, but the mute takes 60 ms and the body's modes ring on for a fraction of a second, so each attack lands on a loud smear of the last note and the line loses its edges.
 
 ```python {run echo=false}
 # Level check: lint every sound in build/audio, this chapter's and any written before it.
