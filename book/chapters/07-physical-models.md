@@ -18,7 +18,7 @@ for name in ("bell", "finale"):
 listen(scope["song"], 9.0, "The first 9 s of the chapter's finale")
 ```
 
-The chime of Big Ben's clock tower, on four bells and a great hour bell, over a low plucked string. None of it is a recording or a list of partials: each bell is a struck object and the string a plucked one, simulated.
+The chime of Big Ben's clock tower on four bells, over a low plucked string; later in the finale a great hour bell strikes. None of it is a recording or a list of partials: each bell is a struck object and the string a plucked one, simulated.
 
 ## A string you can pluck
 
@@ -36,7 +36,7 @@ string = OnePoleHighPass(Comb(burst, delay=1 / 220, feedback=0.996), 20.0)
 display((string * ADSR(attack=0.0, sustain=1.0, gate=2.4, release=0.4) * 0.25).take(3.0, "A burst of noise circulating in a comb at 220 Hz"))
 ```
 
-It has a pitch, 220 Hz, because the burst repeats every 1/220 s, and a sound that repeats f times a second has the harmonics of f (chapter 3). But it does not sound like a string. It buzzes, with a hard, electric edge, and its tone never changes as it fades, because the comb loses the same 0.4 % at every frequency. Two small filters in the loop, the subject of steps 2 and 3, turn it into a string. Here is the result first: `Pluck(freq, damping=0.996, brightness=0.5, position=0.0, seed=0)` is the burst, the delay line and both filters in one unit, with the same 0.4 % lost per trip as the comb above.
+It has a pitch, 220 Hz, because the burst repeats every 1/220 s, and a sound that repeats f times a second has the harmonics of f (chapter 3). But it does not sound like a string. It buzzes, with a hard, electric edge, and its tone never changes as it fades, because the comb loses the same 0.4 % at every frequency. A small filter in the loop, step 2, turns it into a string, and a second one, step 3, puts it in tune. Here is the result first: `Pluck(freq, damping=0.996, brightness=0.5, position=0.0, seed=0)` is the burst, the delay line and both filters in one unit, with the same 0.4 % lost per trip as the comb above (its burst is shaped too, as the next section shows).
 
 ```python {run}
 from euterpe.sound import ADSR, Pluck
@@ -90,11 +90,11 @@ How far each note is off depends on where its period falls between two loop leng
 
 ### The knobs of a pluck
 
-`Pluck`'s burst is not raw noise. One period of raw noise gives each harmonic a random level, so with some seeds the octave above the note is louder than the note itself, and the same note played with two seeds differs in loudness and tone. `Pluck` sets the level of each harmonic and draws only their phases from the seed. The k-th harmonic starts at 1 / (1 + (k × freq / cutoff)²), with cutoff = freq × 2^(8 × brightness): This curve is the gain of two of chapter 5's one-pole low-passes in a row, each with gain 1 / √(1 + (f / cutoff)²). `brightness=0` puts the cutoff at the note itself, so the harmonics start at about 1/k². That is the spectrum of a string a finger has pulled aside at one point, so that it starts in the shape of a triangle; the triangle is the string's shape, not chapter 3's triangle wave, which falls as 1/k² too. `brightness=1` puts the cutoff at the 256th harmonic, as bright as raw noise.
+`Pluck`'s burst is not raw noise. One period of raw noise gives each harmonic a random level, so with some seeds the octave above the note is louder than the note itself, and the same note played with two seeds differs in loudness and tone. `Pluck` sets the level of each harmonic and draws only their phases from the seed. The k-th harmonic starts at 1 / (1 + (k × freq / cutoff)²), with cutoff = freq × 2^(8 × brightness): this curve is the gain of two one-pole low-passes in a row (chapter 5), each with gain 1 / √(1 + (f / cutoff)²) at f Hz. `brightness=0` puts the cutoff at the note itself, so the harmonics start at about 1/k². That is the spectrum of a string a finger has pulled aside at one point, so that it starts in the shape of a triangle; the triangle is the string's shape, not chapter 3's triangle wave, which falls as 1/k² too. `brightness=1` puts the cutoff at the 256th harmonic, as bright as raw noise.
 
 `damping` is the gain of one trip round the loop, between 0.9 and 0.9999 (above 1 the sound would grow without end, so `Pluck` refuses it): low, the note is short and muffled, like a string damped by the palm of the hand; high, it rings like a harp. `brightness` is the softness of what plucks it, from a fingertip (dark) to a hard plectrum (bright). `position` is where the string is plucked, as a fraction of its length from one end, from 0 to 0.5. The k-th harmonic of a string vibrates in k segments, with still points between them, at 1/k, 2/k … of its length. A pluck at a point where a harmonic stands still cannot set that harmonic moving, so plucking at 1/n of the length removes the n-th, the 2n-th, the 3n-th harmonic and so on: `position=0.5` removes every even harmonic, and the tone turns hollow, as the square of chapter 3 does. Guitarists play near the bridge, at about 0.1, for a thin, bright tone, and over the sound hole, nearer 0.25, for a round one.
 
-Three settings of the three knobs, each playing the same four notes, A3, C♯4, E4 and A4 (chapter 3's A major chord, one note at a time, and the octave), with chapter 2's `play`:
+Three settings of the three knobs, each playing the same four notes, A3, C♯4, E4 and A4, with chapter 2's `play`. A3, C♯4 and E4 are 0, 4 and 7 steps above A3, a *major chord*; played one note after another, with the octave on top, they are an *arpeggio*:
 
 ```python {run}
 from euterpe.instruments import play
@@ -110,7 +110,7 @@ for name, knobs in settings.items():
     display(play(lambda n: Pluck(n.freq, seed=1, **knobs) * 0.5, notes).take(3.5, f"A plucked arpeggio, {name}"))
 ```
 
-Palm-muted, each note stops short and dull. The harp rings on, each note still sounding under the next. Near the bridge, the bright pluck has lost its 10th, 20th … harmonics and sounds thin and glassy. Playing the notes of a chord one after another like this is an *arpeggio*.
+Palm-muted, each note stops short and dull. The harp rings on, each note still sounding under the next. Near the bridge, the bright pluck has lost its 10th, 20th … harmonics and sounds thin and glassy.
 
 ## Modes: bars and bells
 
@@ -172,21 +172,21 @@ from euterpe.sound import Modal
 ratios = [0.5, 1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.2]
 decays = [6.0, 4.0, 3.5, 3.0, 2.5, 1.5, 1.0, 0.6]
 amps = [0.6, 1.0, 0.7, 0.5, 0.8, 0.4, 0.3, 0.2]
-display((Modal([220 * r for r in ratios], decays, amps) * 0.18).take(5.0, "A bell with its prime at 220 Hz: eight modes"))
+display((Modal([220 * r for r in ratios], decays, amps) * 0.18).take(5.0, "A bell with its note at 220 Hz: eight modes"))
 ```
 
 The mode a minor third up gives a tuned bell its particular colour. Compare it with the FM bell of chapter 6: FM made inharmonic partials from two sines and one ratio, and put every one of them where the ratio placed it; the modal bell takes each frequency, level and decay from a list, so it can copy a real object that has been measured. FM is cheap and has few knobs. A modal model costs one filter per mode and can be as exact as the measurements behind it.
 
 ## Putting it all together
 
-The clock tower of the Palace of Westminster, which holds Big Ben, plays a tune on four bells every quarter of an hour, and before each hour all four of its *changes*, four notes each, then the hour bell strikes. Here the four bells are the bell above at G♯4, F♯4, E4 and B3, steps 11, 9, 7 and 2 above A3. Each strike is a new `Modal`, placed by `play`, so a bell can ring on while the next one is struck. The hour bell is an octave and a fifth below, at E2, struck with the soft mallet of the bar, three times. Under it all, a low E1 string, plucked at damping 0.999, rings on every change.
+The clock tower of the Palace of Westminster, which holds Big Ben, plays a tune on four bells every quarter of an hour, and before each hour all four of its *changes*, four notes each, then the hour bell strikes. Here the four bells are the bell above at G♯4, F♯4, E4 and B3, steps 11, 9, 7 and 2 above A3. Each strike is a new `Modal`, placed by `play`, so a bell can ring on while the next one is struck. The hour bell is an octave and a fifth below the lowest bell, at E2, struck three times with a mallet softer and longer than the bar's (800 Hz, 10 ms). Under it all, a low E1 string, two octaves below the hour bell, plucked at damping 0.999, is plucked again at each change and once more under the hour bell. A `Modal` rings on as its modes decay, whatever duration `play` gives its note.
 
 ```python {run continue name=finale}
 from euterpe.instruments import play
 from euterpe.sound import ADSR, LowPass, Pluck, Segments, WhiteNoise
 
 CHANGES = [[7, 11, 9, 2], [7, 9, 11, 7], [11, 7, 9, 2], [2, 9, 11, 7]]  # E G# F# B, ...: steps above A3
-GAP = 0.8  # seconds between strikes; a change takes five gaps, its last note held
+GAP = 0.8  # seconds between strikes; a change is four strikes and a gap of silence
 
 
 def bell(n):
@@ -224,7 +224,7 @@ song.take(28.0, "The Westminster chimes: four modal bells, an hour bell and a pl
 
 ### Answers
 
-1. Each trip now keeps 0.98 × cos(π × 220 / 48 000) of the first harmonic, and 220 trips a second give 20 × log₁₀ of that to the 220th power: about −38.8 dB in one second, about five times as much as at 0.996. By the 60 dB rule the note lasts 60 / 38.8 = 1.5 s instead of 7.6 s, and it sounds muted, like a pizzicato on a violin.
+1. Each trip now keeps 0.98 × cos(π × 220 / 48 000) of the first harmonic, and 220 trips a second give 20 × log₁₀ of that to the 220th power: about −38.8 dB in one second, about five times as much as at 0.996. By the 60 dB rule the note lasts 60 / 38.8 = 1.5 s instead of 7.6 s, and it sounds muted, like a string plucked and then damped.
 2. Plucking at 0.2 = 1/5 of the length removes every harmonic with a still point there: the 5th, 10th, 15th and so on. The first two are at 5 × 220 = 1 100 Hz and 10 × 220 = 2 200 Hz.
 3. Every mode now rings for 1.2 s, so the high ones no longer die first. The bar no longer mellows towards its lowest mode as it fades: it stays as bright and as metallic at the end as at the strike. A real bar does not do this, because a faster vibration loses more energy per second; in the spectrogram the four lines would all be the same length.
 
