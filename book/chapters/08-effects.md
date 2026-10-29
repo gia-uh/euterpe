@@ -19,7 +19,7 @@ exec("\n".join(line for line in code.split("\n") if ".take(" not in line), scope
 listen(scope["song"], 10.0, "The first 10 s of the chapter's finale")
 ```
 
-A dub groove: a bass, off-beat chords that echo away into a hall, and a distorted chord at the end. The instruments are plucked strings from chapter 7; everything else you hear is effects.
+A dub groove: a bass and off-beat chords that echo away into a hall; the full piece ends on a distorted chord. The instruments are plucked strings from chapter 7; everything else you hear is effects.
 
 ## Delay and echo
 
@@ -99,7 +99,7 @@ noise = WhiteNoise(seed=3) * ADSR(attack=0.5, gate=7.2, release=0.6) * 0.15
 listen(Flanger(noise, rate=0.25, depth=0.004, feedback=0.7, mix=0.5), 8.0, "White noise through a flanger, rate 0.25 Hz, feedback 0.7")
 ```
 
-The noise sounds like a jet passing overhead. The picture shows why: in this *spectrogram* time runs to the right, frequency goes up, and darker means louder. The dark bands are the peaks of the comb, evenly spaced in hertz (so on this axis, where each octave takes the same height, they crowd together higher up), rising and falling together.
+The noise sounds like a jet passing overhead. The spectrogram of chapter 1 shows why. The dark bands are the peaks of the comb, evenly spaced in hertz (so on this axis, where each octave takes the same height, they crowd together higher up), rising and falling together.
 
 ```python {run echo=false}
 from euterpe.sound import Flanger, WhiteNoise
@@ -146,7 +146,7 @@ curve(
 )
 ```
 
-A sine pushed through a curve stays periodic with the same period, so whatever the curve adds must be harmonics, multiples of the sine's frequency. All three curves are *odd*: the bottom half is the top half turned upside down, so the positive and negative halves of the sine are bent the same way, and a wave with that symmetry has only odd harmonics, as the square of chapter 3. The spectra below show it, and show that the curves bend the wave by different amounts at the same drive: `SoftClip`, whose curve rises most steeply and turns flat at the same point as `HardClip`, has the loudest high harmonics.
+A sine pushed through a curve stays periodic with the same period, so whatever the curve adds must be harmonics, multiples of the sine's frequency. All three curves are *odd*: the bottom half is the top half turned upside down, so the positive and negative halves of the sine are bent the same way, and a wave with that symmetry has only odd harmonics, as the square of chapter 3. The spectra after the next section show it, and show that the curves bend the wave by different amounts at the same drive: `SoftClip`, which tops out at 2/3 before the −1 dBFS scaling and so is scaled up the most, is the steepest after it, turns flat at the same point as `HardClip`, and has the loudest high harmonics.
 
 More drive pushes more of the wave into the bend. Here is the same sine at drive 1 and 16, through `tanh`:
 
@@ -270,13 +270,13 @@ view.level(
 )
 ```
 
-*Attack.* At the jump to the loud step, at 1 s, the output overshoots for about 40 ms before it settles near −25 dB. Two delays add up there: the detector's 10 ms average needs time to see the new level, and the gain then follows what it sees with its own 10 ms attack. A slower attack lets more of the start of each note through, which keeps the click of a drum or a plucked string.
+*Attack.* At the jump to the loud step, at 1 s, the output overshoots for about 40 ms before it settles near −25 dB. Two delays add up there, and each time constant covers only 63 % of the way, so settling takes several of them: the detector's 10 ms average needs time to see the new level, and the gain then follows what it sees with its own 10 ms attack. A slower attack lets more of the start of each note through, which keeps the click of a drum or a plucked string.
 
 *Release.* At 2 s the level drops, but the gain is still low, so the output dips well below where it settles and climbs back with the 100 ms release, taking about 0.2 s.
 
 *Pumping.* A fast release makes the gain spring back soon after each loud note, so the quiet tail of every note swells as the gain recovers. Producers call the sound *pumping*, and some music uses it on purpose.
 
-A compressor is easiest to hear on a note that starts loud and decays, such as a pluck. The second version goes through a compressor with a very low threshold, −55 dB, ratio 8, release 0.2 s and 30 dB of makeup gain, then is scaled by 0.5 and passes a `Limiter`, the next section's unit, for a reason the measurement shows:
+A compressor is easiest to hear on a note that starts loud and decays, such as a pluck. The second version goes through a compressor with a very low threshold, −55 dB, ratio 8, release 0.2 s and 30 dB of makeup gain, then is scaled by 0.5 and passes a `Limiter`, the next section's unit, for a reason explained below:
 
 ```python {run}
 from euterpe.sound import Compressor, Limiter, Pluck
@@ -406,7 +406,7 @@ A stereo file has two channels, one for each speaker. A sound placed only in the
 
 ### Pan
 
-`Pan(src, pos)` places a mono sound: `pos` −1 is fully left, 0 the middle, 1 fully right. Recall from chapter 2 that power goes as amplitude squared. The obvious rule, with p = (pos + 1) / 2 running from 0 to 1, left gain 1 − p and right gain p, makes the sound quieter in the middle: two speakers at half level carry half the power of one at full level, 2 × 0.5² = 0.5, which is −3 dB. So `Pan` uses a *constant-power* rule. It turns `pos` into an angle θ = (pos + 1) × π / 4, from 0 to π / 2, and uses cos θ for the left and sin θ for the right. Since cos² θ + sin² θ = 1, the total power never changes. In the middle θ = π / 4, and each side gets cos(π / 4) = 0.707, −3 dB. `pos` can be a unit, so a slow sine moves the sound from side to side, an *auto-pan*. Listen to this one through headphones:
+`Pan(src, pos)` places a mono sound: `pos` −1 is fully left, 0 the middle, 1 fully right. Recall from chapter 2 that power goes as amplitude squared. The obvious rule, with p = (pos + 1) / 2 running from 0 to 1, left gain 1 − p and right gain p, makes the sound quieter in the middle: two speakers at half level carry half the power of one at full level, 2 × 0.5² = 0.5, which is −3 dB. So `Pan` uses a *constant-power* rule. It turns `pos` into an angle θ = (pos + 1) × π / 4, from 0 to π / 2, and uses cos θ for the left and sin θ for the right. Since cos² θ + sin² θ = 1, the total power never changes. In the middle θ = π / 4, and each side gets cos(π / 4) = 0.707: each side is 3 dB down, but together they keep the full power. `pos` can be a unit, so a slow sine moves the sound from side to side, an *auto-pan*. Listen to this one through headphones:
 
 ```python {run}
 from euterpe.sound import ADSR, LowPass, Pan, Saw, Sine
@@ -437,25 +437,25 @@ At width 0 the tail sits in the middle of your head; at 2 it spreads around it, 
 
 Effects are usually chained in a fixed order, the order a guitarist puts pedals on the floor: first what shapes the tone (distortion), then what moves it (chorus), then what places it in time and space (delay, pan, reverb), and last the dynamics that hold the mix together and guard the output. *Dub*, the Jamaican music of the 1970s, was made at the mixing desk with exactly these effects: a bass, off-beat chords called the *skank*, and echoes sent into a spring reverb until they fill the room.
 
-Here, at 75 beats a minute, the bass plucks a line on A and G under the skank, which strikes a three-note chord on beats 2 and 4. The skank goes through a chorus and a delay of three eighths of a beat, and is panned a little left. On the last bar a *power chord* of A and E (the fifth of the distortion section) rings through a saturator. Everything shares one hall, a gentle compressor and a limiter. Eight bars and the hall ringing out, 29 seconds:
+Here, at 75 beats a minute, the bass plucks a line on A and G under the skank, which strikes a three-note chord on beats 2 and 4. The skank goes through a chorus and a delay of three quarters of a beat, 0.6 s, the *dotted eighth* of dub, and is panned a little left. On the last bar a *power chord* of A and E (the fifth of the distortion section) rings through a saturator. Everything shares one hall, a gentle compressor and a limiter. Eight bars and the hall ringing out, 29 seconds:
 
 ```python {run name=finale}
 from euterpe.instruments import play
 from euterpe.sound import Chorus, Compressor, Delay, FDNReverb, Limiter, Pan, Pluck, Saturator
 
 BEAT = 0.8  # seconds: 75 beats a minute
-ROOTS = [0, -2] * 4  # A, G, A, G, ...: steps above A2 (110 Hz)
+ROOTS = [0, -2] * 4  # A, G, A, G, ...: steps from A2 (110 Hz); bars 1 to 7 groove, bar 8 is the power chord
 hz = lambda steps: 110 * 2 ** (steps / 12)
 
 bass = play(lambda n: Pluck(n.freq, damping=0.995, brightness=0.2, seed=1) * 0.25,
             [(4 * BEAT * b + BEAT * t, hz(r - 12 + s), BEAT) for b, r in enumerate(ROOTS[:7])
-             for t, s in ((0, 0), (1.5, 0), (2, 7), (3, 5))])
+             for t, s in ((0, 0), (1.5, 0), (2, 7), (3, 5))])  # t: beats from 0; the root twice, then 7 and 5 steps up
 skank = play(lambda n: Pluck(n.freq, damping=0.98, brightness=0.6, seed=2) * 0.4,
              [(4 * BEAT * b + BEAT * t, hz(r + 12 + s), BEAT) for b, r in enumerate(ROOTS[:7])
-              for t in (1, 3) for s in (0, 3, 7)])
+              for t in (1, 3) for s in (0, 3, 7)])  # beats 2 and 4; a minor chord on the root
 power = play(lambda n: Pluck(n.freq, damping=0.998, brightness=0.8, seed=3) * 0.6, [(28 * BEAT, hz(0), 4.0), (28 * BEAT, hz(7), 4.0)])
 
-echoes = Pan(Delay(Chorus(skank, rate=0.6, depth=0.002), time=0.375 * BEAT, feedback=0.5, mix=0.35), pos=-0.3)
+echoes = Pan(Delay(Chorus(skank, rate=0.6, depth=0.002), time=0.75 * BEAT, feedback=0.5, mix=0.35), pos=-0.3)
 band = bass + echoes + Saturator(power, drive=6.0, bias=0.2) * 0.5
 song = Limiter(Compressor(FDNReverb(band, decay=2.5, size=1.0, mix=0.25), threshold=-24.0, ratio=2.0, makeup=3.0), ceiling=-1.0)
 song.take(29.0, "A dub groove: plucks through chorus, delay, pan, saturator, hall, compressor and limiter")
