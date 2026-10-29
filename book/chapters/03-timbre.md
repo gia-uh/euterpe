@@ -1,20 +1,26 @@
 # Timbre
 
-Near its end, chapter 2 played four waves at the same pitch, 220 Hz, and the same peak. They did not sound alike. A sine sounds pure, a triangle soft, a square hollow and buzzy, a saw bright and brassy. What differs between them is called *timbre*: everything that tells two sounds apart when their pitch and loudness are the same. This chapter shows that for a steady tone, timbre is a list of sines: which frequencies a wave contains and how strong each one is.
+Near its end, chapter 2 played four waves at the same pitch, 220 Hz, and the same peak. They did not sound alike. A sine sounds pure, a triangle soft, a square hollow and buzzy, a saw bright and brassy. What differs between them is called *timbre*: everything that tells two sounds apart when their pitch and loudness are the same. This chapter shows that for a steady tone, timbre is a list of sines (a *steady* tone is one whose level and pitch do not change while it sounds): which frequencies a wave contains and how strong each one is. This is where it ends up:
+
+```python {run echo=false}
+# The teaser: the second half of the finale, built by the code of this chapter's last section,
+# which it reads from this file so the two never differ.
+import re
+from pathlib import Path
+
+from euterpe.sound.clip import Clip
+from euterpe.sound.core import RATE, render
+
+text = Path("chapters/03-timbre.md").read_text()
+exec(re.search(r"```python \{[^}\n]*name=finale\b[^}\n]*\}\n(.*?)\n```", text, re.S).group(1))
+display(Clip(render(song, 24.0)[12 * RATE:], caption="The end of the chapter's finale"))
+```
+
+An organ plays a hymn's *chords*, several notes struck at once, and then bells join it on the same chords. Organ, pedal and bells are each one list of `(ratio, amplitude)` pairs, and the last section writes all three.
 
 ## Four waves, one pitch
 
-Here are the four waves again, at 220 Hz and gain 0.5. 220 Hz is the note A3, one octave below A4.
-
-```python {run}
-from euterpe.sound import Saw, Sine, Square, Triangle
-from euterpe.view import listen
-
-for wave in (Sine, Triangle, Square, Saw):
-    display(listen(wave(220.0) * 0.5, 1.5, f"{wave.__name__} at 220 Hz"))
-```
-
-All four have the same pitch: you could sing along with any of them on the same note. The plot shows two cycles of each, about 9.1 ms; each period is 1/220 of a second, 4.5 ms.
+All four waves of chapter 2's last section have the same pitch, 220 Hz, the note A3, an octave below A4: you could sing along with any of them on the same note. The plot shows two cycles of each, about 9.1 ms; each period is 1/220 of a second, 4.5 ms.
 
 ```python {run echo=false}
 from euterpe.sound import Saw, Sine, Square, Triangle
@@ -55,9 +61,9 @@ Each column is a harmonic, from 220 Hz to 1 760 Hz. The sine has only its fundam
 - The square has only the odd harmonics, 1, 3, 5, 7, also at 1/k: 1.273, 0.424 (a third), 0.254 (a fifth).
 - The triangle has only the odd harmonics too, but at 1/k²: 0.811, 0.090 (a ninth), 0.032 (a twenty-fifth).
 
-The fundamentals are larger than 1 for the square and smaller for the saw and the triangle, although all three waves peak at 1. A sine of amplitude 1.273 is taller than the square, but the other harmonics pull the sum back down to 1, everywhere except next to the jumps, as the overshoot below shows. The exact values are 4/π for the square, 2/π for the saw and 8/π² for the triangle; they come from Fourier's formula for each shape, and they matter less than the pattern.
+The fundamentals are larger than 1 for the square and smaller for the saw and the triangle, although all three waves peak at 1. A sine of amplitude 1.273 is taller than the square, but the other harmonics pull the sum back down to 1, everywhere except next to the jumps. The exact values are 4/π for the square, 2/π for the saw and 8/π² for the triangle; they come from Fourier's formula for each shape, and they matter less than the pattern.
 
-`np.abs` keeps the size of each number and drops its phase. That loses nothing the ear needs: for a steady tone, the ear hears the amplitudes of the harmonics, not their phases or signs. So for a steady tone the spectrum table is the whole of timbre. Phase does matter for the shape of the wave, and so for its peak and for whether it clips; the end of this chapter hears and measures both.
+`np.abs` keeps the size of each number and drops its phase. That loses nothing the ear needs: for a steady tone, the ear hears the amplitudes of the harmonics, not their phases or signs. So for a steady tone the spectrum table is the whole of timbre. Phase does matter for the shape of the wave, and so for its peak and for whether it clips; the last section before the finale hears both.
 
 The plot shows the same spectra up to 6 000 Hz, in decibels. Each harmonic is a line at its frequency, as tall as its level in dB, so equal steps down mean equal ratios, as in chapter 2.
 
@@ -88,19 +94,13 @@ for wave in (Sine, Triangle, Square, Saw):
     print(wave.__name__, [round(report.value(f"A-BALANCE-{band}"), 3) for band in ("LOW", "MID", "HIGH")])
 ```
 
-At 220 Hz only the fundamental is below 250 Hz, so the low share is the fundamental's share of the energy. The energy of a harmonic grows with the square of its amplitude, so for the saw, whose harmonic k has amplitude 1/k, harmonic k carries 1/k² of the fundamental's energy. With the 109 harmonics below 24 000 Hz, the fundamental's share is:
-
-```python {run output=code}
-print(1 / sum(1 / k ** 2 for k in range(1, 110)))
-```
-
-That is 0.611, and the report reads 0.616. The difference is `Saw`'s polyBLEP correction: it weakens the highest harmonics a little, as the end of this chapter measures, which leaves a slightly larger share to the fundamental.
+At 220 Hz only the fundamental is below 250 Hz, so the low share is the fundamental's share of the energy. The energy of a harmonic grows with the square of its amplitude, so for the saw, whose harmonic k has amplitude 1/k, harmonic k carries 1/k² of the fundamental's energy. With the 109 harmonics below 24 000 Hz, the fundamental's share is 1 / (1 + 1/2² + 1/3² + … + 1/109²) = 0.611, and the report reads 0.616. The difference is `Saw`'s polyBLEP correction: it weakens the highest harmonics a little, which leaves a slightly larger share to the fundamental.
 
 For brightness, the band to compare is the high one. The saw puts the most energy above 4 000 Hz, 0.022 of it, against 0.015 for the square and nothing measurable for the triangle; that is what makes it the brightest. Later chapters use these numbers to balance a mix.
 
 ## Building sounds from sines
 
-If a wave is a sum of sines, it can be built by adding sines. Euterpe's `Additive` does that. `Additive(freq, partials)` takes a frequency and a list of *partials*, pairs `(ratio, amplitude)`. Each partial is a sine at `ratio * freq` with that amplitude, and the unit outputs their sum. Partial is the general word: a harmonic is a partial whose ratio is a whole number. `Additive` does not scale the sum, so the gain after it decides the level.
+If a wave is a sum of sines, it can be built by adding sines. Euterpe's `Additive` does that. `Additive(freq, partials)` takes a frequency and a list of *partials*, pairs `(ratio, amplitude)`. Each partial is a sine at `ratio * freq` with that amplitude, and the unit outputs their sum. Partial is the general word: a harmonic is a partial whose ratio is a whole number. `Additive` does not scale the sum, so the gain after it decides the level, and it skips any partial at or above the Nyquist limit of chapter 1, 24 000 Hz.
 
 Here is a 220 Hz tone built from its first three harmonics, at amplitudes 1, 1/2 and 1/3, then the same three harmonics with the second one turned up to 1:
 
@@ -123,22 +123,13 @@ display((Additive(220.0, list(zip([1, 3, 5, 9], amps))) * 0.3).take(2.0, "Harmon
 display((Additive(220.0, list(zip([1, 2.76, 5.40, 8.93], amps))) * 0.3).take(2.0, "Partials at 1, 2.76, 5.40 and 8.93: a metal bar"))
 ```
 
-The first tone is one note. It has only odd harmonics, and strong ones, as the square does, so it sounds hollow like the square. The second sounds metallic, and it is hard to say what note it is. A sum of sines repeats when every one of them has finished a whole number of cycles. This block finds when that happens for the bar:
-
-```python {run output=code}
-import numpy as np
-
-hz = 220 * np.array([1, 2.76, 5.40, 8.93])
-print(hz, hz / 2.2, np.gcd.reduce([100, 276, 540, 893]))
-```
-
-The four frequencies are 2.2 Hz times 100, 276, 540 and 893. Some of those whole numbers share a factor (100, 276 and 540 are all multiples of 4), but all four together share none, as `np.gcd.reduce` shows. So 2.2 Hz is the largest step that fits all four, and the wave repeats every 1/2.2 s, 0.45 s. A repetition rate of 2.2 Hz is far below any pitch the ear hears, so the ear finds no single note, and hears several pitches at once. This is why bells and gongs sound the way they do. Chapter 7 makes such sounds ring and decay.
+The first tone is one note. It has only odd harmonics, and strong ones, as the square does, so it sounds hollow like the square. The second sounds metallic, and it is hard to say what note it is. A sum of sines repeats when every one of them has finished a whole number of cycles. The four frequencies are 220, 607.2, 1 188 and 1 964.6 Hz, which is 2.2 Hz times 100, 276, 540 and 893. Some of those whole numbers share a factor (100, 276 and 540 are all multiples of 4), but 893 = 19 × 47 shares none with them. So 2.2 Hz is the largest step that fits all four, and the wave repeats every 1/2.2 s, 0.45 s; with a real bar's exact ratios, which are no whole-number fractions, it never repeats at all. A repetition rate of 2.2 Hz is far below any pitch the ear hears, so the ear finds no single note, and hears several pitches at once. This is why bells and gongs sound the way they do. Chapter 7 makes such sounds ring and decay.
 
 ## A saw, one sine at a time
 
 The spectrum table measured the saw's harmonics at 2/π × 1/k. That gives the recipe for a saw: harmonic k at amplitude 2/(πk). There is one more detail. Euterpe's `Saw` rises and then drops; the plain sum of these sines falls and then jumps up, the same wave played backwards. To rise instead, every sine is turned upside down, which is what a negative amplitude does: it shifts that sine's phase by half a cycle. The ear cannot hear the difference, but the plots can.
 
-`saw_partials(n)` lists harmonics 1 to n with those amplitudes. The block builds the saw with 1, 2, 4, 8, 16 and 109 harmonics. 109 is the last one below the Nyquist limit of chapter 1: 109 × 220 = 23 980 Hz, and the 110th would be 24 200 Hz.
+`saw_partials(n)` lists harmonics 1 to n with those amplitudes. The block builds the saw with 1, 2, 4 and 16 harmonics.
 
 ```python {run}
 import numpy as np
@@ -149,12 +140,11 @@ from euterpe.view import listen
 def saw_partials(n):
     return [(k, -2 / (np.pi * k)) for k in range(1, n + 1)]
 
-for n in (1, 2, 4, 8, 16, 109):
+for n in (1, 2, 4, 16):
     display(listen(Additive(220.0, saw_partials(n)) * 0.5, 1.5, f"A saw built up to harmonic {n}"))
-listen(Saw(220.0) * 0.5, 1.5, "Saw at 220 Hz, for comparison")
 ```
 
-One harmonic is a sine. Each doubling adds an octave of brighter harmonics, and the tone grows from a soft hum towards the buzz of the saw. The step from 16 to 109 harmonics adds everything above 3 520 Hz; it is a smaller change to the ear than the step from 1 to 2, because the added harmonics are weak, 1/17 of the fundamental and less. The last two players are hard to tell apart.
+One harmonic is a sine. Each doubling adds an octave of brighter harmonics, and the tone grows from a soft hum towards the buzz of the saw. With 16 it is already hard to tell from `Saw`: the 93 harmonics left below the Nyquist limit of chapter 1 (109 × 220 = 23 980 Hz) are 1/17 of the fundamental and weaker.
 
 The plot shows one cycle of the sums with 1, 4, 16 and 109 harmonics, drawn over the saw:
 
@@ -170,43 +160,11 @@ waveform(
 )
 ```
 
-Each harmonic added makes the ramp straighter and the drop steeper. Next to the drop the sum overshoots: it goes above 1, where the saw stops. This block prints the highest sample in one second of each sum, and of `Saw` and `Square`:
-
-```python {run continue output=code}
-from euterpe.sound import Square, render
-
-for n in (4, 8, 16, 109):
-    print(n, "harmonics:", render(Additive(220.0, saw_partials(n)), 1.0).max())
-print("Saw:", render(Saw(220.0), 1.0).max(), " Square:", render(Square(220.0), 1.0).max())
-```
-
-With 4 harmonics the sum stays below 1 (0.972); with 8 it already passes 1, and with 16 and 109 it reaches 1.12 and 1.17. This is called the *Gibbs phenomenon*. Adding harmonics narrows the overshoot, squeezing it closer to the drop, but does not lower it, so its height settles near 9 % of the jump, which is 2: the peak approaches 1.18. `Saw` and `Square` do not overshoot (0.991 and 1.0), because they are computed from the shape itself, with polyBLEP's two-sample correction at each jump, not as a sum of sines. The overshoot matters for levels: a saw built from its harmonics at full scale would reach 1.17 and clip, so the examples here use gain 0.5.
-
-Which is the better saw? They sound the same; `Saw` is cheaper, one formula per sample instead of 109 sines, and its polyBLEP correction lets a little aliasing through, while `Additive` drops every partial at or above 24 000 Hz and aliases not at all. This block compares their harmonics 1, 10, 50 and 100, each multiplied by k so that the ideal value is 2/π = 0.637 for every one:
-
-```python {run continue output=code}
-k = np.array([1, 10, 50, 100])
-for unit in (Additive(220.0, saw_partials(109)), Saw(220.0)):
-    x = render(unit, 1.0)
-    amp = np.abs(np.fft.rfft(x)) * 2 / len(x)
-    print(type(unit).__name__, np.round(k * amp[220 * k], 3))
-```
-
-The two agree up to the tenth harmonic, 2 200 Hz. Above it, `Saw` falls behind: harmonic 50, at 11 000 Hz, is at 84 % of the ideal (0.534 / 0.637), and harmonic 100, at 22 000 Hz, at 47 %. polyBLEP smooths the drop over two samples, which is a little smoother than the ideal saw, and smoothing takes away high harmonics. Those harmonics are already weak, so the loss changes the sound very little.
+Each harmonic added makes the ramp straighter and the drop steeper. Next to the drop the sum overshoots: it goes above 1, where the saw stops. This is called the *Gibbs phenomenon*. Adding harmonics squeezes the overshoot closer to the drop but does not lower it: its height settles near 9 % of the jump, which is 2, so a saw built from its harmonics at full scale would reach about 1.18 and clip, and the examples here use gain 0.5. `Saw` does not overshoot, because it is computed from the shape itself, with polyBLEP's two-sample correction at the drop. That correction also costs it a little of its highest harmonics, which are weak anyway, so the two saws sound the same.
 
 ## Why the square has only odd harmonics
 
-A square spends the first half of each cycle at +1 and the second half at −1. So its second half is its first half turned upside down. The proof that this rules out every even harmonic takes one step per line. Let T be the period.
-
-1. Shift the wave by half a period: look at x(t + T/2) instead of x(t).
-2. Harmonic k makes k cycles per period, so in half a period it makes k/2 cycles.
-3. When k is even, k/2 is a whole number, so the harmonic is back where it was: an even harmonic h satisfies h(t + T/2) = h(t).
-4. When k is odd, the harmonic is half a cycle further on, which is the same sine upside down: an odd harmonic h satisfies h(t + T/2) = −h(t).
-5. For the square, the second half is the first upside down: x(t + T/2) = −x(t).
-6. Shifting the square shifts each of its harmonics, so by step 3 the shifted square has the same even harmonics h(t) as the square.
-7. Minus the square has every harmonic negated, so its even harmonics are −h(t).
-8. A wave has only one spectrum, and by step 5 these two waves are the same wave. So h(t) = −h(t) for every t.
-9. Only h = 0 satisfies that. The square has no even harmonics.
+A square spends the first half of each cycle at +1 and the second half at −1, so its second half is its first half turned upside down: x(t + T/2) = −x(t), with T the period. Shift any wave by half a period and each harmonic k moves k/2 cycles: an even one comes back to where it was, an odd one lands upside down. For the square the shifted wave is minus the wave, so each even harmonic must equal minus itself, and only 0 does.
 
 The triangle has the same property: its second half, a fall from 1 to −1, is its first half, a rise from −1 to 1, turned upside down. The saw does not: its second half continues the same rising ramp. This block checks it on the samples. At 200 Hz a cycle is exactly 240 samples, so half a cycle is 120 samples, and `x[120:240] + x[:120]` is zero wherever the second half mirrors the first:
 
@@ -222,20 +180,7 @@ for wave in (Square, Triangle, Saw):
 
 The square and the triangle print 0 to four decimals: they mirror, and their spectra have no even harmonic. The saw does not, and has every harmonic.
 
-The argument also runs the other way: a sum of odd harmonics alone always mirrors itself. When those odd harmonics are strong, at 1/k as in the square, it sounds hollow; at 1/k², as in the triangle, they fade too fast to be heard much, and it sounds soft. Here is the square built from its odd harmonics, at 4/π × 1/k as the table measured, next to `Square`:
-
-```python {run}
-import numpy as np
-
-from euterpe.sound import Additive, Square
-from euterpe.view import listen
-
-partials = [(k, 4 / (np.pi * k)) for k in range(1, 110, 2)]   # k = 1, 3, 5, ..., 109
-display((Additive(220.0, partials) * 0.35).take(1.5, "A square from its odd harmonics"))
-listen(Square(220.0) * 0.35, 1.5, "Square at 220 Hz, for comparison")
-```
-
-The gain is 0.35 rather than 0.5 because a square is louder than the other waves at the same peak (chapter 2), and because the built square overshoots, as the saw did.
+The argument also runs the other way: a sum of odd harmonics alone always mirrors itself. When those odd harmonics are strong, at 1/k as in the square, it sounds hollow; at 1/k², as in the triangle, they fade too fast to be heard much, and it sounds soft. Exercise 1 builds the square that way.
 
 ### The triangle, and what phase changes
 
@@ -244,7 +189,7 @@ The triangle's odd harmonics have amplitude 8/(π²k²), and their signs alterna
 ```python {run}
 import numpy as np
 
-from euterpe.sound import Additive, Triangle
+from euterpe.sound import Additive
 from euterpe.view import listen
 
 odd = range(1, 110, 2)
@@ -252,11 +197,10 @@ triangle = [(k, (-1) ** (k // 2) * 8 / (np.pi ** 2 * k ** 2)) for k in odd]
 same_sizes = [(k, 8 / (np.pi ** 2 * k ** 2)) for k in odd]
 
 display(listen(Additive(220.0, triangle) * 0.5, 1.5, "A triangle from its odd harmonics, signs alternating"))
-display(listen(Additive(220.0, same_sizes) * 0.5, 1.5, "The same harmonics, every sign positive"))
-listen(Triangle(220.0) * 0.5, 1.5, "Triangle at 220 Hz, for comparison")
+listen(Additive(220.0, same_sizes) * 0.5, 1.5, "The same harmonics, every sign positive")
 ```
 
-The three players sound the same. The plot shows why that is remarkable: the second wave has a different shape.
+The two players sound the same. The plot shows why that is remarkable: the second wave has a different shape.
 
 ```python {run continue echo=false}
 from euterpe.view import waveform
@@ -268,19 +212,52 @@ waveform(
 )
 ```
 
-The block below measures what changed and what did not: the amplitudes of the first four odd harmonics, the loudness of the sum at gain 0.5, and its peak.
-
-```python {run continue output=code}
+```python {run continue echo=false}
+# Check the claim below: same loudness, different peaks.
 from euterpe.lint import lint_audio
 from euterpe.sound import render
 
-for partials in (triangle, same_sizes):
-    x = render(Additive(220.0, partials), 1.0)
-    amp = np.abs(np.fft.rfft(x)) * 2 / len(x)
-    print(np.round(amp[220 * np.array([1, 3, 5, 7])], 3), lint_audio(x * 0.5).value("A-LUFS"), "LUFS, peak", x.max())
+a, b = (render(Additive(220.0, partials), 1.0) for partials in (triangle, same_sizes))
+assert abs(lint_audio(a * 0.5).value("A-LUFS") - lint_audio(b * 0.5).value("A-LUFS")) < 0.1
+assert a.max() > 0.99 and b.max() < 0.75, (a.max(), b.max())
 ```
 
-Both have the same harmonic amplitudes and the same loudness, −11.7 LUFS, so they have the same timbre. Only the phases differ, and the phases change the shape and the peak: 0.996 for the triangle, 0.742 for the other. Phase decides how high a wave reaches, and so how much gain it takes before it clips, but not how it sounds.
+Both have the same harmonic amplitudes, so the same loudness and the same timbre. Only the phases differ, and the phases change the shape and the peak, as the plot shows: the triangle reaches 1, the other about three quarters of that. Phase decides how high a wave reaches, and so how much gain it takes before it clips, but not how it sounds.
+
+## Putting it all together
+
+A pipe organ makes each note from several ranks of pipes, each rank sounding at a fixed ratio above or below the key. The Hammond organ of 1935 copied that with nine *drawbars*, sliders that set the level of nine sines at ratios 0.5, 1, 1.5, 2, 3, 4, 5, 6 and 8 to the key: an organ sound is a list of partials, and `Additive` plays it. Three lists make the piece:
+
+- `DRAWBARS`, the organ: all nine drawbars, the sub-octave (0.5) and 1.5 times the key among them.
+- `HOLLOW`, the pedal an octave below (organists play the bass notes with their feet, on a keyboard of *pedals*): odd harmonics only, the square's pattern, so it sounds hollow.
+- `BAR`, the bells: the metal bar's four partials, an octave above the chord.
+
+Each chord is three notes, 0, 4 and 7 steps above a *root*: that pattern is a *major chord*, the bright chord of most hymns. The roots move A, D, A, E and back, the chords that close countless hymns. The organ and pedal play the eight chords twice, and on the second pass the bells play them too. The gains are small because nine partials of three notes add up.
+
+```python {run name=finale}
+from euterpe.instruments import play
+from euterpe.sound import Additive
+
+DRAWBARS = [(0.5, 0.8), (1, 1.0), (1.5, 0.6), (2, 0.8), (3, 0.5), (4, 0.5), (5, 0.3), (6, 0.3), (8, 0.3)]
+HOLLOW = [(1, 1.0), (3, 0.33), (5, 0.2)]
+BAR = [(1, 1.0), (2.76, 0.6), (5.40, 0.4), (8.93, 0.25)]
+ROOTS = [0, 5, 0, 7, 0, 5, 7, 0]          # A, D, A, E, A, D, E, A: steps above A3
+
+
+def chords(start, steps=(0, 4, 7), down=0):
+    """(time, frequency, duration) for a chord on each root, one every 1.5 s from start, each 1.4 s long."""
+    return [(start + 1.5 * i, 220 * 2 ** ((root + s - down) / 12), 1.4)
+            for i, root in enumerate(ROOTS) for s in steps]
+
+
+organ = play(lambda n: Additive(n.freq, DRAWBARS) * 0.04, chords(0) + chords(12))
+pedal = play(lambda n: Additive(n.freq, HOLLOW) * 0.15, chords(0, (0,), 12) + chords(12, (0,), 12))
+bells = play(lambda n: Additive(n.freq * 2, BAR) * 0.06, chords(12))
+song = organ + pedal + bells
+song.take(24.0, "A hymn's chords on a drawbar organ, then with bells")
+```
+
+`play` and its notes are chapter 2's; `chords(0, (0,), 12)` plays only the root, 12 steps (an octave) down. The organ and the pedal fuse into one rich tone per note, because every partial is a whole multiple of half the key's frequency (0.5 = 1 × ½, 1.5 = 3 × ½, 2 = 4 × ½ …); the bells do not fuse, and ring as a cloud of separate pitches above. But the bells do not sound like bells yet: a struck bell is loudest at the strike and dies away over seconds, and these hold steady, then stop. So does the organ, which is right for an organ and wrong for almost anything else. A sound's level over time is its *envelope*, and chapter 4 shapes it.
 
 ## Summary
 
@@ -294,15 +271,15 @@ Both have the same harmonic amplitudes and the same loudness, −11.7 LUFS, so t
 
 ## Exercises
 
-1. In the block that builds the saw, change `range(1, n + 1)` in `saw_partials` to `range(1, n + 1, 2)`, and add `listen(Square(220.0) * 0.25, 1.5, "Square at gain 0.25")` (import `Square`). Which wave does the sum approach, and why does gain 0.25 on `Square` match its level?
+1. In the block that builds the saw, change `range(1, n + 1)` in `saw_partials` to `range(1, n + 1, 2)`, and add `listen(Square(220.0) * 0.25, 1.5, "Square at gain 0.25")` (import `Square`). Which wave does the sum approach, and why does gain 0.25 on `Square` match its level? (Players even out loudness, so compare `lint_audio(...).value("A-PEAK")` of the two.)
 2. `Square` takes a second parameter, `duty`: the fraction of each cycle it spends at +1. At `duty=0.5`, the default, it is the square of this chapter; at any other duty it is called a *pulse*. In the spectrum table, define `def quarter_pulse(freq): return Square(freq, duty=0.25)` and put `quarter_pulse` in place of `Square` in the tuple. Which harmonics are missing now?
-3. In the block that builds the saw, raise the frequency from `220.0` to `2_000.0` in the `listen` line. How many harmonics are left below 24 000 Hz, and how does the 16-harmonic version compare with the 109-harmonic one?
+3. In the block that builds the saw, raise the frequency from `220.0` to `2_000.0` and the counts to `(8, 11, 16)`. How many harmonics are left below 24 000 Hz, and why do the last two players sound the same?
 
 ### Answers
 
 1. It approaches a square: the odd harmonics at 1/k are the square's spectrum. The amplitudes are 2/(πk) instead of the square's 4/(πk), half as large, and the sum then goes through gain 0.5, so it matches `Square` at 0.5 × 0.5 = 0.25. It points the other way, because the amplitudes are negative, and that does not change the sound.
 2. Harmonics 4 and 8 are missing, and all the others are present, odd and even: a pulse with duty 0.25 no longer mirrors itself. Fourier's formula gives harmonic k of a pulse with duty d an amplitude proportional to sin(πkd) / k, which is zero whenever k × d is a whole number: here at k = 4, 8, 12 and so on.
-3. Only 11: 11 × 2 000 = 22 000 Hz, and the 12th would be 24 000 Hz, which is the limit itself, so `Additive` drops it. The 16- and 109-harmonic versions sound the same, because both have the same 11 harmonics.
+3. Only 11: 11 × 2 000 = 22 000 Hz, and the 12th would be 24 000 Hz, which is the limit itself, so `Additive` drops it. The 11- and 16-harmonic versions sound the same, because both have the same 11 harmonics.
 
 ```python {run echo=false}
 # Level check: lint every sound in build/audio, this chapter's and any written before it.
