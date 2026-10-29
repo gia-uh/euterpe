@@ -68,3 +68,39 @@ def test_a_saw_without_antialias_is_the_direct_ramp_and_aliases():
     freqs = np.fft.rfftfreq(len(big), 1 / 48_000)
     harmonic = np.min(np.abs(freqs[:, None] - 4_000.0 * np.arange(1, 7)), axis=1) < 30
     assert spectrum[~harmonic].sum() / spectrum.sum() > 0.01
+
+
+def test_unison_of_one_voice_is_the_oscillator():
+    from euterpe.sound.osc import Unison
+
+    y = render(Unison(Saw, 220.0, voices=1), 0.2)
+    assert np.array_equal(y[:, 0], render(Saw(220.0), 0.2)) and np.array_equal(y[:, 0], y[:, 1])
+
+
+def test_unison_keeps_its_level_and_spreads_its_harmonics():
+    from euterpe.sound.osc import Unison
+    from tests.helpers import band_db
+
+    one = render(Saw(220.0), 1.0).astype(np.float64)
+    seven = render(Unison(Saw, 220.0, voices=7, detune=0.3), 1.0).astype(np.float64)
+    rms = lambda x: np.sqrt(np.mean(x**2))
+    assert abs(20 * np.log10(rms(seven) / rms(one))) < 2.0
+    # the 10th harmonic (2200 Hz) spreads over +-0.3 semitone, about +-38 Hz
+    assert band_db(seven, 2_170, 2_190) - band_db(one, 2_170, 2_190) > 10
+    assert not np.array_equal(seven[:, 0], seven[:, 1])
+
+
+def test_unison_does_not_depend_on_the_block_size():
+    from euterpe.sound.osc import Unison
+
+    f = lambda: Unison(Saw, Sine(3.0) * 10 + 220, voices=5)
+    assert np.array_equal(render(f(), 0.3), render(f(), 0.3, block=100))
+
+
+def test_unison_refuses_a_unit_that_is_not_an_oscillator():
+    import pytest
+    from euterpe.sound import FM
+    from euterpe.sound.osc import Unison
+
+    with pytest.raises(TypeError):
+        Unison(FM, 220.0)

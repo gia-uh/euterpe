@@ -78,11 +78,16 @@ class ADSR(Unit):
         c = np.clip(c, -100.0, 100.0)
         t = (self._done + np.arange(n)) / RATE
         self._done += n
-        held = self._held(t, a, d, s, c)
-        start = self._held(g, a, d, s, c)
+        before = t < g
+        if before.all():  # the key is held through the whole block
+            return self._held(t, a, d, s, c).astype(np.float32)
         p = np.clip((t - g) / np.maximum(r, 1e-12), 0.0, 1.0)
-        released = start * (1.0 - _bend(p, c))  # p = 1 once the release is over, so 0
-        return np.where(t < g, held, released).astype(np.float32)
+        if (p >= 1.0).all():  # the release is over
+            return np.zeros(n, np.float32)
+        released = self._held(g, a, d, s, c) * (1.0 - _bend(p, c))  # p = 1 once the release is over, so 0
+        if not before.any():
+            return released.astype(np.float32)
+        return np.where(before, self._held(t, a, d, s, c), released).astype(np.float32)
 
 
 class Segments(Unit):

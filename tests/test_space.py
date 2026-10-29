@@ -3,7 +3,7 @@ import pytest
 
 from euterpe.sound.core import RATE, Const, Unit, render
 from euterpe.sound.space import ConvolutionReverb, Delay, FDNReverb, Pan
-from euterpe.sound.osc import Sine
+from euterpe.sound.osc import Saw, Sine
 from euterpe.sound.noise import WhiteNoise
 from euterpe.sound.space import Chorus, Flanger, Phaser, Width
 from tests.helpers import band_db, peak_hz
@@ -235,3 +235,53 @@ def test_fdn_response_has_energy_one_per_side(decay):
 def test_fdn_without_damping_decays_in_its_setting(decay):
     x = render(FDNReverb(Click(), decay=decay, damping=0.0, mix=1.0), decay * 1.3)
     assert abs(rt60(x.mean(axis=1)) - decay) / decay < 0.1
+
+
+def _swirl_hz(speed: float) -> float:
+    """The rate at which a Leslie's level swings, from the spectrum of its left channel's envelope."""
+    from euterpe.sound.space import Leslie
+
+    y = render(Leslie(Sine(2_000.0) * 0.5, speed=speed), 6.0)[RATE:, 0].astype(np.float64)
+    env = np.abs(y).reshape(-1, 480).max(axis=1)  # 100 values a second
+    spec = np.abs(np.fft.rfft((env - env.mean()) * np.hanning(len(env))))
+    return float(np.fft.rfftfreq(len(env), 0.01)[np.argmax(spec[1:]) + 1])
+
+
+def test_leslie_swirls_at_its_rotor_rate():
+    assert abs(_swirl_hz(1.0) - 6.7) < 0.4
+    assert abs(_swirl_hz(0.0) - 0.8) < 0.3
+
+
+def test_leslie_is_stereo_and_its_horn_spins_up_within_a_second_and_a_half():
+    from euterpe.sound.env import Segments
+    from euterpe.sound.space import Leslie
+
+    les = Leslie(Sine(2_000.0) * 0.5, speed=Segments([(0.0, 0.0), (0.5, 0.0), (0.501, 1.0)]))
+    y = render(les, 2.0)
+    assert not np.allclose(y[:, 0], y[:, 1])
+    assert les._rate[0] > 0.8 + 0.9 * (6.7 - 0.8)
+
+
+def test_leslie_does_not_depend_on_the_block_size():
+    from euterpe.sound.space import Leslie
+
+    f = lambda: Leslie(Saw(220.0) * 0.3, speed=Sine(0.5) * 0.5 + 0.5)
+    assert np.array_equal(render(f(), 0.5), render(f(), 0.5, block=100))
+
+
+def test_leslie_does_not_depend_on_the_block_size_over_seconds():
+    from euterpe.sound.space import Leslie
+
+    f = lambda: Leslie(Saw(220.0) * 0.3, speed=Sine(0.3) * 0.5 + 0.5)
+    ref = render(f(), 3.0)
+    for block in (1, 7, 4096):
+        assert np.array_equal(render(f(), 3.0, block=block), ref)
+
+
+def test_leslie_starts_at_the_speed_it_is_given():
+    from euterpe.sound.env import Segments
+    from euterpe.sound.space import Leslie
+
+    les = Leslie(Sine(2_000.0) * 0.5, speed=Segments([(0.0, 1.0), (5.0, 1.0)]))
+    render(les, 0.01)
+    assert les._rate[0] > 6.5

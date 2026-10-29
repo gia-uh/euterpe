@@ -93,3 +93,16 @@ def test_a_plain_function_is_a_voice():
     assert sounding(p, 0.1) == 3 and p.starts[3] == round(0.5 * RATE)
     x = np.asarray(p.take(1.2))
     assert np.abs(x[: round(0.4 * RATE)]).max() > 0.3 and np.abs(x[round(1.1 * RATE):]).max() == 0
+
+
+def test_an_instruments_glide_sets_how_long_a_slur_takes():
+    from euterpe.sound.core import render
+    from tests.helpers import peak_hz
+
+    class Slow(Theremin):
+        glide = 0.1
+
+    notes = [Note(0.0, 440.0, 0.5), Note(0.5, 880.0, 0.5, articulation=Legato())]
+    window = slice(int(0.53 * RATE), int(0.57 * RATE))
+    assert abs(peak_hz(render(Theremin().play(notes), 1.0)[window]) - 880.0) < 30
+    assert abs(peak_hz(render(Slow().play(notes), 1.0)[window]) - 660.0) < 40

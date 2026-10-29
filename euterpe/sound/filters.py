@@ -218,6 +218,92 @@ class HighShelf(_Gained):
     _kind = "highshelf"
 
 
+def _state(b: np.ndarray, a: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """lfilter's state for coefficients b, a after past inputs x and outputs y (oldest first,
+    one row per sample): what the filter would hold had it always had these coefficients.
+    Row i is the sum over k of b[i + 1 + k] x[-1 - k] - a[i + 1 + k] y[-1 - k]."""
+    order = len(a) - 1
+    idx = np.arange(order)[:, None] + np.arange(order)[None, :] + 1
+    inside = idx <= order
+    idx = np.minimum(idx, order)
+    tb, ta = np.where(inside, b[idx], 0.0), np.where(inside, a[idx], 0.0)
+    return tb @ x[::-1] - ta @ y[::-1]
+
+
+_LADDER_LOW = 10.0  # Hz: the lowest cutoff a Ladder keeps its gain at
+
+
+class Ladder(_Filter):
+    """Keeps frequencies below cutoff Hz and cuts those above by 24 dB per octave: four
+    one-pole low-passes in a row, the output fed back to the input upside down, 4 * resonance
+    times as strong.
+
+    At the cutoff each stage shifts the phase by 45 degrees, so the four turn the feedback
+    around and it adds there: a peak rises at the cutoff as resonance grows, and at 1 the filter
+    rings on by itself, a sine at the cutoff. The feedback also lowers everything below the
+    cutoff by 1 + 4 * resonance, as on the analog filter, so a resonant ladder sounds thinner.
+    It is the linear model, computed as one fourth-order filter; the analog one also saturates,
+    which a Saturator before it adds. cutoff is clipped to [10, 23 000] Hz, since below 10 Hz the
+    fourth-order filter loses precision, and resonance to
+    [0, 0.995], below the edge where it would ring forever. A moving cutoff is read every
+    5.3 ms, and the filter restarts there from its last four inputs and outputs, which keeps
+    it stable under a fast sweep.
+    """
+
+    _names = ("cutoff", "resonance")
+    _STEP = 256  # a moving cutoff or resonance is read every 256 samples (5.3 ms), counted from the start
+
+    @property
+    def duration(self) -> float | None:
+        """The source's plus the ringing: the slowest pole decays at (1 - resonance ** 0.25)
+        times 2 pi cutoff, with 5 % and sixteen stage time constants of margin."""
+        r = min(max(_fixed(self.resonance, 0.995), 0.0), 0.995)
+        w = 2 * np.pi * max(_fixed(self.cutoff, 20.0), _LADDER_LOW)
+        return _after(self.src.duration, float(1.05 * LN60 / (w * (1 - r**0.25)) + 16 / w))
+
+    def __init__(self, src: Unit, cutoff: float | Unit = 1000.0, resonance: float | Unit = 0.0):
+        """cutoff in Hz; resonance from 0 (none) to 1 (the edge of ringing on its own)."""
+        super().__init__(src, cutoff=cutoff, resonance=resonance)
+        self._section = _Section(self.channels, 4)
+
+    def _coeffs(self, cutoff: float, resonance: float) -> tuple[np.ndarray, np.ndarray]:
+        g = np.tan(np.pi * min(max(float(cutoff), _LADDER_LOW), _CUTOFF[1]) / RATE)
+        k = 4 * min(max(float(resonance), 0.0), 0.995)
+        # one stage is g / (1 + g) * (1 + z^-1) / (1 + p z^-1); four of them, by the binomial
+        p = (g - 1) / (1 + g)
+        b = (g / (1 + g)) ** 4 * np.array([1.0, 4.0, 6.0, 4.0, 1.0])
+        a = np.array([1.0, 4 * p, 6 * p**2, 4 * p**3, p**4]) + k * b
+        return b / a[0], a / a[0]
+
+    def reset(self) -> None:
+        super().reset()
+        self._x = np.zeros((4, self.channels))  # the last four inputs and outputs: a moving
+        self._y = np.zeros((4, self.channels))  # cutoff restarts the filter from them
+        self._now: tuple[float, ...] | None = None
+
+    def block(self, n: int) -> np.ndarray:
+        if not self._moving:
+            return super().block(n)
+        x = _as_frames(self.src.block(n))
+        values = [_signal(getattr(self, k), n).astype(np.float64) for k in self._names]
+        first = (-self._done) % self._STEP
+        cuts = [0, *range(first, n, self._STEP), n]
+        y = np.empty_like(x)
+        for lo, hi in zip(cuts, cuts[1:]):
+            if lo == hi:
+                continue
+            now = tuple(float(v[lo]) for v in values)
+            if (self._done + lo) % self._STEP == 0 and now != self._now:  # still parameters keep running
+                self._now = now
+                self._ba = b, a = self._coeffs(*now)
+                self._section.zi = _state(b, a, self._x, self._y)
+            y[lo:hi] = self._section.run(*self._ba, x[lo:hi])
+            self._x = np.concatenate([self._x, x[lo:hi]])[-4:]
+            self._y = np.concatenate([self._y, y[lo:hi]])[-4:]
+        self._done += n
+        return _out(y, self.channels)
+
+
 class _OnePole(_Filter):
     """The simplest filter: one pole, a gentle slope of 6 dB per octave beyond cutoff Hz.
 

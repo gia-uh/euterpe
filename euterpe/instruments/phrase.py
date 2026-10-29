@@ -19,7 +19,8 @@ class Phrase(Unit):
     stops the voice there; then, while polyphony voices or more still sound, the oldest one
     stops. A stopped voice fades over 5 ms. A monophonic instrument (polyphony 1) slurs a note
     that starts before the previous one ends, or carries Legato, into one voice, unless its
-    slurs attribute is False, as on a drum.
+    slurs attribute is False, as on a drum. The slur moves to the new pitch in the instrument's
+    glide seconds, 20 ms if it has none.
     """
 
     def __init__(self, notes: list[Note], instrument):
@@ -27,7 +28,7 @@ class Phrase(Unit):
         self.notes = notes
         polyphony = instrument.polyphony
         resource = getattr(instrument, "resource", None) or (lambda note: note.resource)
-        played = _slurred(notes) if polyphony == 1 and getattr(instrument, "slurs", True) else notes
+        played = _slurred(notes, getattr(instrument, "glide", GLIDE)) if polyphony == 1 and getattr(instrument, "slurs", True) else notes
         self.voices = [instrument.voice(n) for n in played]
         self.channels = 2 if any(v.channels == 2 for v in self.voices) else 1
         self.starts = [round(n.time * RATE) for n in played]
@@ -83,9 +84,9 @@ class Phrase(Unit):
         return out
 
 
-def _slurred(notes: list[Note]) -> list[Note]:
+def _slurred(notes: list[Note], glide: float = GLIDE) -> list[Note]:
     """Notes of a monophonic line with each run of joined notes merged into one, whose freq
-    steps from pitch to pitch with a short glide."""
+    moves from pitch to pitch in glide seconds."""
     runs: list[list[Note]] = []
     for n in notes:
         # compared in samples, as allocation is: 0.2 + 0.1 must not overlap a note at 0.3
@@ -105,8 +106,8 @@ def _slurred(notes: list[Note]) -> list[Note]:
         for k in range(1, len(run)):
             t = run[k].time - first.time
             following = run[k + 1].time if k + 1 < len(run) else end
-            glide = min(GLIDE, following - first.time - t)  # a glide never runs into the next note
-            points += [(t, run[k - 1].freq), (t + glide, run[k].freq)]
+            g = min(glide, following - first.time - t)  # a glide never runs into the next note
+            points += [(t, run[k - 1].freq), (t + g, run[k].freq)]
         note = _copy(first, duration=end - first.time)
         note._freq = Segments(points)
         merged.append(note)
