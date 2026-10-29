@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Literal
 
 import numpy as np
-from scipy.signal import lfilter
+from scipy.signal import lfilter, lfiltic
 
 from euterpe.sound.core import LN60, RATE, Unit, _after, _arg, _fixed, _signal
 
@@ -216,6 +216,71 @@ class HighShelf(_Gained):
     the level is unchanged. A tone control's treble knob."""
 
     _kind = "highshelf"
+
+
+class Ladder(_Filter):
+    """Keeps frequencies below cutoff Hz and cuts those above by 24 dB per octave: four
+    one-pole low-passes in a row, the output fed back to the input upside down, 4 * resonance
+    times as strong.
+
+    At the cutoff each stage shifts the phase by 45 degrees, so the four turn the feedback
+    around and it adds there: a peak rises at the cutoff as resonance grows, and at 1 the filter
+    rings on by itself, a sine at the cutoff. The feedback also lowers everything below the
+    cutoff by 1 + 4 * resonance, as on the analog filter, so a resonant ladder sounds thinner.
+    It is the linear model, computed as one fourth-order filter; the analog one also saturates,
+    which a Saturator before it adds. cutoff is clipped to [1, 23 000] Hz and resonance to
+    [0, 0.995], below the edge where it would ring forever.
+    """
+
+    _names = ("cutoff", "resonance")
+
+    @property
+    def duration(self) -> float | None:
+        """The source's plus the ringing: the feedback lengthens a stage's time constant
+        1 / (2 pi cutoff) by 1 / (1 - resonance)."""
+        r = min(_fixed(self.resonance, 0.995), 0.995)
+        tail = LN60 / (2 * np.pi * _fixed(self.cutoff, 20.0) * (1 - max(r, 0.0)))
+        return _after(self.src.duration, float(tail))
+
+    def __init__(self, src: Unit, cutoff: float | Unit = 1000.0, resonance: float | Unit = 0.0):
+        """cutoff in Hz; resonance from 0 (none) to 1 (the edge of ringing on its own)."""
+        super().__init__(src, cutoff=cutoff, resonance=resonance)
+        self._section = _Section(self.channels, 4)
+
+    def _coeffs(self, cutoff: float, resonance: float) -> tuple[np.ndarray, np.ndarray]:
+        g = np.tan(np.pi * np.clip(cutoff, *_CUTOFF) / RATE)
+        k = 4 * float(np.clip(resonance, 0.0, 0.995))
+        num = np.array([g, g]) / (1 + g)  # one stage: g (1 + z^-1) / ((1 + g) + (g - 1) z^-1)
+        den = np.array([1.0, (g - 1) / (1 + g)])
+        b4, a4 = np.poly1d(num) ** 4, np.poly1d(den) ** 4
+        a = a4.coeffs + k * b4.coeffs
+        return b4.coeffs / a[0], a / a[0]
+
+    def reset(self) -> None:
+        super().reset()
+        self._x = np.zeros((4, self.channels))  # the last four inputs and outputs: a moving
+        self._y = np.zeros((4, self.channels))  # cutoff restarts the filter from them
+
+    def block(self, n: int) -> np.ndarray:
+        if not self._moving:
+            return super().block(n)
+        x = _as_frames(self.src.block(n))
+        values = [_signal(getattr(self, k), n).astype(np.float64) for k in self._names]
+        first = (-self._done) % _GRID
+        cuts = [0, *range(first, n, _GRID), n]
+        y = np.empty_like(x)
+        for lo, hi in zip(cuts, cuts[1:]):
+            if lo == hi:
+                continue
+            if (self._done + lo) % _GRID == 0:
+                self._ba = b, a = self._coeffs(*(v[lo] for v in values))
+                self._section.zi = np.stack(
+                    [lfiltic(b, a, self._y[::-1, c], self._x[::-1, c]) for c in range(self.channels)], axis=1)
+            y[lo:hi] = self._section.run(*self._ba, x[lo:hi])
+            self._x = np.concatenate([self._x, x[lo:hi]])[-4:]
+            self._y = np.concatenate([self._y, y[lo:hi]])[-4:]
+        self._done += n
+        return _out(y, self.channels)
 
 
 class _OnePole(_Filter):

@@ -170,3 +170,35 @@ def test_a_moving_gain_renders():
 
     y = render(Peak(Saw(110.0) * 0.5, 800.0, gain=Segments([(0.0, -12.0), (0.5, 12.0)])), 0.5)
     assert np.all(np.isfinite(y))
+
+
+def test_ladder_falls_24_db_per_octave_above_its_cutoff():
+    from euterpe.sound.filters import Ladder
+
+    lad = lambda s: Ladder(s, 500.0)
+    slope = _gain_db(lad, 4_000.0) - _gain_db(lad, 2_000.0)
+    assert abs(slope + 24.0) < 2.0
+
+
+def test_ladder_resonance_raises_a_peak_near_the_cutoff():
+    from euterpe.sound.filters import Ladder
+
+    lad = lambda s: Ladder(s, 1_000.0, resonance=0.9)
+    peak = max(_gain_db(lad, f) for f in (800.0, 900.0, 1_000.0, 1_100.0))
+    assert peak - _gain_db(lad, 100.0) > 10.0
+
+
+def test_ladder_stays_stable_low_and_swept():
+    from euterpe.sound.filters import Ladder
+
+    low = render(Ladder(Saw(55.0) * 0.5, 40.0, resonance=0.99), 2.0)
+    swept = render(Ladder(Saw(110.0) * 0.5, Sine(3.0) * 2_000 + 2_100, resonance=1.0), 2.0)
+    for y in (low, swept):
+        assert np.all(np.isfinite(y)) and np.abs(y).max() < 20
+
+
+def test_ladder_does_not_depend_on_the_block_size():
+    from euterpe.sound.filters import Ladder
+
+    f = lambda: Ladder(Saw(110.0) * 0.5, Sine(2.0) * 800 + 1_000, resonance=0.8)
+    assert np.array_equal(render(f(), 0.5), render(f(), 0.5, block=100))
