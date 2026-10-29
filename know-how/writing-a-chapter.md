@@ -25,6 +25,18 @@ Utility code runs hidden, in `{run echo=false}` blocks: hand-made drawings, form
 - File names come from the caption and a hash of the content, so never name files by hand.
 - Keep every example below full scale: `* 0.5` on a full-scale source.
 
+## Pacing
+
+A chapter loses the reader when it re-shows what they have already heard. Five rules, from the pacing review of issue #45:
+
+1. **Sound first, destination first.** The first player comes by line 20, a 5 to 10 s teaser of the closing piece. No table or derivation comes before the sound it explains. A teaser that needs the closing code runs hidden and executes the closing blocks, found by their `name=`, from the chapter file (chapter 11 does this), so the two never differ.
+2. **Two takes per knob.** Show both extremes of a parameter in one block; add a third only when the middle value is the lesson. A parameter taught in an earlier chapter gets a sentence and a back-reference, no block.
+3. **One proof per fact.** A player, a figure or a table, not two or three of them. Checks that only confirm the author's numbers run hidden. Earlier terms are cited, never re-explained; no glossary walls.
+4. **Music by the middle, built in layers.** A phrase of at least four notes, or a bar of rhythm, by the midpoint; each later section adds one layer to it, so the closing piece is assembled across the chapter. Budget: about 300 lines, at most 18 code blocks, at most 3 printed tables (the level check and the exercises' answers do not count).
+5. **End on the closing piece, and open the door.** At least 20 s, with at least three of the chapter's tools sounding at once, a known piece or a recognisable genre. Its last paragraph names what it cannot do yet, which the next chapter adds. Solo showcases go before it, not instead of it.
+
+Blocks that share variables chain with `{run continue}`: every block after the first of a chain must carry it, or the chain breaks and every later block fails with `NameError`. The site build does not fail on a block's error; it prints the traceback on the page, so search the built page for `Traceback`.
+
 ## Prose
 
 - Short sentences, real numbers, the mechanism instead of a metaphor.
