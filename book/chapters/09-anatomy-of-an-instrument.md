@@ -18,7 +18,7 @@ for name in ("theremin", "ode", "voices", "finale"):
 listen(scope["song"], 9.0, "The first 9 s of the chapter's finale")
 ```
 
-Beethoven's *Ode to Joy*, sung by a theremin over chords on three more theremins, in a hall. Everything in it is a sine and an envelope from Part I; what is new is the instrument, the object that turns a list of notes into sound.
+Beethoven's *Ode to Joy*, sung by a theremin over chords on a three-voice theremin, in a hall. Everything in it is a sine and an envelope from Part I; what is new is the instrument, the object that turns a list of notes into sound.
 
 ## Pitches and notes
 
@@ -33,11 +33,11 @@ print(A4 + 7, E5 - A4, Cs4 is Db4)
 
 A4 is 440 Hz and the A an octave up, 12 semitones higher, is 880. Seven semitones up from A4 is E5, the fifth of chapter 2. The numbers behind the names are those of MIDI, the standard that keyboards and synthesizers use to send notes to each other as numbers: 60 for C4 and 69 for A4, so a pitch is a whole number of semitones and its frequency is 440 × 2^((number − 69) / 12).
 
-A *note* is a pitch with a time: when it starts, in seconds; how long it is held, in seconds; and how hard it is played, its *velocity*, from 0 to 1. The name comes from keyboards, which measure how hard a key is played by the speed at which it goes down. The short way to write one is a tuple, `(time, pitch, duration)` or `(time, pitch, duration, velocity)`; velocity defaults to 0.8. A pitch can also be a frequency in Hz, for a note between the twelve steps. Rhythm, in bars and beats, comes in Part III; until then a melody is a list of times in seconds.
+A *note* is a pitch with a time: when it starts, in seconds; how long it is held, in seconds; and how hard it is played, its *velocity*, from 0 to 1. The name comes from keyboards, which measure how hard a key is played by the speed at which it goes down. The short way to write one is a tuple, `(time, pitch, duration)` or `(time, pitch, duration, velocity)`; velocity defaults to 0.8. A pitch can also be a frequency in Hz, for a note between the twelve steps. This chapter turns beats into seconds by hand; Part III automates it.
 
 ## An instrument by hand
 
-An instrument is a class with one method, `voice(note)`, which returns the unit that sounds one note. A *theremin* is an electronic instrument from the 1920s, played without touching it: one hand moves the pitch, the other the volume, and its tone is close to a pure sine with a slight wobble. The class below gives it three things. `polyphony = 1`: *polyphony* is how many notes an instrument can sound at once, and a theremin sounds one. `playable = (C4, C7)`, the range this one is given (real theremins vary), and `comfortable = (C4, C6)`, the part of it where it plays well (the end of the chapter uses both). And a voice: a sine whose frequency moves 1 % up and down five times a second, the *vibrato* of chapter 6, made with an LFO (chapter 5). `Sine(self.vibrato)` swings between −1 and 1, so `Sine(self.vibrato) * 0.01 + 1.0` swings between 0.99 and 1.01, and multiplying the note's frequency by it moves the pitch 1 % each way. An `ADSR` (chapter 4) shapes the sound: it rises in 0.15 s, falls in its default 0.1 s decay to its default sustain of 0.7, holds there for `gate`, the time the note is held, and fades over 0.4 s after it. The final `* 0.5` keeps the peak at half of full scale, as every example in this book stays below it.
+An instrument is a class with one method, `voice(note)`, which returns the unit that sounds one note. A *theremin* is an electronic instrument from the 1920s, played without touching it: one hand moves the pitch, the other the volume, and its tone is close to a pure sine with a slight wobble. The class below gives it three things. `polyphony = 1`: *polyphony* is how many notes an instrument can sound at once, and a theremin sounds one. `playable = (C4, C7)`, the range this one is given (real theremins vary), and `comfortable = (C4, C6)`, the part of it where it plays well (the end of the chapter uses both). And a voice: a sine whose frequency moves 1 % up and down five times a second, the *vibrato* of chapter 6, made with an LFO (chapter 5). `Sine(self.vibrato)` swings between −1 and 1, so `Sine(self.vibrato) * 0.01 + 1.0` swings between 0.99 and 1.01, and multiplying the note's frequency by it moves the pitch 1 % each way. An `ADSR` (chapter 4) shapes the sound: it rises in 0.15 s, falls in its default 0.1 s decay to its default sustain of 0.7, holds there until `gate`, the time the note is held, counted from its start, and fades over 0.4 s after it. The final `* 0.5` keeps the peak at 0.4 at the default velocity, below full scale.
 
 ```python {run name=theremin}
 from euterpe.instruments import Instrument
@@ -106,7 +106,7 @@ for phrase in (chord, strings):
         print(f"{note.pitch!r:3} (resource {note.resource}) sounds from {start / RATE:.3f} s to {stop / RATE:.3f} s")
 ```
 
-On the trio, C4, the oldest, stops at 0.305 s: the 0.3 s at which C5 arrives, plus the 5 ms fade. The others ring their full 2 s plus the 0.4 s release. On the strings, E4 stops at 0.505 s, when G4 takes string 1, although the instrument had four voices free; B3 rings its whole second on its own string, and then `PluckedString`'s finger mutes it in 0.08 s. A note that is stolen too early is a sign that the music asks more of the instrument than it has; the range rules at the end of the chapter warn about it before anything is rendered. Chapter 10's guitar fills in the strings itself, from chord shapes or from plain pitches.
+On the trio, C4, the oldest, stops at 0.305 s: the 0.3 s at which C5 arrives, plus the 5 ms fade. The others ring their full 2 s plus the 0.4 s release. On the strings, E4 stops at 0.505 s, when G4 takes string 1, although the instrument had four voices free; B3 rings its whole second on its own string, and then `PluckedString`'s finger mutes it in 0.08 s. A note that is stolen too early is a sign that the music asks more of the instrument than it has; R-POLYPHONY, in the next section, warns about it before anything is rendered. Chapter 10's guitar fills in the strings itself, from chord shapes or from plain pitches.
 
 ### Slurs
 
@@ -117,7 +117,7 @@ legato = [(time, pitch, 0.5 * beats + 0.05) for (time, pitch, _), beats in zip(n
 display(Theremin().play(legato).take(caption="The same melody slurred: one voice, gliding from note to note"))
 ```
 
-The whole melody is one voice now, with one attack at the start. The spectrogram shows the difference: above, every note starts again from silence; below, the line of the melody is unbroken.
+The whole melody is one voice now, with one attack at the start; a repeated pitch, such as the opening E4 E4, merges into one long note, since a slur only changes pitch. The spectrogram shows the difference: above, every note starts again from silence; below, the line of the melody is unbroken.
 
 ```python {run continue echo=false}
 from euterpe.view import spectrogram
@@ -139,7 +139,7 @@ display(Theremin().play(marked).take(caption="The melody with every other note s
 
 ## Ranges and lint
 
-A real instrument cannot play every note. A theremin reaches from about C4 to C7; a flute starts at C4; a guitar's lowest note is its lowest open string. `playable` is the range the instrument can reach at all, and `comfortable` the part of it where it plays well. Outside `playable`, `play` warns. `lint_notes`, from `euterpe.lint`, checks a phrase's notes against its instrument before anything is rendered, with three rules:
+A real instrument cannot play every note. This theremin reaches C4 to C7; a flute starts at C4; a guitar's lowest note is its lowest open string. `playable` is the range the instrument can reach at all, and `comfortable` the part of it where it plays well. Outside `playable`, `play` warns. `lint_notes`, from `euterpe.lint`, checks a phrase's notes against its instrument before anything is rendered, with three rules:
 
 - **R-PLAYABLE**, an error, for each note outside `playable`, named by its number and time.
 - **R-COMFORT**, the share of note time outside `comfortable`, and a warning above a quarter.
@@ -165,7 +165,7 @@ D6 (1 s) and B7 (0.5 s) lie above C6, so 1.5 s of the 2.5 s of notes are outside
 
 ## Putting it all together
 
-The *Ode to Joy* has a second line, the same as the first but for its ending, which comes home to C. Here are both, an octave up on the theremin, slurred within each bar; each bar starts a new note, with an `Accent`, as a singer takes a breath. Under them, the trio plays one chord per bar, C major (C4, E4, G4) or G major (D4, G4, B4), the two chords the tune needs, softly. The two phrases are units, so they add, and chapter 8's hall takes their sum. At 0.6 s a beat, eight bars:
+The *Ode to Joy* has a second line, the same as the first but for its ending, which comes home to C. Here are both, an octave up on the theremin, slurred within each bar. A slur is one voice with one velocity, so an accent on a slurred note would be lost, and a repeated pitch would merge into one long note: so a note ends 0.05 s early before each bar, where an `Accent` starts the new one, as a singer takes a breath, and before a repeated pitch. Under them, the trio plays one chord per bar, C major (C4, E4, G4) or G major (G4, B4 and D4, the D moved down an octave so the chord sits near the C chord), the two chords the tune needs, softly. The two phrases are units, so they add, and chapter 8's hall takes their sum. At 0.6 s a beat, eight bars:
 
 ```python {run continue name=finale}
 from euterpe.instruments import Accent
@@ -174,9 +174,11 @@ from euterpe.sound import FDNReverb
 
 BEAT = 0.6
 line2 = ode[:12] + [D4, C4, C4]
+pitches, beats_of = ode + line2, lengths + lengths
 tune, b = [], 0.0  # b counts beats from the start
-for pitch, beats in zip(ode + line2, lengths + lengths):
-    joined = (b + beats) % 4 != 0  # the next note is in the same bar: slur into it
+for i, (pitch, beats) in enumerate(zip(pitches, beats_of)):
+    following = pitches[i + 1] if i + 1 < len(pitches) else None
+    joined = (b + beats) % 4 != 0 and following != pitch  # slur into a new pitch in the same bar
     held = BEAT * beats + (0.05 if joined else -0.05)
     tune.append(Note(BEAT * b, pitch + 12, held, 0.6, None if b % 4 else Accent()))
     b += beats
@@ -186,7 +188,7 @@ song = FDNReverb(Theremin().play(tune) + Trio().play(chords), decay=2.0, size=0.
 song.take(22.0, "Ode to Joy, arranged: slurred theremin, a trio of chords and a hall")
 ```
 
-`b % 4` is 0 on the first beat of each bar, so the accent goes on every downbeat; there the previous note ends 0.05 s early, so the slur breaks (an accent on a slurred note would be lost, since a slur is one voice with one velocity). Every voice here is a sine with vibrato, so the melody and the chords blur into one colour, an electronic organ more than a band. The next chapter's instruments have strings, fingers and wooden bodies, and each sounds like a different object.
+`b % 4` is 0 on the first beat of each bar, so the accent goes on every downbeat. Every voice here is a sine with vibrato, so the melody and the chords blur into one colour, an electronic organ more than a band. The next chapter's instruments have strings, fingers and wooden bodies, and each sounds like a different object.
 
 
 ## Summary
