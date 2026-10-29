@@ -96,26 +96,6 @@ def _name_lines(ax, lines, labels) -> None:
                     va="center", fontsize=8.5, fontstyle="italic", color=color)
 
 
-def _period(x: np.ndarray, rate: int) -> float | None:
-    """The period in seconds, from the strongest autocorrelation peak between 30 and 2000 Hz."""
-    seg = x[: min(len(x), 8192)]
-    if len(seg) < 1024 or not np.any(seg):
-        return None
-    seg = seg - seg.mean()
-    ac = np.correlate(seg, seg, "full")[len(seg) - 1:]
-    lo, hi = rate // 2000, min(rate // 30, len(ac) - 1)
-    if hi <= lo or ac[0] <= 0:
-        return None
-    neg = np.flatnonzero(ac[:hi] < 0)  # past the first dip, so the lag-0 lobe is not taken for a period
-    if not len(neg):
-        return None
-    lo = max(lo, int(neg[0]))
-    if hi <= lo:
-        return None
-    k = lo + int(np.argmax(ac[lo:hi]))
-    return k / rate if ac[k] > 0.3 * ac[0] else None
-
-
 class _Many(View):
     def __init__(self, *xs: Unit | Clip, labels: list[str] | None = None, caption=None, id=None):
         super().__init__(caption=caption, id=id)
@@ -182,65 +162,6 @@ class Waveform(_Many):
         label_axis(axes[-1], "time (ms)" if ms else "time (s)")
         axes[len(axes) // 2].set_ylabel("pressure", fontstyle="italic")
         _mark_default(self.clips, ax0)
-        return fig
-
-
-class Default(View):
-    """What display(x) shows: the waveform, or for a clip over 50 ms the whole clip as an envelope
-    with three cycles magnified; and the player."""
-
-    def __init__(self, x: Unit | Clip, *, caption=None, id=None):
-        super().__init__(caption=caption, id=id)
-        self.audio = sources(x)[0]
-
-    def draw(self):
-        import matplotlib.pyplot as plt
-        from matplotlib.patches import ConnectionPatch, Rectangle
-        from matplotlib.ticker import MaxNLocator
-
-        c = self.audio
-        x = _mono(c)
-        if c.seconds <= 0.05:
-            fig = Waveform(c).draw()
-            return fig
-        fig, (a, b) = plt.subplots(1, 2, figsize=(self.width, 2.3), gridspec_kw={"width_ratios": [1.15, 1], "wspace": 0.28})
-        hop = max(1, len(x) // 600)
-        env = np.abs(x[: len(x) // hop * hop]).reshape(-1, hop).max(axis=1)
-        te = np.arange(len(env)) * hop / c.rate
-        top = max(float(env.max()) * 1.1, 1e-3)
-        a.fill_between(te, -env, env, color=PRUSSIAN, alpha=0.18, lw=0)
-        a.plot(te, env, color=PRUSSIAN, lw=0.8)
-        a.plot(te, -env, color=PRUSSIAN, lw=0.8)
-        a.set_xlim(0, c.seconds)
-        a.set_ylim(-top, top)
-        label_axis(a, "time (s)", "pressure")
-        z0 = max(0.05, 0.2 * c.seconds)
-        quiet = env[min(len(env) - 1, int(z0 * c.rate / hop))] < 0.1 * env.max()
-        if quiet:  # the sound has died or not begun there: start just before its loud part
-            z0 = max(0.0, float(te[np.argmax(env >= 0.5 * env.max())]) - 0.002)
-        z0 = min(z0, c.seconds - 0.01)
-        i0 = round(z0 * c.rate)
-        period = _period(x[i0:i0 + 2048] if quiet else x[i0:], c.rate)
-        width = 3 * period if period else 0.01
-        n = max(2, round(width * c.rate))
-        seg = x[i0:i0 + n]
-        t = (np.arange(i0, i0 + len(seg)) / c.rate) * 1000
-        b.plot(t, seg, color=INK, lw=1.0)
-        lim = max(float(np.abs(seg).max()) * 1.15, 1e-3)
-        b.set_xlim(t[0], t[-1])
-        b.set_ylim(-lim, lim)
-        b.spines["left"].set_color(MADDER)
-        b.spines["bottom"].set_color(MADDER)
-        label_axis(b, "time (ms)")
-        b.xaxis.set_major_locator(MaxNLocator(4))
-        a.add_patch(Rectangle((z0, -top), width, 2 * top, facecolor=MADDER, alpha=0.25, edgecolor=MADDER, lw=0.8))
-        for y in (top, -top):
-            fig.add_artist(ConnectionPatch((z0 + width, y), (0, (y / top + 1) / 2), "data", "axes fraction",
-                                           axesA=a, axesB=b, color=MADDER, lw=0.5, ls=(0, (2, 2))))
-        what = "three cycles" if period else "10 ms"
-        b.text(1.0, 1.04, f"{what} at {z0:.2g} s, magnified", transform=b.transAxes, ha="right", va="bottom",
-               fontstyle="italic", fontsize=8.5, color=MADDER)
-        _mark_default([c], a)
         return fig
 
 
@@ -396,8 +317,11 @@ def waveform(*xs, **kw) -> Waveform:
     return Waveform(*xs, **kw)
 
 
-def default(x, **kw) -> Default:
-    return Default(x, **kw)
+def default(x, **kw):
+    """What display(x) shows: the widget."""
+    from euterpe.view.widget import Widget
+
+    return Widget(x, **kw)
 
 
 def spectrum(*xs, **kw) -> Spectrum:

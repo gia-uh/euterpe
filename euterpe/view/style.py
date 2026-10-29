@@ -54,7 +54,7 @@ def rc() -> dict:
         "axes.spines.right": False,
         "axes.facecolor": "none",
         "axes.prop_cycle": cycler(color=list(SERIES)),
-        "figure.facecolor": "none",
+        "figure.facecolor": "#ffffff",  # a white plate in both of the book's themes, as the widget
         "text.color": INK,
         "xtick.color": INK,
         "ytick.color": INK,

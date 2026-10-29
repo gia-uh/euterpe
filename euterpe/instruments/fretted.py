@@ -37,6 +37,18 @@ class Shape:
     def __repr__(self) -> str:
         return f"Shape({', '.join(map(repr, self.frets))})"
 
+    def view(self, normalize: bool = True, caption: str | None = None, id: str | None = None):
+        """The chord diagram over the shape strummed down once on Guitar(), 2 s."""
+        from euterpe.view.special import chord
+        from euterpe.view.widget import Widget
+
+        guitar = Guitar()
+        clip = guitar.play(guitar.strum(self, at=0.0, length=2.0)).take(2.0)
+        return Widget(clip, caption=caption, id=id, normalize=normalize, special=chord(self, guitar.tuning))
+
+    def _repr_mimebundle_(self, include=None, exclude=None):
+        return self.view()._repr_mimebundle_(include, exclude)
+
 
 class Fretted(Plucked):
     """A plucked instrument whose strings are stopped on frets. A subclass sets frets (how many)

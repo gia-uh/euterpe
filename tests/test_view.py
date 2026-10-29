@@ -83,14 +83,6 @@ def test_stems_of_several_sources_are_small_multiples():
     assert len(spectrum(Sine(220).take(0.5), Saw(220).take(0.5), f0=220).figure().axes) == 2
 
 
-def test_defaulted_clip_says_so():
-    fig = default(Sine(440).take()).figure()
-    assert any(t.get_text() == "1 s (default)" for ax in fig.axes for t in ax.texts)
-
-
-def test_default_view_has_audio_and_two_panels_when_long():
-    v = default(Pluck(220).take(1.0))
-    assert v.audio is not None and len(v.figure().axes) == 2
 
 
 def test_unit_view_is_the_default_view():
@@ -256,23 +248,3 @@ def test_stems_of_a_panned_sine_match_the_mono_sine():
     def top(c):
         return max(float(np.max(l.get_ydata())) for l in spectrum(c, f0=440).figure().axes[0].lines)
     assert top(Pan(Sine(440) * 0.5, 1.0).take(0.5)) == pytest.approx(top((Sine(440) * 0.5).take(0.5)), abs=0.5)
-
-
-def test_a_very_long_default_is_capped_and_says_so():
-    c = Pluck(55, damping=0.9999).take()
-    assert c.seconds == 10.0 and c.defaulted
-    fig = default(Pluck(55, damping=0.9999)).figure()
-    assert any(t.get_text() == "10 s (default)" for ax in fig.axes for t in ax.texts)
-
-
-def test_default_magnifies_where_the_sound_is():
-    import matplotlib.pyplot as plt
-
-    from euterpe.sound import ADSR, Sine
-    from euterpe.view import default
-
-    drum = (Sine(60.0) * ADSR(attack=0.001, decay=0.08, sustain=0.0, release=0.0, gate=1.0)).take(1.0)
-    fig = default(drum).figure()
-    zoom = fig.axes[1].lines[0].get_ydata()
-    plt.close(fig)
-    assert np.abs(zoom).max() > 0.1
