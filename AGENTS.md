@@ -1,10 +1,11 @@
 # Euterpe: notes for agents
 
-Euterpe is a Python library for composing music by writing code. It has four layers, each usable alone: sound (`euterpe/sound/`), instruments, theory and score, performance and mix. Only layer 1 exists so far. The design is `docs/superpowers/specs/2026-10-25-euterpe-design.html`; the current plan is in `docs/superpowers/plans/`.
+Euterpe is a Python library for composing music by writing code. It has four layers, each usable alone: sound (`euterpe/sound/`), instruments (`euterpe/instruments/`), theory and score, performance and mix. Layers 1 and 2 exist so far. The design is `docs/superpowers/specs/2026-10-25-euterpe-design.html`; the current plan is in `docs/superpowers/plans/`.
 
 ## Layout
 
 - `euterpe/sound/`: layer 1, sound units. A `Unit` answers `block(n)` with its next `n` samples and pulls from the units it was built on. `render` asks the top unit for blocks.
+- `euterpe/instruments/`: layer 2, instruments that turn notes into sound: an `Instrument` gives each `Note` a voice, and `play(notes)` returns a `Phrase`, a unit.
 - `euterpe/io.py`: write and read audio files.
 - `euterpe/cli.py`: the `euterpe` command, `render` and `lint`.
 - `euterpe/lint/`: rules that measure audio (and later scores). `lint_audio` returns a `Report` of `Finding`s.
