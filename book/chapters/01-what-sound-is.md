@@ -43,7 +43,7 @@ One cycle at 440 Hz lasts 1/440 of a second, about 2.27 milliseconds. In that ti
 ```python {run echo=false}
 from euterpe.sound import Sine
 
-(Sine(440.0) * 0.5).take(0.005).waveform(samples=True, caption="The first 5 ms of the 440 Hz sine: a little over two cycles, and its 240 samples")
+(Sine(440.0) * 0.5).take(0.005).waveform(samples=True, caption="The first 5 ms of the 440 Hz sine: a little over two cycles, drawn as dots")
 ```
 
 The vertical axis is not in pascals. Inside a computer a sound is a number between −1 and 1, and the loudspeaker and its volume knob decide how many pascals that becomes. That is why a value of 1 is called *full scale*: it means the most the file can hold, not a pressure. The largest value a wave reaches is its *amplitude*: the sine above has amplitude 0.5, half of full scale.
@@ -75,7 +75,7 @@ print(0.5 * np.sin(2 * np.pi * 440.0 * n / 48_000))
 
 The last digit can differ, because a 32-bit float keeps only about 7 significant digits and numpy computes here with 64-bit floats.
 
-Between two samples there is nothing: the file does not say what the pressure was in between. The dots in the plot above are all that is stored. At 440 Hz there are 48 000 / 440, about 109 samples per cycle. The minimum is a little more than 2 samples per cycle, and the next section shows why. Below that, the samples no longer pin down the wave.
+Between two samples there is nothing: the file does not say what the pressure was in between. The dots in the plot above are the samples, all that is stored. At 440 Hz there are 48 000 / 440, about 109 samples per cycle. The minimum is a little more than 2 samples per cycle, and the next section shows why. Below that, the samples no longer pin down the wave.
 
 ## The Nyquist limit
 
@@ -138,7 +138,7 @@ Euterpe's *oscillators*, the units that make a repeating wave (`Sine` and the `S
 
 A sine has one frequency, so it is easy to keep below the limit. Most sounds are not sines. A *saw wave* rises steadily from −1 to 1 and then drops back at once, once per cycle. Chapter 3 shows that such a wave is a sum of sines at every whole multiple of its frequency, called its *harmonics*: harmonic k is at k times the frequency and has 1/k of the first one's amplitude. A 10 000 Hz saw contains 10 000 Hz at amplitude 1, 20 000 Hz at 1/2, 30 000 Hz at 1/3, and so on without end. The first harmonic is the frequency you hear as the note.
 
-Why does a saw have harmonics so far up? Because of the drop. A sine of frequency f takes half a cycle, 1 / (2f) seconds, to go from its lowest value to its highest, and it cannot get there faster. A sum of sines can change only as fast as its sines do, so the ideal saw, which drops in no time, needs harmonics without end (chapter 3). Sampled, it drops in one sample, 1/48 000 of a second, which takes sines above 24 000 Hz; the samples store only what lies below, and the rest folds back. A drop spread over two samples, 1/24 000 of a second, is half a cycle at 12 000 Hz, slow enough for sines below 24 000 Hz to draw.
+Why does a saw have harmonics so far up? Because of the drop. A sine of frequency f takes half a cycle, 1 / (2f) seconds, to go from its lowest value to its highest, and it cannot get there faster. A sum of sines can change only as fast as its sines do, so the ideal saw, which drops in no time, needs harmonics without end (chapter 3). Sampled, it drops in one sample, 1/48 000 of a second, which takes sines at 24 000 Hz and above; the samples store only what lies below, and the rest folds back. A drop spread over two samples, 1/24 000 of a second, is half a cycle at 12 000 Hz, slow enough for sines below 24 000 Hz to draw.
 
 Every harmonic above 24 000 Hz folds back. Here is the rule from the last section as a function, applied to the first seven harmonics of the 10 000 Hz saw:
 
@@ -153,7 +153,15 @@ for k in range(1, 8):
 
 Adding `rate / 2` before the remainder `%` and taking it away after gives the signed distance from f to the nearest multiple of `rate`, between −24 000 and 24 000. `abs` drops the sign, which only turns the sine upside down.
 
-The 5th harmonic, 50 000 Hz, is heard at 2 000 Hz, far below the note itself. A folded harmonic usually does not sit at a multiple of the note's frequency, so it does not blend into the note's tone. It sounds like a separate whistle that does not belong to the note.
+The 5th harmonic, 50 000 Hz, is heard at 2 000 Hz, far below the note itself. A folded harmonic usually does not sit at a multiple of the note's frequency, so it does not blend into the note's tone. It sounds like a separate whistle that does not belong to the note. Here is the 10 000 Hz saw, with and without the correction described next:
+
+```python {run}
+from euterpe.sound import Saw
+from euterpe.view import listen
+
+display(listen(Saw(10_000.0) * 0.5, 2.0, "A 10 kHz saw"))
+listen(Saw(10_000.0, antialias=False) * 0.5, 2.0, "The same saw without the correction: a whistle at 2 kHz")
+```
 
 To hear the difference, Euterpe's `Saw` can be told to skip its correction. With `antialias=False` it computes the wave the direct way: take the position in the cycle, from 0 to 1, and scale it to run from −1 to 1, with the whole drop between two samples. The normal `Saw` adds a small correction to the sample just before each drop and the sample just after it: it turns each cliff into a two-sample slope. The correction is called *polyBLEP*, for polynomial band-limited step. The plot shows a few samples around one drop of a 1 100 Hz saw:
 
@@ -193,7 +201,7 @@ listen(Saw(sweep, antialias=False) * 0.5, 4.0, "The same sweep without the corre
 
 Listen to the first sweep: one tone rises until it is too high to hear. Most adults stop hearing somewhere between 15 000 and 20 000 Hz, so the end of it may sound like silence. In the second sweep, other tones move down while the note moves up, and they stay audible after the note itself is gone. Those are folded harmonics.
 
-A *spectrogram* shows the same thing as a picture. It cuts the sound into short overlapping slices, measures how strong each frequency is in each slice, and draws one column per slice. Time runs left to right, frequency bottom to top, with a keyboard along the edge so that each octave takes the same height, and darker ink is more strength:
+A *spectrogram* shows the same thing as a picture. It cuts the sound into short overlapping slices, measures how strong each frequency is in each slice, and draws one column per slice. Time runs left to right, frequency bottom to top, with a keyboard along the edge so that each octave (a doubling of the frequency) takes the same height, and darker ink is more strength:
 
 ```python {run echo=false}
 from euterpe.sound import Saw, Sine
@@ -229,16 +237,16 @@ for bits in (6, 4, 2):
 
 `BitCrush` acts on the full-scale sine, and `* 0.5` scales after. The order matters, because the levels stay between −1 and 1 whatever the input. At 2 bits they are −1, 0 and 1, and every sample of a half-scale sine is nearer to 0 than to either end: `BitCrush(Sine(440.0) * 0.5, bits=2)` rounds every sample to 0 and plays silence. Crushing first uses all the levels; scaling after turns them into −0.5, 0 and 0.5.
 
-At 6 bits a faint hiss sits under the tone. At 4 bits the tone is harsh. At 2 bits the wave has three levels, −0.5, 0 and 0.5, but it spends two thirds of each cycle at 0.5 or −0.5 and only a third at 0, so it sounds close to a *square wave*, a wave that jumps between two values and spends half of each cycle at each. The plot shows one cycle of each, before the scaling:
+At 6 bits a faint hiss sits under the tone. At 4 bits the tone is harsh, a mix of hiss and buzz. At 2 bits the wave has three levels, −0.5, 0 and 0.5, but it spends two thirds of each cycle at 0.5 or −0.5 and only a third at 0, so it sounds close to a *square wave*, a wave that jumps between two values and spends half of each cycle at each. The plot shows one cycle of each, before the scaling:
 
 ```python {run echo=false}
 from euterpe.sound import BitCrush, Sine
 from euterpe.view import waveform
 
 waveform(
-    *[BitCrush(Sine(440.0), bits=bits).take(1 / 440) for bits in (16, 4, 2)],
-    labels=["16 bits", "4 bits", "2 bits"],
-    caption="One cycle of the 440 Hz sine with 16, 4 and 2 bits",
+    *[BitCrush(Sine(440.0), bits=bits).take(1 / 440) for bits in (6, 4, 2)],
+    labels=["6 bits", "4 bits", "2 bits"],
+    caption="One cycle of the 440 Hz sine with 6, 4 and 2 bits",
 )
 ```
 
@@ -246,7 +254,7 @@ Rounding changes the shape of the wave, so it adds frequencies that were not the
 
 ## Putting it all together
 
-The teaser at the top plays both flaws of sampling on purpose, three sounds at once for 24 seconds, the noises of an early video game:
+The teaser at the top played the first 8 seconds of this piece; here is all of it. It plays both flaws of sampling on purpose, three sounds at once for 24 seconds, the noises of an early video game:
 
 ```python {run name=finale}
 from euterpe.sound import BitCrush, Saw, Sine
@@ -263,11 +271,11 @@ from euterpe.view import listen
 listen(song, 24.0, "Sampling's two flaws, played on purpose")
 ```
 
-- `hum` is a sine at 110 Hz, the A two octaves below 440, rounded to 2 bits: the buzz of the last section, an error that repeats with every cycle.
-- `ghosts` is a saw with no correction whose frequency rises from 8 000 to 16 000 Hz and comes back over 24 seconds. Its harmonics fold back from 24 000 Hz, so while the note climbs, most ghost tones fall, and when it turns, they turn.
-- `siren` is a sine whose frequency is itself a slow sine: it swings between 500 and 800 Hz twice a second. `downsample=6` keeps every 6th sample and holds it for the next 5, a sample rate of 8 000 Hz, and `bits=3` rounds what is left to 7 levels. The early video game consoles worked with numbers this coarse, and they sounded like this.
+- `hum` is a sine at 110 Hz, the A two octaves below 440 (an octave is a doubling of the frequency, so 440 / 2 / 2), rounded to 2 bits: the buzz of the last section, an error that repeats with every cycle.
+- `ghosts` is a saw with no correction whose frequency rises from 8 000 to 16 000 Hz and comes back over 24 seconds. Its harmonics fold back from 24 000 Hz, so while the note climbs, about half of the ghost tones fall, and when it turns, they turn.
+- `siren` is a sine whose frequency is itself a slow sine: it swings between 500 and 800 Hz and back every two seconds. `downsample=6` keeps every 6th sample and holds it for the next 5, a sample rate of 8 000 Hz, so harmonics of its held steps above 4 000 Hz fold back, aliasing; `bits=3` rounds what is left to 7 levels, quantisation. The early video game consoles worked with numbers this coarse, and they sounded like this.
 
-`+` sums the three units sample by sample; their gains, 0.15, 0.1 and 0.2, keep the sum below full scale. Every sound here is one pitch held or one slide, and none of them is a tune: which frequencies make notes that belong together, and how loud each must be to be heard, is chapter 2.
+`+` sums the three units sample by sample. Their *gains*, the numbers each unit is multiplied by, 0.15, 0.1 and 0.2, keep the sum below full scale: the player evens out loudness, but only after the samples are computed, and a sum above 1 would already be clipped. Every sound here is one pitch held or one slide, and none of them is a tune: which frequencies make notes that belong together, and how loud each must be to be heard, is chapter 2.
 
 ## Summary
 
