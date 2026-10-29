@@ -8,7 +8,7 @@ A guitar string, plucked, starts with the shape the finger gave it. That shape r
 
 ### Step 1: noise in a delay line
 
-The pluck is a short burst of noise, one period long: at 220 Hz, 1/220 s, 4.5 ms. It goes into a comb whose delay is the same period and whose feedback is 0.996, so it circulates and comes back 220 times a second, losing 0.4 % at each trip. `Segments` (chapter 5) holds the noise at 1 for samples 0 to 218, the first 1/220 s, then at 0. A `OnePoleHighPass` at 20 Hz removes the small offset of those 219 random samples, which the comb would otherwise build up. The `ADSR`, with no attack and full sustain, only fades the note out from 2.4 s, as a hand laid on the string would.
+The pluck is a short burst of noise, one period long: at 220 Hz, 1/220 s, 4.5 ms. It goes into a comb whose delay is the same period and whose feedback is 0.996, so it circulates and comes back 220 times a second, losing 0.4 % at each trip. `Segments` (chapter 4) holds the noise at 1 for samples 0 to 218, the first 1/220 s, then at 0. A `OnePoleHighPass` at 20 Hz removes the small offset of those 219 random samples, which the comb would otherwise build up. The `ADSR`, with no attack and full sustain, only fades the note out from 2.4 s, as a hand laid on the string would.
 
 ```python {run}
 from euterpe.sound import ADSR, Comb, OnePoleHighPass, Segments, WhiteNoise
