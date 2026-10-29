@@ -474,6 +474,9 @@ class Width(Unit):
         return np.stack([mid + side, mid - side], axis=1).astype(np.float32)
 
 
+_TURN = 1 << 32  # one turn of a Leslie rotor in its fixed-point angle
+
+
 class Leslie(Unit):
     """A rotating speaker: a horn for the highs and a drum for the lows, each spinning, heard
     by two microphones on opposite sides.
@@ -516,7 +519,8 @@ class Leslie(Unit):
         super().reset()
         s = _fixed(self.speed, 0.0)
         self._rate = np.array([self.slow[i] + (self.fast[i] - self.slow[i]) * s for i in range(2)])
-        self._angle = np.zeros(2)  # cycles
+        self._acc = [0, 0]  # each rotor's angle, a fixed-point fraction of a turn as in an oscillator
+        self._started = False
         self._zi = np.zeros(2)
         self._tail = np.zeros((self._cap, 2))  # the last samples of the drum and horn bands
 
@@ -530,6 +534,9 @@ class Leslie(Unit):
         self._tail = buf[-self._cap:]
         here = self._cap + np.arange(n)
         speed = _p64(self.speed, n)
+        if not self._started and n:  # a moving speed starts the rotors at its first value
+            self._rate = np.array([self.slow[i] + (self.fast[i] - self.slow[i]) * speed[0] for i in range(2)])
+            self._started = True
         out = np.zeros((n, 2))
         for i, (swing, depth) in enumerate((self._DRUM, self._HORN)):
             r = 1 - i  # rise, slow and fast are given (horn, drum)
@@ -537,11 +544,12 @@ class Leslie(Unit):
             c = 1 - np.exp(-1 / (self.rise[r] * RATE / 5))  # within 1 % of the target after rise seconds
             rate, zf = lfilter([c], [1.0, c - 1], target, zi=[(1 - c) * self._rate[r]])
             self._rate[r] = rate[-1]
-            angle = self._angle[r] + np.cumsum(rate) / RATE
-            self._angle[r] = angle[-1] % 1.0
+            acc = self._acc[r] + np.cumsum(np.round(rate / RATE * _TURN).astype(np.int64))
+            angle = (acc % _TURN) / _TURN
+            self._acc[r] = int(acc[-1] % _TURN) if n else self._acc[r]
             for ch, offset in enumerate((0.0, 0.5)):
                 turn = 2 * np.pi * (angle + offset)
-                at = here - (swing * (1 + np.sin(turn)) * RATE + 1)
+                at = here - (swing * (1 - np.cos(turn)) * RATE + 1)  # nearest when it faces the microphone
                 k = np.floor(at).astype(np.int64)
                 frac = at - k
                 band = (1 - frac) * buf[k, i] + frac * buf[k + 1, i]

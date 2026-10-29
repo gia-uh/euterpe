@@ -31,7 +31,8 @@ def test_an_acid_slide_glides_and_an_accent_is_louder_and_brighter():
     plain = render(AcidBass().play([Note(0.0, A1, 0.2)]), 0.2).astype(np.float64)
     hit = render(AcidBass().play([Note(0.0, A1, 0.2, articulation=Accent())]), 0.2).astype(np.float64)
     assert np.sqrt(np.mean(hit**2)) > 1.2 * np.sqrt(np.mean(plain**2))
-    assert band_db(hit, 1_000, 20_000) > band_db(plain, 1_000, 20_000)
+    bass = AcidBass()
+    assert bass.contour(Note(0.0, A1, 0.2, articulation=Accent()))[0] > 2 * bass.contour(Note(0.0, A1, 0.2))[0]
 
 
 def test_patches_do_not_depend_on_the_block_size():

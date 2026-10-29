@@ -202,3 +202,30 @@ def test_ladder_does_not_depend_on_the_block_size():
 
     f = lambda: Ladder(Saw(110.0) * 0.5, Sine(2.0) * 800 + 1_000, resonance=0.8)
     assert np.array_equal(render(f(), 0.5), render(f(), 0.5, block=100))
+
+
+def test_ladder_duration_covers_its_ringing():
+    from euterpe.sound.filters import Ladder
+
+    class Click(Sine):
+        def __init__(self):
+            super().__init__(0.0)
+
+        def block(self, n):
+            out = np.zeros(n, np.float32)
+            if self._acc == 0 and not getattr(self, "_fired", False):
+                out[0], self._fired = 1.0, True
+            return out
+
+        def reset(self):
+            super().reset()
+            self._fired = False
+
+        @property
+        def duration(self):
+            return 0.0
+
+    lad = Ladder(Click(), 1_000.0, resonance=0.995)
+    y = np.abs(render(lad, 1.5).astype(np.float64))
+    above = np.nonzero(y > y.max() * 1e-3)[0][-1] / 48_000
+    assert lad.duration >= above

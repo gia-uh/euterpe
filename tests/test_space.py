@@ -267,3 +267,21 @@ def test_leslie_does_not_depend_on_the_block_size():
 
     f = lambda: Leslie(Saw(220.0) * 0.3, speed=Sine(0.5) * 0.5 + 0.5)
     assert np.array_equal(render(f(), 0.5), render(f(), 0.5, block=100))
+
+
+def test_leslie_does_not_depend_on_the_block_size_over_seconds():
+    from euterpe.sound.space import Leslie
+
+    f = lambda: Leslie(Saw(220.0) * 0.3, speed=Sine(0.3) * 0.5 + 0.5)
+    ref = render(f(), 3.0)
+    for block in (1, 7, 4096):
+        assert np.array_equal(render(f(), 3.0, block=block), ref)
+
+
+def test_leslie_starts_at_the_speed_it_is_given():
+    from euterpe.sound.env import Segments
+    from euterpe.sound.space import Leslie
+
+    les = Leslie(Sine(2_000.0) * 0.5, speed=Segments([(0.0, 1.0), (5.0, 1.0)]))
+    render(les, 0.01)
+    assert les._rate[0] > 6.5

@@ -230,6 +230,9 @@ def _state(b: np.ndarray, a: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.nda
     return tb @ x[::-1] - ta @ y[::-1]
 
 
+_LADDER_LOW = 10.0  # Hz: the lowest cutoff a Ladder keeps its gain at
+
+
 class Ladder(_Filter):
     """Keeps frequencies below cutoff Hz and cuts those above by 24 dB per octave: four
     one-pole low-passes in a row, the output fed back to the input upside down, 4 * resonance
@@ -240,22 +243,23 @@ class Ladder(_Filter):
     rings on by itself, a sine at the cutoff. The feedback also lowers everything below the
     cutoff by 1 + 4 * resonance, as on the analog filter, so a resonant ladder sounds thinner.
     It is the linear model, computed as one fourth-order filter; the analog one also saturates,
-    which a Saturator before it adds. cutoff is clipped to [1, 23 000] Hz and resonance to
+    which a Saturator before it adds. cutoff is clipped to [10, 23 000] Hz, since below 10 Hz the
+    fourth-order filter loses precision, and resonance to
     [0, 0.995], below the edge where it would ring forever. A moving cutoff is read every
-    2.7 ms, and the filter restarts there from its last four inputs and outputs, which keeps
+    5.3 ms, and the filter restarts there from its last four inputs and outputs, which keeps
     it stable under a fast sweep.
     """
 
     _names = ("cutoff", "resonance")
-    _STEP = 128  # a moving cutoff or resonance is read every 128 samples (2.7 ms), counted from the start
+    _STEP = 256  # a moving cutoff or resonance is read every 256 samples (5.3 ms), counted from the start
 
     @property
     def duration(self) -> float | None:
-        """The source's plus the ringing: the feedback lengthens a stage's time constant
-        1 / (2 pi cutoff) by 1 / (1 - resonance)."""
-        r = min(_fixed(self.resonance, 0.995), 0.995)
-        tail = LN60 / (2 * np.pi * _fixed(self.cutoff, 20.0) * (1 - max(r, 0.0)))
-        return _after(self.src.duration, float(tail))
+        """The source's plus the ringing: the slowest pole decays at (1 - resonance ** 0.25)
+        times 2 pi cutoff, with 5 % and sixteen stage time constants of margin."""
+        r = min(max(_fixed(self.resonance, 0.995), 0.0), 0.995)
+        w = 2 * np.pi * max(_fixed(self.cutoff, 20.0), _LADDER_LOW)
+        return _after(self.src.duration, float(1.05 * LN60 / (w * (1 - r**0.25)) + 16 / w))
 
     def __init__(self, src: Unit, cutoff: float | Unit = 1000.0, resonance: float | Unit = 0.0):
         """cutoff in Hz; resonance from 0 (none) to 1 (the edge of ringing on its own)."""
@@ -263,7 +267,7 @@ class Ladder(_Filter):
         self._section = _Section(self.channels, 4)
 
     def _coeffs(self, cutoff: float, resonance: float) -> tuple[np.ndarray, np.ndarray]:
-        g = np.tan(np.pi * min(max(float(cutoff), _CUTOFF[0]), _CUTOFF[1]) / RATE)
+        g = np.tan(np.pi * min(max(float(cutoff), _LADDER_LOW), _CUTOFF[1]) / RATE)
         k = 4 * min(max(float(resonance), 0.0), 0.995)
         # one stage is g / (1 + g) * (1 + z^-1) / (1 + p z^-1); four of them, by the binomial
         p = (g - 1) / (1 + g)

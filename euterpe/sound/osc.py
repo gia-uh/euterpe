@@ -189,6 +189,8 @@ class Unison(Unit):
         """osc: an oscillator class taking freq as its first argument; detune in semitones."""
         if voices < 1:
             raise ValueError(f"Unison needs at least one voice, got {voices}")
+        if not (isinstance(osc, type) and issubclass(osc, _Oscillator)):
+            raise TypeError(f"Unison needs an oscillator class (Sine, Saw, Square, Triangle), got {osc!r}")
         self.osc, self.freq, self.voices = osc, _arg(freq), int(voices)
         self.detune, self.width, self.seed = float(detune), float(width), int(seed)
         spread = np.linspace(-1.0, 1.0, self.voices) if self.voices > 1 else np.zeros(1)

@@ -8,7 +8,7 @@ from euterpe.instruments.core import Control, Instrument, Note
 from euterpe.instruments.percussion import _seed, fall
 from euterpe.pitch import C2, C4, C6, C7, E1, E7, F2
 from euterpe.sound import ADSR, FM, Additive, HighPass, Sine, WhiteNoise
-from euterpe.sound.core import Unit
+from euterpe.sound.core import RATE, Unit
 
 # the nine drawbars' footages, from 16' to 1', as ratios to the note: 8' is the note itself
 FOOTAGES = (0.5, 1.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0)
@@ -25,8 +25,8 @@ class Organ(Instrument):
     or 3, a second or third harmonic that strikes and dies in 0.3 s, only on a note played when
     no other note is held, as on the real instrument. The organ ignores velocity and holds a
     note at full level for as long as the key is down. The sines are scaled so their sum peaks
-    at level, so pulling out more drawbars changes the colour, not the loudness. Play it
-    through a Leslie.
+    at level, percussion included, so pulling out more drawbars changes the colour, not the
+    loudness; the click adds up to click times level on top. Play it through a Leslie.
 
     Limit: every key's sines start in phase and are perfectly in tune, where real tonewheels
     drift and leak into each other; there is no foldback at the top of the keyboard.
@@ -51,26 +51,30 @@ class Organ(Instrument):
         return [(r, 10 ** (-3 * (8 - int(d)) / 20)) for r, d in zip(FOOTAGES, self.drawbars) if d != "0"]
 
     def perform(self, notes: list[Note], controls: list[Control]) -> list[Note]:
-        """Mark the notes that start while no other key is held: percussion sounds only on those."""
+        """Mark the notes that start while no other key is held, and the rest of a chord struck
+        with them: percussion sounds only on those. Times are compared in samples."""
         self._struck = set()
-        held_until = -1.0
-        for n in notes:
-            if n.time >= held_until:
+        held_until, chord_at = -1, None
+        for n in sorted(notes, key=lambda m: m.time):
+            start = round(n.time * RATE)
+            if start >= held_until or start == chord_at:
                 self._struck.add(id(n))
-            held_until = max(held_until, n.time + n.duration)
+                chord_at = start
+            held_until = max(held_until, round((n.time + n.duration) * RATE))
         return notes
 
     def voice(self, note: Note) -> Unit:
         f = float(note.freq)
         partials = self.partials()
+        total = sum(a for _, a in partials)
         tone = Additive(f, partials) if partials else Sine(f) * 0.0
         if self.percussion and id(note) in self._struck:
             tone = tone + Sine(f * self.percussion) * fall(0.3)
+            total += 1.0
         if self.click:
             tone = tone + HighPass(WhiteNoise(_seed(note)), 2_000.0) * fall(0.005) * self.click
         key = ADSR(attack=0.005, decay=0.0, sustain=1.0, release=0.01, gate=note.duration)
-        total = sum(a for _, a in partials) or 1.0
-        return tone * key * (self.level / total)
+        return tone * key * (self.level / (total or 1.0))
 
 
 class ElectricPiano(Instrument):
@@ -82,9 +86,11 @@ class ElectricPiano(Instrument):
     the note with a modulator 14 times higher, whose index dies in about 50 ms: sidebands
     around the 13th and 15th harmonics, the short metallic ping of the struck tine. Velocity
     scales both indexes and the level, so soft notes are round and hard ones bark and ring. A
-    held note dies in about 4 s at C4, faster up high; releasing it damps it in 0.2 s.
+    held note dies in about 4 s at C4, faster up high; releasing it damps it in 0.2 s. A hard
+    note peaks at about 1.3 times level, body and tine together.
 
-    Limit: the pickup's asymmetry (the growl of a hard low note) and the tremolo of the
+    Limits: the tine's sidebands are not band-limited, so from about C5 up the highest fold back
+    below 24 000 Hz, faintly, during the first 50 ms. The pickup's asymmetry (the growl of a hard low note) and the tremolo of the
     suitcase models are not modelled; wrap it in a chorus or a slow Pan for the tremolo.
     """
 

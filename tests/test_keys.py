@@ -52,3 +52,17 @@ def test_keys_stay_below_full_scale_and_renders_do_not_depend_on_block_size():
         chord = [(0.0, p, 0.5, 1.0) for p in (A3, C4, E4)]
         a, b = render(inst.play(chord), 0.8), render(inst.play(chord), 0.8, block=100)
         assert np.array_equal(a, b) and np.abs(a).max() < 1.0
+
+
+def test_percussion_strikes_every_note_of_a_chord_and_compares_in_samples():
+    organ = Organ(percussion=3)
+    chord = [Note(0.0, p, 0.5) for p in (C4, E4, A3)]
+    organ.play(chord).voices
+    assert len(organ._struck) == 3
+    organ.play([Note(0.1, C4, 0.2), Note(0.3, E4, 0.2)]).voices  # 0.1 + 0.2 ends where the next starts
+    assert len(organ._struck) == 2
+
+
+def test_organ_with_percussion_stays_below_full_scale():
+    y = render(Organ(drawbars="008000000", percussion=2).play([(0.0, p, 0.5) for p in (A3, C4, E4, A3 + 12)]), 0.6)
+    assert np.abs(y).max() < 1.0

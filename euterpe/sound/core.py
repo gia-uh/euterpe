@@ -229,9 +229,12 @@ def _check_not_shared(top: Unit) -> None:
 
 
 def render(
-    unit: Unit, seconds: float, *, to: str | Path | None = None, block: int = BLOCK
+    unit: Unit, seconds: float, *, to: str | Path | None = None, block: int = BLOCK, reset: bool = True
 ) -> np.ndarray | Path:
     """Reset the unit and pull round(seconds * RATE) frames from it, block by block.
+
+    With reset false the unit is not reset, so the frames continue from where the last render
+    stopped: renders of a and then b seconds give the samples of one render of a + b seconds.
 
     Returns the samples, or, with to, writes them to that file and returns its path.
     """
@@ -240,7 +243,8 @@ def render(
     if block < 1:
         raise ValueError(f"render needs block >= 1, got {block}")
     _check_not_shared(unit)
-    unit.reset()
+    if reset:
+        unit.reset()
     total = round(seconds * RATE)
     parts = []
     done = 0

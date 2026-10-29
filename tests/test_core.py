@@ -71,3 +71,14 @@ def test_subtraction_renders_the_same_in_any_block_size():
         return 1.0 - (Ramp() - Ramp(step=0.5)) * 0.25 - -Ramp()
 
     assert np.array_equal(render(make(), 0.5, block=BLOCK), render(make(), 0.5, block=37))
+
+
+def test_render_without_reset_continues_where_it_stopped():
+    from euterpe.sound import Ladder, Saw, Sine
+
+    make = lambda: Ladder(Saw(110.0) * 0.5, Sine(2.0) * 500 + 800, resonance=0.5)
+    whole = render(make(), 1.0)
+    u = make()
+    first = render(u, 1024 * 20 / RATE)
+    rest = render(u, 1.0 - 1024 * 20 / RATE, reset=False)
+    assert np.array_equal(np.concatenate([first, rest]), whole)

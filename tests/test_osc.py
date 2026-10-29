@@ -95,3 +95,12 @@ def test_unison_does_not_depend_on_the_block_size():
 
     f = lambda: Unison(Saw, Sine(3.0) * 10 + 220, voices=5)
     assert np.array_equal(render(f(), 0.3), render(f(), 0.3, block=100))
+
+
+def test_unison_refuses_a_unit_that_is_not_an_oscillator():
+    import pytest
+    from euterpe.sound import FM
+    from euterpe.sound.osc import Unison
+
+    with pytest.raises(TypeError):
+        Unison(FM, 220.0)
