@@ -73,7 +73,8 @@ class _Reader:
         """A note's text as a Pitch. A missing octave takes the one nearest the last note, up when it is a tritone."""
         match = _NOTE.fullmatch(text)
         if match is None:
-            raise self.error(token, f"no note {text[0]}" if text and text[0] not in "abcdefg" else f"cannot read the note {text}")
+            unknown = text and text[0] not in "abcdefg"
+            raise self.error(token, f"no note {text[0]}" if unknown else f"cannot read the note {text}")
         letter, alter = match[1].upper(), _ALTERS[match[2]]
         if match[3] is not None:
             pitch = Pitch(letter, alter, int(match[3]))
@@ -123,10 +124,6 @@ class _Melody(_Reader):
         self.hairpin: tuple[str, str] | None = None
 
     def read(self, text: str) -> Line:
-        from euterpe.instruments.core import Accent, Legato, Staccato, Tenuto
-
-        self.marks = {"'": Staccato, ">": Accent, "_": Tenuto}
-        self.legato = Legato
         for token in _TOKEN.findall(text):
             if token == "|":
                 if self.tuplet:
@@ -190,23 +187,28 @@ class _Melody(_Reader):
         self.tuplet = token, Tuplet(actual, normal)
 
     def event(self, token: str) -> None:
+        from euterpe.instruments.core import Accent, Legato, Staccato, Tenuto
+
         head, value, marks = self.parts(token)
         rest = self.rest(token, head, value, marks)
         if rest is not None:
-            if isinstance(rest, Rest) and self.tuplet:
+            if isinstance(rest, BarRest) and self.tuplet:
+                raise self.error(token, "R fills its bar and cannot sit in a tuplet")
+            if self.tuplet:
                 rest = Rest(self.sounding(rest.duration), self.tuplet[1])
             self.bars[-1].append(rest)
             return
         pitches = self.stack(token, head) if head.startswith("<") else (self.pitch(token, head),)
         if len(set(marks)) < len(marks):
             raise self.error(token, "a mark written twice")
-        articulations = [self.marks[mark]() for mark in marks if mark != "~"]
+        written = {"'": Staccato, ">": Accent, "_": Tenuto}
+        articulations = [written[mark]() for mark in marks if mark != "~"]
         slur = None
         if self.slur:
             if self.slurred is None:
                 slur = "start"
             else:
-                articulations.append(self.legato())
+                articulations.append(Legato())
         note = Note(pitches, self.sounding(self.take(token, value)), tie="~" in marks,
                     articulations=articulations, dynamic=self.dynamic and self.dynamic[1],
                     tuplet=self.tuplet and self.tuplet[1], slur=slur, hairpin=self.hairpin and self.hairpin[1])
@@ -284,16 +286,18 @@ def _moved_by(pitches: Sequence[Pitch], previous: Sequence[Pitch]) -> int:
 def chords(text: str, voicing: str = "close", octave: int = 4, bass: int | None = None) -> Line:
     """A line of chords as text: Roman numerals (I:h. | V7:h.), which follow the key in force at their bar, or chord
     symbols (Am:q G/B:q), told apart by the first letter. "close" stays within an octave of the given octave's
-    lowest note, on the inversion that moves least from the chord before, unless the figure sets the bass. "root"
-    keeps root position, "open" drops the second note from the top, and bass=2 adds the bass note in octave 2."""
+    lowest note, on the inversion that moves least from the notes before it in that register or above, so an added
+    bass or a low melody does not steer it, unless the figure sets the bass. "root" keeps root position, "open" drops
+    the second note from the top, and bass=2 adds the bass note in octave 2."""
     if voicing not in _VOICINGS:
         raise ValueError(f"chords: there is no voicing {voicing!r}; the voicings are {', '.join(_VOICINGS)}")
 
     def realize(chord: Chord, previous: tuple[Pitch, ...] | None, length: Fraction) -> list[Event]:
         pitches = chord.pitches(octave, voicing)
-        if voicing == "close" and previous is not None and not chord.inversion:
-            voiced = previous if bass is None else previous[1:]
-            stacks = [Chord(chord.root, chord.quality, inversion).pitches(octave) for inversion in range(len(chord.tones))]
+        voiced = [pitch for pitch in previous or () if pitch.octave >= octave]
+        if voicing == "close" and voiced and not chord.inversion:
+            inversions = (Chord(chord.root, chord.quality, inversion) for inversion in range(len(chord.tones)))
+            stacks = [inverted.pitches(octave) for inverted in inversions]
             pitches = min(stacks, key=lambda stack: _moved_by(stack, voiced))
         if bass is not None:
             pitches = (Pitch(f"{chord.bass}{bass}"), *pitches)

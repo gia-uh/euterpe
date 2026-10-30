@@ -238,6 +238,29 @@ def test_a_written_dynamic_joins_the_placed_ones_in_order():
     assert [mark.mark for mark in part.dynamics] == ["p", "f"]
 
 
+def test_a_hairpin_runs_up_to_a_placed_dynamic():
+    part = Score().part("a").add(melody("< c4:q d4 e4 f4")).dynamic(1, 3, "f")
+    pin = part.hairpins[0]
+    assert (pin.start, pin.end, pin.end_at) == (0, H, (1, H))
+
+
+def test_a_hairpin_runs_up_to_whichever_dynamic_comes_first():
+    part = Score().part("a").add(melody("< c4:q d4 e4 p f4")).dynamic(1, 2, "f")
+    assert part.hairpins[0].end == Q
+    part = Score().part("a").add(melody("< c4:q d4 p e4 f4")).dynamic(1, 4, "f")
+    assert part.hairpins[0].end == H
+
+
+def test_a_placed_dynamic_on_a_hairpins_first_note_does_not_end_it():
+    part = Score().part("a").add(melody("< c4:q d4 e4 f4")).dynamic(1, 1, "p")
+    assert part.hairpins[0].end == W
+
+
+def test_a_placed_dynamic_past_the_voice_does_not_stretch_a_hairpin():
+    part = Score().part("a").add(melody("< c4:q d4")).dynamic(2, 1, "f")
+    assert part.hairpins[0].end == H
+
+
 def test_a_hairpin_runs_up_to_the_next_dynamic():
     s = Score()
     part = s.part("a").add(melody("p < c4:q d4 e4 f4 | f! g4:w"))
@@ -255,10 +278,21 @@ def test_a_hairpin_with_no_mark_after_it_runs_to_the_end_of_its_line():
     assert [(pin.start, pin.end) for pin in part.hairpins] == [(Q, W)]
 
 
+def test_a_hairpin_ends_where_its_voice_ends_and_not_where_the_part_does():
+    s = Score()
+    part = s.part("a").add(melody("< c4:w")).add(melody("c5:w | d5:w"), voice=1)
+    assert [(pin.start, pin.end, pin.end_at) for pin in part.hairpins] == [(0, W, (1, W))]
+
+
 def test_a_hairpin_in_a_pickup_counts_from_the_end_of_the_bar():
     s = Score(pickup=Q)
     pin = s.part("a").add(melody("< c4:q | d4:w f! | e4:w")).hairpins[0]
     assert (pin.start, pin.end, pin.start_at, pin.end_at) == (0, Fraction(5, 4), (1, Fraction(3, 4)), (3, 0))
+
+
+def test_a_note_refuses_a_hairpin_that_is_neither_kind():
+    with pytest.raises(ValueError, match="a hairpin's kind is < or >, not 'x'"):
+        note("C4", hairpin="x")
 
 
 def test_written_marks_survive_a_transpose():
@@ -292,6 +326,7 @@ def test_the_error_names_the_token_and_its_bar():
     ("r'", 'melody: bar 1, token "r\'": a rest takes no marks'),
     ("R:q", 'melody: bar 1, token "R:q": R fills its bar and takes no duration'),
     ("c4''", 'melody: bar 1, token "c4\'\'": a mark written twice'),
+    ("3[R c4:e]", 'melody: bar 1, token "R": R fills its bar and cannot sit in a tuplet'),
     ("3[c5:e | d e]", 'melody: bar 1, token "|": a tuplet must close inside its bar'),
     ("3[c5:e 3[d e]]", 'melody: bar 1, token "3[": a tuplet cannot hold a tuplet'),
     ("3[c5:e d", 'melody: bar 1, token "3[": a tuplet needs its closing ]'),
@@ -416,6 +451,29 @@ def test_bass_adds_the_bass_note_in_its_octave():
 def test_the_added_bass_does_not_steer_the_close_voicing():
     assert names(chords("C:q F G", bass=2)) == [["C2 C4 E4 G4", "F2 C4 F4 A4", "G2 D4 G4 B4"]]
     assert names(chords("D:q Cm", bass=2))[0][1] == "C2 Eb4 G4 C5"
+
+
+def resolved(line):
+    s = Score()
+    s.part("a").add(line)
+    return [" ".join(str(x) for x in p.event.pitches) for p in s.events("a")]
+
+
+def test_a_bass_line_after_a_one_note_melody_reads_it():
+    assert resolved(melody("c4:q") + chords("I:q", bass=2)) == ["C4", "C2 C4 E4 G4"]
+
+
+def test_a_bass_line_with_no_note_in_its_register_before_it_takes_its_plain_voicing():
+    assert resolved(melody("c2:q") + chords("IV:q", bass=2)) == ["C2", "F2 F4 A4 C5"]
+
+
+def test_a_bass_line_after_a_chord_line_with_no_bass_counts_every_note():
+    assert resolved(chords("C:q") + chords("IV:q", bass=2)) == ["C4 E4 G4", "F2 C4 F4 A4"]
+    assert resolved(chords("C7:q") + chords("I:q", bass=2)) == ["C4 E4 G4 Bb4", "C2 C4 E4 G4"]
+
+
+def test_a_line_with_no_bass_after_a_bass_line_does_not_read_the_bass():
+    assert resolved(chords("D:q", bass=2) + chords("i:q")) == ["D2 D4 F#4 A4", "Eb4 G4 C5"]
 
 
 def test_chords_read_rests():
@@ -646,9 +704,3 @@ def test_the_spec_piece_is_written_from_the_top_of_the_package():
     assert s.bars == 3
     assert [str(p.event.pitches[0]) for p in s.events("melody")] == ["F#4", "A4", "D5", "C#5", "B4", "A4"]
     assert [h.chord.root for h in s.harmony() if h.beat == 1] == ["D", "A", "D"]
-
-
-def test_a_hairpin_ends_where_its_voice_ends_and_not_where_the_part_does():
-    s = Score()
-    part = s.part("a").add(melody("< c4:w")).add(melody("c5:w | d5:w"), voice=1)
-    assert [(pin.start, pin.end, pin.end_at) for pin in part.hairpins] == [(0, W, (1, W))]

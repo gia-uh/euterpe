@@ -71,6 +71,8 @@ class Note:
         object.__setattr__(self, "pitches", pitches)
         object.__setattr__(self, "duration", _length(self.duration, "Note"))
         object.__setattr__(self, "articulations", tuple(self.articulations))
+        if self.hairpin is not None and self.hairpin not in _KINDS:
+            raise ValueError(f"Note: a hairpin's kind is < or >, not {self.hairpin!r}")
 
 
 @dataclass(frozen=True)
@@ -329,8 +331,7 @@ class Part:
     @property
     def dynamics(self) -> list[Dynamic]:
         """The marks in order, placed in the meters in force now."""
-        marks = [Dynamic(bar, *self.score._place(bar, beat), mark) for bar, beat, mark in self._dynamics]
-        return sorted(marks + self._written_marks()[0], key=lambda mark: mark.offset)
+        return sorted(self._placed_marks() + self._written_marks()[0], key=lambda mark: mark.offset)
 
     @property
     def hairpins(self) -> list[Hairpin]:
@@ -342,10 +343,15 @@ class Part:
             pins.append(Hairpin(start_offset, end_offset, kind, (start[0], start_in_bar), (end[0], end_in_bar)))
         return sorted(pins + self._written_marks()[1], key=lambda pin: pin.start)
 
+    def _placed_marks(self) -> list[Dynamic]:
+        """The marks placed with Part.dynamic."""
+        return [Dynamic(bar, *self.score._place(bar, beat), mark) for bar, beat, mark in self._dynamics]
+
     def _written_marks(self) -> tuple[list[Dynamic], list[Hairpin]]:
-        """The marks written on the notes, placed. A hairpin ends at the voice's next dynamic or hairpin, or else
-        where the voice ends."""
+        """The marks written on the notes, placed. A hairpin ends at the voice's next dynamic or hairpin, at the next
+        dynamic placed with Part.dynamic, whichever comes first, or else where the voice ends."""
         marks, pins = [], []
+        placed = sorted(self._placed_marks(), key=lambda mark: mark.offset)
         starts = self.score._starts(self.bars)
         measures = self.measures
         for voice in range(len(measures[0].voices) if measures else 0):
@@ -357,7 +363,7 @@ class Part:
                     at = (measure.number, lead + position), starts[measure.number - 1] + position
                     if isinstance(event, Note):
                         if opened and (event.dynamic or event.hairpin):
-                            pins.append(_pin(opened, at))
+                            pins.append(_pin(opened, at, placed))
                             opened = None
                         if event.dynamic:
                             marks.append(Dynamic(*at[0], at[1], event.dynamic))
@@ -367,7 +373,7 @@ class Part:
                 if measure.voices[voice]:
                     last = (measure.number, lead + position), starts[measure.number - 1] + position
             if opened:
-                pins.append(_pin(opened, last))
+                pins.append(_pin(opened, last, placed))
         return marks, pins
 
     def _next(self, voice: int) -> int:
@@ -623,9 +629,16 @@ class Score:
         return beats
 
 
-def _pin(opened: tuple[tuple[tuple[int, Fraction], Fraction], str], end: tuple[tuple[int, Fraction], Fraction]) -> Hairpin:
+def _pin(opened: tuple[tuple[tuple[int, Fraction], Fraction], str], end: tuple[tuple[int, Fraction], Fraction],
+         placed: list[Dynamic]) -> Hairpin:
+    """A hairpin from where it opened to end, or to the first placed mark between them, which are in order."""
     (start_at, start), kind = opened
-    return Hairpin(start, end[1], kind, start_at, end[0])
+    end_at, end_offset = end
+    for mark in placed:
+        if start < mark.offset < end_offset:
+            end_at, end_offset = (mark.bar, mark.in_bar), mark.offset
+            break
+    return Hairpin(start, end_offset, kind, start_at, end_at)
 
 
 def _moved_key(key: Key, interval: Interval) -> Key:
