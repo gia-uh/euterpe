@@ -10,6 +10,7 @@ from euterpe import Key, Meter, Score, chords, drums, melody
 from euterpe.instruments import Harp, Kit
 from euterpe.view import display
 from euterpe.view.notation import PAGE_WIDTH, SCALE
+from euterpe.view.special import X0, X1
 
 
 def _score(text: str = "c4:q d e f | g:q a b c5 | c5:q b a g | c4:w", instrument=None, **options) -> Score:
@@ -146,6 +147,8 @@ def test_line_notation_is_in_treble_clef_whatever_its_pitch():
     ("c4:e d e f g a", Meter("3/4")),
     ("c4:q d e f", Meter("4/4")),
     ("c4:q d e f g", Meter("5/4")),
+    ("c4:q 3[d:q e]", Meter("3/4")),
+    ("3[c4:h d]", Meter("3/4")),
 ])
 def test_a_line_with_no_meter_takes_the_length_of_its_longest_bar(text, expected, monkeypatch):
     seen = []
@@ -156,11 +159,12 @@ def test_a_line_with_no_meter_takes_the_length_of_its_longest_bar(text, expected
     melody(text).notation()
     assert seen[0].meter.bar == expected.bar
     assert seen[0].meter.denominator == expected.denominator
+    assert melody(text).notation().svg().count(b'class="measure"') == text.count("|") + 1
 
 
 def test_a_line_takes_a_meter_it_is_given():
-    svg = melody("c4:q d e | f g a").notation(meter=Meter("3/4")).svg()
-    assert svg.count(b'class="measure"') == 2
+    assert melody("c4:q d e f g a").notation().svg().count(b'class="measure"') == 1
+    assert melody("c4:q d e f g a").notation(meter=Meter("3/4")).svg().count(b'class="measure"') == 2
 
 
 def test_display_shows_the_notation_with_the_player_under_it(monkeypatch):
@@ -184,7 +188,8 @@ def test_display_without_verovio_falls_back_to_the_roll_with_a_note(monkeypatch)
     monkeypatch.setitem(sys.modules, "verovio", None)
     view = _shown(monkeypatch, s, caption="A scale")
     svg = view.svg()
-    assert svg.startswith(s.roll().svg()[:4])
+    assert b"melody" in svg
+    assert svg.count(b"data-t=") == s.roll().svg().count(b"data-t=") == 4
     assert b"euterpe[notation]" in svg
     assert view.caption == "A scale"  # the note is in the drawing, so a caption does not hide it
     assert view.audio is not None
@@ -204,12 +209,15 @@ def test_peak_marks_each_parts_own_highest_note():
     assert s.roll(peak=True).svg().count(b'fill="#b0361f"') == 2
 
 
-def test_the_roll_rules_every_bar():
+def test_the_roll_rules_every_bar_at_its_time():
     s = _score()
+    s.change(3, tempo=60)
+    view = s.roll()
     tempo = s.tempo_map()
-    svg = s.roll().svg().decode()
-    assert svg.count('class="eu-bar"') == 4
-    assert tempo.seconds(Fraction(1)) == 2.0
+    starts = [tempo.seconds(Fraction(n)) for n in range(4)]
+    assert starts == [0.0, 2.0, 4.0, 8.0]
+    xs = [float(x) for x in re.findall(r'class="eu-bar" x1="([\d.]+)"', view.svg().decode())]
+    assert xs == pytest.approx([X0 + (X1 - X0) * t / view.seconds for t in starts], abs=0.06)
 
 
 def test_the_roll_rules_bars_on_both_passes_of_a_repeat():
@@ -234,12 +242,29 @@ def test_the_roll_shows_one_part_by_name():
         s.roll(part="nobody")
 
 
-def test_the_roll_draws_a_kit_as_rows_of_hits():
+def _rows(svg: bytes) -> list[str]:
+    return [text for text in _text(svg) if text in {"crash", "ride", "hihat", "tom1", "tom2", "snare", "kick"}]
+
+
+@pytest.mark.parametrize("instrument", [None, Kit()], ids=["no instrument", "a kit"])
+def test_the_roll_draws_drums_as_written_in_notation_order(instrument):
     s = Score()
-    s.part("kit", Kit()).add(drums({"kick": "x...", "snare": "..x."}, step="q"))
-    svg = s.roll().svg()
-    assert b"kick" in svg and b"snare" in svg
-    assert b"?" not in svg
+    s.part("k", instrument).add(drums({"kick": "x...", "tom2": "..x.", "tom1": "x...", "hihat": "xxxx"}, step="q"))
+    view = s.roll()
+    assert _rows(view.svg()) == ["hihat", "tom1", "tom2", "kick"]
+    fig = view.figure()
+    assert [t.get_text() for t in fig.axes[0].get_yticklabels()][::-1] == ["hihat", "tom1", "tom2", "kick"]
+    assert fig.axes[0].get_ylim() == (-0.5, 3.5)
+    plt.close(fig)
+    assert b"?" not in view.svg()
+
+
+def test_the_rows_of_a_kit_part_mark_each_hit_in_its_own_row():
+    s = Score()
+    s.part("k").add(drums({"tom1": "x...", "tom2": "..x."}, step="q"))
+    marks = re.findall(r'<rect x="[\d.]+" y="([\d.]+)"[^>]*data-t="([\d.]+)"', s.roll().svg().decode())
+    assert [t for _, t in marks] == ["0.000", "1.000"]
+    assert marks[0][0] != marks[1][0]
 
 
 def test_the_roll_of_a_thin_score_does_not_crash():

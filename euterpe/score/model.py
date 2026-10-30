@@ -542,7 +542,8 @@ class Score:
 
     def notation(self, bars: tuple[int, int] | None = None, caption: str | None = None, numerals: bool = False) -> Any:
         """The score engraved, as a view: bars=(first, last) keeps those measures, and numerals=True writes each numeral
-        of harmony() that changes under the staff. Needs verovio (euterpe[notation])."""
+        of harmony() that changes under the staff. A score too long for one figure raises and asks for bars=. Needs verovio
+        (euterpe[notation])."""
         from euterpe.view.notation import notation
 
         return notation(self, bars, caption, numerals)
@@ -556,7 +557,8 @@ class Score:
 
     def view(self, normalize: bool = True) -> Any:
         """What display() shows: the notation with the player under it, or the roll if verovio is missing, at -16 LUFS
-        unless normalize is false. A part with no instrument leaves out the player."""
+        unless normalize is false. A part with no instrument leaves out the player. A score too long for one figure raises,
+        as notation does: show a stretch of it with s.notation(bars=...)."""
         from euterpe.view.notation import score_view
 
         return score_view(self, normalize)

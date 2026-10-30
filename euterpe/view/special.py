@@ -141,6 +141,12 @@ def tablature(notes, instrument, seconds: float) -> tuple:
     return "".join(p), W, h, X0, X1
 
 
+def drum_rows(names) -> list[str]:
+    """Drum names as a score writes them, each once, in the order drum notation stacks them, top to bottom."""
+    places = {"crash": 0, "ride": 1, "hihat": 2, "snare": 4, "kick": 5}
+    return sorted(set(names), key=lambda name: (3, int(name[3:])) if name.startswith("tom") else (places[name], 0))
+
+
 def _drum_names(kit) -> list[tuple[object, str]]:
     """The kit's drums in the order drum notation stacks them, top to bottom."""
     named = [(kit.crash, "crash"), (kit.ride, "ride"), (kit.hihat, "hi-hat")]
@@ -149,17 +155,21 @@ def _drum_names(kit) -> list[tuple[object, str]]:
     return named
 
 
-def hits(notes, kit, seconds: float, bars=(), playhead: bool = True) -> tuple:
+def hits(notes, kit, seconds: float, bars=(), playhead: bool = True, names: dict[int, str] | None = None) -> tuple:
     """One row per drum that plays, a mark per hit at its time, its velocity as ink density. bars are bar starts to
-    rule, in seconds."""
-    order = _drum_names(kit)
-    played = []
-    for drum, name in order:
-        if any(n.resource is drum for n in notes):
-            played.append((drum, name))
-    for n in notes:  # drums not among the kit's own, by their class
-        if all(n.resource is not d for d, _ in played):
-            played.append((n.resource, type(n.resource).__name__.lower()))
+    rule, in seconds. names gives each note's drum as written, by the note's id, in place of the kit's."""
+    if names is not None:
+        played = [(name, name) for name in drum_rows(names[id(n)] for n in notes)]
+        row = lambda n: names[id(n)]
+    else:
+        played = []
+        for drum, name in _drum_names(kit):
+            if any(n.resource is drum for n in notes):
+                played.append((drum, name))
+        for n in notes:  # drums not among the kit's own, by their class
+            if all(n.resource is not d for d, _ in played):
+                played.append((n.resource, type(n.resource).__name__.lower()))
+        row = lambda n: n.resource
     rh, top = 16, 6
     h = top + rh * len(played) + 18
     p = []
@@ -178,7 +188,7 @@ def hits(notes, kit, seconds: float, bars=(), playhead: bool = True) -> tuple:
         y = top + r * rh
         p.append(f'<text x="{X0 - 10}" y="{y + rh / 2 + 3}" text-anchor="end" fill="#555">{html.escape(name)}</text>')
         for n in notes:
-            if n.resource is drum and n.time < seconds:
+            if row(n) == drum and n.time < seconds:
                 x = X0 + (X1 - X0) * n.time / seconds
                 p.append(f'<rect x="{_num(x - 3)}" y="{y + 2}" width="6" height="{rh - 4}" rx="1.5" fill="{PRUSSIAN}" '
                          f'fill-opacity="{0.35 + 0.65 * min(1.0, n.velocity):.2f}" data-t="{n.time:.3f}"/>')

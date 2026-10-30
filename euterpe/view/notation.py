@@ -4,6 +4,7 @@ engraves it to SVG; the roll draws itself, so it stands in when verovio is missi
 from __future__ import annotations
 
 import html
+import math
 import re
 from dataclasses import dataclass
 from fractions import Fraction
@@ -13,7 +14,7 @@ from euterpe.score.model import Score
 from euterpe.score.musicxml import musicxml_bytes
 from euterpe.theory import Meter
 from euterpe.view.base import View
-from euterpe.view.special import W, _num, _number, hits as _hits, roll as _roll
+from euterpe.view.special import W, _num, _number, drum_rows, hits as _hits, roll as _roll
 from euterpe.view.style import INK, MADDER, PRUSSIAN, RULE, hz, keyboard_strip
 from euterpe.view.widget import FONT
 
@@ -66,9 +67,12 @@ def notation(score: Score, bars: tuple[int, int] | None = None, caption: str | N
 
 
 def _meter(line: Line) -> Meter:
-    """The meter a bar of the line's longest length fills, in quarters or shorter."""
+    """The meter a bar of the line's longest length fills, in quarters or shorter. A length no meter can write, as
+    tuplets leave, rounds up to the quarters that hold it."""
     longest = max((sum(item.duration for item in bar if hasattr(item, "duration")) for bar in line.bars), default=0)
     longest = Fraction(longest) or Fraction(1)
+    if longest.denominator & (longest.denominator - 1):
+        longest = Fraction(math.ceil(longest * 4), 4)
     return Meter(f"{longest.numerator * 4 // min(longest.denominator, 4)}/{max(longest.denominator, 4)}")
 
 
@@ -91,12 +95,11 @@ def score_view(score: Score, normalize: bool = True) -> View:
 
 @dataclass
 class _Lane:
-    """One row of the roll: a part's pitched notes, or with names its hits, each named as written."""
+    """One row of the roll: a part's pitched notes, or with names its hits, each drum named as written."""
 
     part: str
     notes: list[Performed]
     numerals: list[tuple[float, str]]
-    kit: object = None
     names: dict[int, str] | None = None
 
 
@@ -132,7 +135,7 @@ class Roll(View):
         if not lane.notes:
             return f'<text x="{W / 2}" y="16" text-anchor="middle" font-style="italic" fill="{RULE}">no notes</text>', 24
         if lane.names is not None:
-            body, _, h, _, _ = _hits(lane.notes, lane.kit, self.seconds, self.bars, playhead=False)
+            body, _, h, _, _ = _hits(lane.notes, None, self.seconds, self.bars, playhead=False, names=lane.names)
         else:
             body, _, h, _, _ = _roll(lane.notes, self.seconds, self.bars, lane.numerals, self.peak, playhead=False)
         return body, h
@@ -162,9 +165,11 @@ class Roll(View):
             for t in self.bars:
                 ax.axvline(t, color=RULE, lw=0.5, zorder=0)
             if lane.names is not None:
-                rows = sorted(set(lane.names.values()))
-                ax.plot([n.time for n in lane.notes], [rows.index(lane.names[id(n)]) for n in lane.notes], "|", color=PRUSSIAN)
+                rows = drum_rows(lane.names[id(n)] for n in lane.notes)[::-1]  # the first row on top
+                ax.plot([n.time for n in lane.notes], [rows.index(lane.names[id(n)]) for n in lane.notes], "|", color=PRUSSIAN,
+                        markersize=11, markeredgewidth=1.6, clip_on=False)
                 ax.set_yticks(range(len(rows)), rows)
+                ax.set_ylim(-0.5, len(rows) - 0.5)
             elif lane.notes:
                 numbers = [_number(n.pitch) for n in lane.notes]
                 lo, hi = hz(min(numbers) - 2), hz(max(numbers) + 2)
@@ -183,8 +188,6 @@ class Roll(View):
 
 def roll(score: Score, part: str | None = None, peak: bool = False, note: str | None = None) -> View:
     """The score's parts as they sound with its own performance, seed 0. note is a line over the drawing."""
-    from euterpe.instruments.percussion import Kit
-
     if not score.parts:
         raise ValueError("roll: the score has no parts")
     score.events(part)  # raises for a part it does not have
@@ -198,8 +201,7 @@ def roll(score: Score, part: str | None = None, peak: bool = False, note: str | 
         if pitched or not struck:
             lanes.append(_Lane(name, pitched, numerals))
         if struck:
-            instrument = score.parts[name].instrument
-            lanes.append(_Lane(name, struck, [], instrument if isinstance(instrument, Kit) else Kit(), names))
+            lanes.append(_Lane(name, struck, [], names))
     tempo = score.tempo_map()
     last = tempo.played[-1]
     seconds = max([tempo.seconds(last.start + last.length)] + [n.time + n.duration for lane in lanes for n in lane.notes])
