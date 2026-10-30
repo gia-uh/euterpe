@@ -7,6 +7,7 @@ from __future__ import annotations
 from bisect import bisect_right
 from dataclasses import dataclass, field
 from fractions import Fraction
+from functools import cache
 from math import expm1, log1p
 from typing import TYPE_CHECKING
 
@@ -18,6 +19,7 @@ from euterpe.theory import EqualTemperament, Meter
 if TYPE_CHECKING:
     from euterpe.instruments.core import Articulation
     from euterpe.instruments.core import Note as Performed
+    from euterpe.instruments.percussion import Kit
     from euterpe.score.model import Dynamic, Note, Part, Placed, Score, Section
 
 _LEVELS = {"pp": .25, "p": .38, "mp": .5, "mf": .62, "f": .76, "ff": .9}
@@ -424,11 +426,17 @@ def _sent(event: Note) -> Articulation | None:
                 readable[0] if readable else None)
 
 
-def _drums(part: Part) -> dict:
-    """A Kit's drums by the names a Hit uses. A part with no instrument yet performs on a Kit of its own, for export."""
+@cache
+def _export_kit() -> Kit:
+    """The Kit a part with no instrument yet performs on, for export. One for all, so a note's drum can be named."""
     from euterpe.instruments.percussion import Kit
 
-    kit = part.instrument if part.instrument is not None else Kit()
+    return Kit()
+
+
+def _drums(part: Part) -> dict:
+    """A Kit's drums by the names a Hit uses."""
+    kit = part.instrument if part.instrument is not None else _export_kit()
     return {"kick": kit.kick, "snare": kit.snare, "hihat": kit.hihat, "crash": kit.crash, "ride": kit.ride,
             **{f"tom{number}": tom for number, tom in enumerate(kit.toms, 1)}}
 

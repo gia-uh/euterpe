@@ -525,6 +525,15 @@ class Score:
         path.write_bytes(musicxml_bytes(self))
         return path
 
+    def to_midi(self, path: str | Path, performed: bool = False) -> Path:
+        """Writes the score as a Standard MIDI File and returns the path: the notation on the grid, with tempo events, or
+        with performed=True the performance, with swing and humanization, in real time."""
+        from euterpe.score.midi import midi_bytes
+
+        path = Path(path)
+        path.write_bytes(midi_bytes(self, performed))
+        return path
+
     def harmony(self) -> list[Harmony]:
         """For each beat, the chord of the notes sounding in it and its numeral in the key in force. A tone counts by
         its longest note in the beat. Tones are taken longest first, and among equal ones the lowest first, until they
