@@ -16,6 +16,8 @@ MEMBRANE = (1.0, 1.59, 2.14, 2.30, 2.65)  # a circular membrane's lowest modes, 
 
 def fall(time60: float, at: float = 0.0, steps: int = 24) -> Segments:
     """An exponential fall from 1 to -60 dB in time60 seconds, starting at time at, then silence."""
+    if not time60 > 0:
+        raise ValueError(f"fall needs time60 above 0 s, got {time60:g}: a drum's decay must be above 0")
     t = np.linspace(0.0, time60, steps)
     return Segments([(at, 0.0)] * (at > 0) + [(at + ti, 10 ** (-3 * ti / time60)) for ti in t] + [(at + time60, 0.0)])
 
@@ -60,7 +62,8 @@ class Struck(Instrument):
     def roll(self, at: float, length: float, velocity: float = 0.6, end: float | None = None,
              rate: float = 20.0, pitch: Pitch | float | None = None) -> list[Note]:
         """Strokes rate times a second from at for length seconds, the velocity moving in a
-        straight line from velocity to end (by default it stays)."""
+        straight line from velocity to end (by default it stays). Each stroke's time is exact in
+        seconds and lands on the nearest sample, so a gap is 1 / rate to the nearest sample."""
         if rate <= 0 or length <= 0:
             raise ValueError(f"roll needs a rate and a length above 0, got {rate} and {length}")
         n = max(1, int(np.ceil(length * rate - 1e-9)))
@@ -70,7 +73,8 @@ class Struck(Instrument):
 
     def flam(self, at: float, velocity: float = 0.8, grace: float = 0.025,
              pitch: Pitch | float | None = None) -> list[Note]:
-        """A soft grace stroke grace seconds before the main one; at 0 the main stroke moves later."""
+        """A soft grace stroke grace seconds before the main one. When at is less than grace, the
+        grace stroke starts at 0 and the main stroke at grace."""
         start = max(0.0, at - grace)
         return self.hit(start, velocity / 2, pitch) + self.hit(start + grace, velocity, pitch)
 
@@ -264,7 +268,8 @@ class Cymbal(Struck):
     modes struck at the cup.
 
     Limit: the modes do not spread over time as a real cymbal's energy moves up the spectrum,
-    and there is no choke by hand.
+    and there is no choke by hand. Every hit keeps a voice until it dies, so a busy ride with a
+    long decay can still hold many voices and, past a kit's polyphony, steal the oldest.
     """
 
     def __init__(self, decay: float = 2.0, wash: float = 0.6, bell: float = 0.0, tune: float = 340.0,
@@ -315,15 +320,18 @@ STEPS = {"x": 0.8, "X": 1.0, "g": 0.3, "o": 0.8}  # what each step of a grid pla
 
 def _steps(row: str) -> tuple[list[tuple[int, str]], int]:
     """One row of a step grid: its hits as (step, character), and its length in steps. A dot
-    or a space is a rest; any character outside STEPS raises."""
-    hits = []
-    for i, c in enumerate(row):
-        if c in ". ":
+    is a rest; a space or a | groups steps and takes none; any other character outside STEPS
+    raises."""
+    hits, i = [], 0
+    for c in row:
+        if c in " |":
             continue
-        if c not in STEPS:
-            raise ValueError(f"pattern: {c!r} at step {i} is not one of x X g o . or a space")
-        hits.append((i, c))
-    return hits, len(row)
+        if c not in STEPS and c != ".":
+            raise ValueError(f"pattern: {c!r} at step {i} is not one of x X g o . (a space or | groups)")
+        if c != ".":
+            hits.append((i, c))
+        i += 1
+    return hits, i
 
 
 class Kit(Instrument):
@@ -339,7 +347,7 @@ class Kit(Instrument):
     drums share no room.
     """
 
-    polyphony = 24
+    polyphony = 32
 
     def __init__(self, kick: Struck | None = None, snare: Struck | None = None, hihat: Struck | None = None,
                  toms: tuple[Struck, ...] | None = None, crash: Struck | None = None, ride: Struck | None = None,
@@ -363,8 +371,9 @@ class Kit(Instrument):
     def pattern(self, grid: dict[Struck, str], step: float, at: float = 0.0, repeat: int = 1) -> list[Note]:
         """Notes from a step grid: one row of characters per drum, one character per step of
         step seconds. x is a hit, X an accent, g a ghost note, o an open stroke (the hi-hat's
-        Open()); a dot or a space is a rest. The grid lasts as long as its longest row, and
-        repeat plays it that many times."""
+        Open()); a dot is a rest. A space or a | groups steps for the eye and takes no step, so
+        "x... x..." is "x...x...". The grid lasts as long as its longest row, counted in steps,
+        and repeat plays it that many times."""
         if step <= 0 or repeat < 1:
             raise ValueError(f"pattern needs a step above 0 and repeat of at least 1, got {step} and {repeat}")
         rows = {drum: _steps(row) for drum, row in grid.items()}

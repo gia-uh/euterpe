@@ -262,6 +262,9 @@ def _check(note: Note) -> None:
         raise ValueError(f"note {note} needs a velocity from 0 to 1")
     if note.time < 0:
         raise ValueError(f"note {note} starts before 0 s")
+    freq = note.freq
+    if not isinstance(freq, Unit) and not (math.isfinite(freq) and freq > 0):
+        raise ValueError(f"note {note} needs a pitch whose frequency is finite and above 0 Hz, got {freq}")
 
 
 def _copy(note: Note, **changes) -> Note:

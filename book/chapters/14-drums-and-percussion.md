@@ -142,7 +142,7 @@ display(kit.play(kit.pattern(swing, step=60 / 140 / 3, repeat=6)).take(11.0, "Th
 
 - `x` a hit at velocity 0.8, `X` an accent at 1.0, `g` a ghost note at 0.3;
 - `o` an open stroke, the hi-hat's `Open()`;
-- `.` or a space, a rest. A space takes a whole step, like a dot.
+- `.` a rest; a space or a `|` groups steps for the eye and takes no step, so `"x... x..."` is `"x...x..."`.
 
 The grid lasts as long as its longest row, and `repeat` plays it that many times. A grid is notation, read like a guitar tab: the drums themselves stay objects. The kit's `level`, 0.35 by default, scales every drum, so that four drums struck at once at full velocity, a drummer's four limbs, stay under full scale.
 

@@ -145,3 +145,9 @@ def test_no_vibrato_is_the_frequency_itself():
     from euterpe.instruments import Vibrato
 
     assert Vibrato(cents=0).of(440.0, _vibrato_note()) == 440.0
+
+
+@pytest.mark.parametrize("pitch", [0.0, -100.0, float("nan"), float("inf")])
+def test_a_pitch_not_above_0_hz_raises_naming_the_note(pitch):
+    with pytest.raises(ValueError, match=r"note Note\(.*frequency"):
+        Theremin().play([(0.0, pitch, 0.2)])

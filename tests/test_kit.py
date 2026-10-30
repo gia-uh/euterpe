@@ -37,7 +37,7 @@ def test_each_note_sounds_on_its_own_drum():
 
 def test_a_bar_with_every_drum_renders():
     kit = Kit()
-    grid = {kit.kick: "x...x...", kit.snare: "..x...x.", kit.hihat: "xxxo xxx", kit.crash: "x.......",
+    grid = {kit.kick: "x...x...", kit.snare: "..x...x.", kit.hihat: "xxxo.xxx", kit.crash: "x.......",
             kit.ride: ".x.x.x.x", kit.toms[0]: "......x.", kit.toms[2]: ".......x", Clap(): "....x..."}
     x = render(kit.play(kit.pattern(grid, step=0.125)), 3.0)
     assert x.shape[0] == 3 * RATE and abs(x).max() > 0.1
@@ -47,3 +47,21 @@ def test_the_kit_shares_the_hihat_pedal():
     kit = Kit()
     p = kit.play(kit.pattern({kit.hihat: "o.x."}, step=0.1))
     assert p.stops[0] < p.ends[0]
+
+
+def test_a_space_or_a_bar_groups_steps_and_takes_none():
+    kit = Kit()
+    plain = kit.pattern({kit.kick: "x...x..."}, step=0.125, repeat=2)
+    for grouped in ("x... x...", "x...|x...", "| x... | x... |"):
+        notes = kit.pattern({kit.kick: grouped}, step=0.125, repeat=2)
+        assert [n.time for n in notes] == [n.time for n in plain]
+
+
+def test_an_unknown_step_names_its_place():
+    kit = Kit()
+    with pytest.raises(ValueError, match="'y' at step 4"):
+        kit.pattern({kit.kick: "x... y..."}, step=0.125)
+
+
+def test_the_kit_holds_32_voices():
+    assert Kit.polyphony == 32
