@@ -5,6 +5,7 @@ other views; listen(x) gives the player alone. Drawing needs matplotlib (euterpe
 
 from euterpe.view.base import Player, View, listen, sources
 from euterpe.view.layout import figure, row
+from euterpe.view.notation import ScoreWidget
 from euterpe.view.signal import default, level, spectrogram, spectrum, waveform
 from euterpe.view.system import curve, response
 from euterpe.view.widget import Widget, widget
@@ -26,6 +27,6 @@ def display(*xs, normalize: bool = True, caption: str | None = None, id: str | N
         show(x)
 
 __all__ = [
-    "Player", "View", "Widget", "curve", "default", "display", "figure", "level", "listen", "response", "row", "sources",
+    "Player", "ScoreWidget", "View", "Widget", "curve", "default", "display", "figure", "level", "listen", "response", "row", "sources",
     "spectrogram", "spectrum", "waveform", "widget",
 ]

@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import html
+import re
 from functools import cache
 from pathlib import Path
 
@@ -29,12 +30,16 @@ POINTS = 96  # spectrum points, log-spaced from 20 Hz to 20 kHz; widget.js uses 
 FFT = 4096  # the analyser's size in widget.js, so the average and the live line agree
 FONT = "font-family=\"'Source Serif 4',Georgia,serif\""
 BLACK = {1, 3, 6, 8, 10}
+PLATE = (f"margin:1em 0;padding:10px 12px;background:#fff;color:{INK};border:1px solid {WASH};border-radius:6px;"
+         "font-family:'Source Serif 4',Georgia,serif")  # the paper every widget and engraving sits on, in both themes
 
 
 @cache
 def _script() -> str:
+    """widget.js as the page carries it: no comment lines, and no space around punctuation, which no string in it needs."""
     lines = (Path(__file__).parent / "widget.js").read_text().splitlines()
-    return "\n".join(line.strip() for line in lines if line.strip())
+    kept = (line.strip() for line in lines if line.strip() and not line.strip().startswith("//"))
+    return "\n".join(re.sub(r"\s*([=+\-*/<>!&|?:,;{}()])\s*", r"\1", line) for line in kept)
 
 
 def _num(v: float) -> str:
@@ -55,6 +60,10 @@ def _fx(f: float) -> float:
 
 def _level(db: float) -> float:
     return SPEC_TOP + SPEC_H * (1 - min(1.0, max(0.0, (db + 100) / 90)))
+
+
+def caption_html(caption: str | None) -> str:
+    return f'<figcaption style="font-style:italic;font-size:.9em;margin-top:4px">{html.escape(caption)}</figcaption>' if caption else ""
 
 
 def average_spectrum(x: np.ndarray, rate: int) -> np.ndarray:
@@ -79,6 +88,9 @@ class Widget(View):
     """What display(x) shows for a unit, a clip, a phrase or a shape, at -16 LUFS unless
     normalize is false."""
 
+    classes = "euterpe-widget"
+    points = 200  # across the envelope
+
     def __init__(self, x: Unit | Clip, *, caption: str | None = None, id: str | None = None,
                  normalize: bool = True, special: tuple | None = None):
         super().__init__(caption=caption, id=id, normalize=normalize)
@@ -94,18 +106,16 @@ class Widget(View):
     def _envelope(self) -> str:
         c, g = self.audio, self.gain()[0]
         x = _mono(c) * g
-        n = 200
-        hop = max(1, len(x) // n)
+        hop = max(1, len(x) // self.points)
         env = np.abs(x[: len(x) // hop * hop]).reshape(-1, hop).max(axis=1) if len(x) >= hop else np.abs(x)
         mid, half = (TOP + BOTTOM) / 2, (BOTTOM - TOP) / 2
         xs = 4 + (ENV_W - 8) * np.arange(len(env)) / max(1, len(env) - 1)
         ys = mid - np.minimum(env, 1.0) * half
-        top = f"M4,{_num(mid)}" + "".join(f"L{_num(a)},{_num(b)}" for a, b in zip(xs, ys)) + f"L{ENV_W - 4},{_num(mid)}Z"
+        top = f"M4,{_num(mid)}L" + " ".join(f"{a:.0f},{_num(b)}" for a, b in zip(xs, ys)) + f" {ENV_W - 4},{_num(mid)}Z"
         u = self.uid
         parts = [
             f'<defs><path id="e{u}" d="{top}"/><clipPath id="p{u}" class="eu-played"><rect x="4" y="0" width="0" height="{H}"/></clipPath></defs>',
-            f'<line x1="4" x2="{ENV_W - 4}" y1="{TOP}" y2="{TOP}" stroke="{RULE}" stroke-width="0.6" stroke-dasharray="2 3"/>',
-            f'<line x1="4" x2="{ENV_W - 4}" y1="{BOTTOM}" y2="{BOTTOM}" stroke="{RULE}" stroke-width="0.6" stroke-dasharray="2 3"/>',
+            f'<path d="M4,{TOP}H{ENV_W - 4}M4,{BOTTOM}H{ENV_W - 4}" stroke="{RULE}" stroke-width="0.6" stroke-dasharray="2 3"/>',
             f'<g fill="{PRUSSIAN}" fill-opacity="0.18" stroke="{PRUSSIAN}" stroke-width="0.8"><use href="#e{u}"/>'
             f'<use href="#e{u}" transform="matrix(1 0 0 -1 0 {TOP + BOTTOM})"/></g>',
             f'<g fill="{PRUSSIAN}" fill-opacity="0.22" clip-path="url(#p{u})"><use href="#e{u}"/>'
@@ -130,17 +140,16 @@ class Widget(View):
         c, g = self.audio, self.gain()[0]
         db = average_spectrum(_mono(c) * g, c.rate)
         xs = SPEC_TOP + 192 * np.arange(POINTS) / (POINTS - 1)
-        line = "".join(f"{'L' if i else 'M'}{_num(a)},{_num(_level(b))}" for i, (a, b) in enumerate(zip(xs, db)))
+        line = "M" + " ".join(f"{a:.0f},{_num(_level(b))}" for a, b in zip(xs, db))
         base = SPEC_TOP + SPEC_H
-        parts = [f'<line x1="{_num(_fx(f))}" x2="{_num(_fx(f))}" y1="{SPEC_TOP}" y2="{base}" stroke="{WASH}" stroke-width="0.6"/>'
-                 for f in (100, 1000, 10000)]
+        grid = "".join(f"M{_num(_fx(f))},{SPEC_TOP}V{base}" for f in (100, 1000, 10000))
+        parts = [f'<path d="{grid}" stroke="{WASH}" stroke-width="0.6"/>']
         parts.append(f'<path class="eu-avg" d="{line}L196,{base}L4,{base}Z" fill="{PRUSSIAN}" fill-opacity="0.1" '
                      f'stroke="{PRUSSIAN}" stroke-width="1"/>')
         parts.append(f'<path class="eu-live" d="" fill="none" stroke="{PRUSSIAN}" stroke-width="1.1" style="display:none"/>')
-        keys = "".join(f"M{_num(a)},{KEYS_Y}h{_num(b - a)}v6H{_num(a)}Z" for a, b in
-                       ((_fx(440 * 2 ** ((m - 69.5) / 12)), _fx(440 * 2 ** ((m - 68.5) / 12))) for m in range(24, 121) if m % 12 in BLACK))
+        keys = "".join(f"M{_num(_fx(440 * 2 ** ((m - 69) / 12)))},{KEYS_Y}v6" for m in range(24, 121) if m % 12 in BLACK)
         parts.append(f'<rect x="4" y="{KEYS_Y}" width="192" height="6" fill="#fff" stroke="{RULE}" stroke-width="0.4"/>'
-                     f'<path d="{keys}" fill="{INK}"/>')
+                     f'<path d="{keys}" stroke="{INK}" stroke-width="{_num(_fx(440 * 2 ** (1 / 12)) - _fx(440))}"/>')
         for f, label in ((20, "20"), (100, "100"), (1000, "1k"), (10000, "10k")):
             anchor = "start" if f == 20 else "middle"
             parts.append(f'<text x="{_num(_fx(f))}" y="{LABEL}" text-anchor="{anchor}">{label}</text>')
@@ -201,20 +210,22 @@ class Widget(View):
         sign = "+" if d >= 0 else "−"
         return f"rendered {lufs:.1f} LUFS · plays {lufs + d:.1f} LUFS ({sign}{abs(d):.1f} dB)".replace("-", "−")
 
+    def _top(self, sp: str | None) -> str:
+        """What stands over the envelope and the spectrum: here the special view."""
+        return f'<div style="margin-bottom:6px">{sp}</div>' if sp else ""
+
     def html(self, mp3: bytes) -> str:
         env, spec, sp = self._svgs()
         src = "data:audio/mpeg;base64," + base64.b64encode(mp3).decode()
-        cap = f'<figcaption style="font-style:italic;font-size:.9em;margin-top:4px">{html.escape(self.caption)}</figcaption>' if self.caption else ""
         return "".join([
-            f'<figure class="euterpe-widget" data-dur="{self.audio.seconds:.4f}" style="margin:1em 0;padding:10px 12px;'
-            f"background:#fff;color:{INK};border:1px solid {WASH};border-radius:6px;font-family:'Source Serif 4',Georgia,serif\">",
+            f'<figure class="{self.classes}" data-dur="{self.audio.seconds:.4f}" style="{PLATE}">',
             '<style>@media (max-width:640px){.euterpe-widget .eu-grid{grid-template-columns:1fr!important}.euterpe-widget .eu-spec{max-width:65%;margin:0 auto}}</style>',
-            f'<div style="margin-bottom:6px">{sp}</div>' if sp else "",
+            self._top(sp),
             f'<div class="eu-grid" style="display:grid;grid-template-columns:2.2fr 1fr;gap:10px">{env}{spec}</div>',
             '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:6px">',
             f'<audio controls preload="metadata" src="{src}" style="flex:1 1 240px;min-width:0;height:34px"></audio>',
             f'<span style="font:11px ui-monospace,monospace;color:#6b7078">{html.escape(self.level_line())}</span></div>',
-            cap,
+            caption_html(self.caption),
             f"<script>\n{_script()}\n</script></figure>",
         ])
 
