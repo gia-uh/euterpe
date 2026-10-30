@@ -4,7 +4,9 @@ import pytest
 from euterpe.instruments import Bowed, Bowing, CelloBody, Gut, Legato, Note, Staccato, StringSection, Violin, ViolinBody
 from euterpe.lint import lint_audio, lint_notes
 from euterpe.pitch import A4, B4, C2
+from euterpe.sound import WhiteNoise
 from euterpe.sound.core import RATE, render
+from tests.helpers import band_db
 
 PRESETS = [Violin, StringSection]
 
@@ -43,7 +45,10 @@ def test_a_section_plays_its_low_notes_through_a_cello_body():
 
 
 def test_a_cello_body_rings_near_100_200_and_400_hz():
-    assert CelloBody().freqs == pytest.approx((100.0, 200.0, 400.0), rel=0.15)
+    cello, violin = (render(body(WhiteNoise(seed=1)), 1.0) for body in (CelloBody(), ViolinBody()))
+    near = lambda x, hz: band_db(x, 0.9 * hz, 1.1 * hz)  # noqa: E731
+    assert near(cello, 100) - near(violin, 100) > 6 and near(cello, 200) - near(violin, 200) > 4
+    assert near(cello, 400) - near(cello, 300) > 3
 
 
 def test_the_bow_lifts_at_the_end_and_the_string_rings_out():

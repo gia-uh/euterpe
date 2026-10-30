@@ -119,7 +119,6 @@ class Violin(Bowed):
     col legno or harmonics; the body is three modes, not a violin's hundreds.
     """
 
-    polyphony = 1
     playable = (G3, A7)
     comfortable = (G3, E6)
 
