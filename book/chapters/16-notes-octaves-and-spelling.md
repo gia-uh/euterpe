@@ -24,7 +24,20 @@ Mozart's *Eine kleine Nachtmusik*, K. 525, written in 1787: a violin, a string s
 
 ## Seven letters
 
-Western music names its notes with seven letters, A to G, and then starts over. `Pitch` is one of those names with an *octave number* after it, the system called *scientific pitch notation*. A4 is the A of chapter 2, the 440 Hz that orchestras tune to. Each pitch also has a number, the count of keys from a very low C that MIDI, the standard file format for notes, calls note 0. `Scale` lists the notes of a scale, here the white keys from C4, and the text after the keyboard says more:
+Western music names its notes with seven letters, A to G, and then starts over. `Scale` lists the notes of a scale, and C major from C4 is the white keys of a piano; chapter 18 explains scales, and here `Scale` only hands us the notes. `degree(n)` counts them from 1, with 8 back on C. `Harp`, from chapter 10, plays them, and its phrase draws itself as a *piano roll*: a keyboard on its side, with each note a bar from where it starts to where it ends:
+
+```python {run}
+from euterpe import Scale
+from euterpe.instruments import Harp
+
+c_major = Scale("C", "major")
+run = [(0.4 * (n - 1), c_major.degree(n), 0.4) for n in range(1, 9)]
+Harp().play(run).take(4.0, "C major from C4 to C5, on the harp")
+```
+
+Listen to the 7th note, B4, and how much it wants to go on to C5. Stop the player there and the run feels unfinished. Chapter 18 says why.
+
+Each note of that run is a `Pitch`: a letter with an *octave number* after it, the system called *scientific pitch notation*. A4 is the A of chapter 2, the 440 Hz that orchestras tune to. Each pitch also has a number, the count of keys from a very low C that MIDI, the standard file format for notes, calls note 0:
 
 ```python {run output=code}
 from euterpe import Pitch, Scale
@@ -61,22 +74,9 @@ def draw():
 figure(draw, caption="One octave of a keyboard, from C4 to C5: each key's name and number")
 ```
 
-The eight white keys from C4 to C5 are the C major scale, which chapter 18 explains. Here `Scale` only hands us the notes, and `degree(n)` counts them from 1, with 8 back on C. `Harp`, from chapter 10, plays them, and its phrase draws itself as a *piano roll*: a keyboard on its side, with each note a bar from where it starts to where it ends:
-
-```python {run}
-from euterpe import Scale
-from euterpe.instruments import Harp
-
-c_major = Scale("C", "major")
-run = [(0.4 * (n - 1), c_major.degree(n), 0.4) for n in range(1, 9)]
-Harp().play(run).take(4.0, "C major from C4 to C5, on the harp")
-```
-
-Listen to the 7th note, B4, and how much it wants to go on to C5. Stop the player there and the run feels unfinished. Chapter 18 says why.
-
 ## The octave
 
-The run ended on a C, and the C at its end sounded like the C at its start, only higher. That distance is an *octave*: eight letters counted from the first to the last, 12 semitones, and a doubling of the frequency. A5 is 880 Hz, A3 is 220 Hz. It is the reason the letters start over at all. Two notes an octave apart get one name because the ear treats them as one note in two heights. A4, then A5, then both at once:
+The run ended on a C, and the C at its end sounded like the C at its start, only higher. That distance is chapter 2's octave: eight letters counted from the first to the last, 12 semitones, and a doubling of the frequency. A5 is 880 Hz, A3 is 220 Hz. It is the reason the letters start over at all. Two notes an octave apart get one name because the ear treats them as one note in two heights. A4, then A5, then both at once:
 
 ```python {run}
 from euterpe.instruments import Harp
@@ -94,7 +94,7 @@ from euterpe.view import spectrum
 
 low = (Saw(A4.freq) * 0.5).take(1.0)
 high = (Saw(A5.freq) * 0.5).take(1.0)
-spectrum(low, high, f0=A4.freq, harmonics=16, labels=["A4", "A5"], caption="A saw on A4 and on A5, in harmonics of 440 Hz")
+spectrum(low, high, f0=A4.freq, labels=["A4", "A5"], caption="A saw on A4 and on A5, in harmonics of 440 Hz")
 ```
 
 A5 has stems only on A4's even harmonics: every partial of A5 is a partial of A4. So adding A5 to A4 adds no new frequency, and nothing beats: it only makes the even partials of the same stack louder. That is what brighter meant above. The octave is the smallest distance that does this, but this arithmetic is not the whole reason for the shared name: three times A4, 1320 Hz, is on A4's stack too, and it is almost exactly E6, which has a name of its own. Chapter 17 hears the other distances.
@@ -177,10 +177,12 @@ display(right.notation(bars=(4, 4), caption="Bar 4 with F♯"), wrong.notation(b
 The first staff has no sign on that note. The second prints a flat in front of a G, where a player sight-reading G major expects the plain F that the key has already sharpened. So the two look different. Do they sound different? Play this one against the violin of the last section:
 
 ```python {run continue}
-display(wrong, caption="The same four bars with G♭")
+from euterpe.view import listen
+
+listen(wrong.play(), caption="The same four bars with G♭")
 ```
 
-Now the same question with the data, including what each file format keeps. MIDI is the note format of the first section, and MusicXML is the format notation programs read:
+Now the same question with the data. `play` performs a score into a sound, as an instrument's `play` does, so the samples can be compared. Then what each file format keeps: MIDI is the note format of the first section, and MusicXML is the format notation programs read:
 
 ```python {run continue output=code}
 import numpy as np
@@ -191,11 +193,10 @@ from euterpe.sound import render
 a, b = right.play(), wrong.play()
 print("same samples:", np.array_equal(render(a, a.duration), render(b, b.duration)))
 print("same MIDI:", midi_bytes(right) == midi_bytes(wrong))
-for score in (right, wrong):
-    print([line.strip() for line in musicxml_bytes(score).decode().splitlines() if "alter" in line or "accidental" in line])
+print("same MusicXML:", musicxml_bytes(right) == musicxml_bytes(wrong))
 ```
 
-The samples are equal to the bit, so no ear could tell. The MIDI data is equal too, since MIDI stores key numbers and has no idea what a note is called. MusicXML keeps the spelling. Each list holds every `alter` and `accidental` line of one score: F♯ raises its letter by 1, and G♭ lowers its letter by 1 and asks for a printed flat.
+The samples are equal to the bit, so no ear could tell. The MIDI data is equal too, since MIDI stores key numbers and has no idea what a note is called. MusicXML keeps the spelling.
 
 A key can check this. `key.scale` holds its notes, and `key.spell` turns a number into the name this key gives it. The last column moves each spelling up by `m2`, the interval of chapter 17 that goes one semitone up and one letter on:
 
@@ -210,6 +211,18 @@ for p in (Fs5, Gb5):
 ```
 
 So why call it a bug, if nothing audible breaks? Because a score is read as well as heard, and the music of the next chapters runs on letters. F♯ up to A is a third, three letters; G♭ up to A is a kind of second, two letters. Those are different things to chapter 17. And the same move, up by `m2`, lands the right spelling on G and the wrong one on A with two flats. A wrong spelling sounds right today and breaks later, which is what bugs do. Euterpe keeps your spelling exactly as you wrote it, so that it can be checked.
+
+An interval keeps the letters too, which is what makes `transpose` safe. The score from the last section still holds the violin and the section, and the plucked strings of chapter 10, `PizzicatoStrings`, join them two octaves under the violin. `-P15` is two octaves counted in letters, 8 + 8 - 1, since the note where they meet is counted once:
+
+```python {run continue}
+from euterpe import Interval, display
+from euterpe.instruments import PizzicatoStrings
+
+s.part("pizzicato", PizzicatoStrings()).add(opening.transpose(Interval("-P15")))
+display(s, caption="The opening in three octaves")
+```
+
+All three parts carry F♯, each with no sign of its own in bar 4. The lowest staff opens with the *bass clef* instead of the treble clef, which moves the letters so low notes fit on the lines, so the same shape there sounds lower. The plucked notes fade fast and mark each note's start under the sustained bows.
 
 ## Putting it all together
 
@@ -227,7 +240,7 @@ k525 = melody("""
     f! g4:w""")
 ```
 
-Then the three octaves, on one line. The violin plays what is written, the section an octave under it, and `PizzicatoStrings`, from chapter 10, two octaves under it. `-P15` is two octaves counted in letters, 8 + 8 - 1, since the note where they meet is counted once. The three start from one text, so they cannot disagree. The plucked notes fade fast and mark each note's start under the sustained bows. `gain` scales a part's level, and these bring the softer section and pizzicato up against the violin:
+Then the three layers you have built, on the whole text: the violin, the section an octave under it and the pizzicato two octaves under it. The three start from one text, so they cannot disagree. `gain` scales a part's level, and these bring the softer section and pizzicato up against the violin:
 
 ```python {run continue name=strings}
 from euterpe import Interval, Key, Score, display
@@ -239,11 +252,11 @@ s.part("violin", Violin(), gain=0.8).add(k525)
 s.part("section", StringSection(players=2), gain=1.2).add(k525.transpose(Interval("-P8")))
 s.part("pizzicato", PizzicatoStrings(), gain=1.2).add(k525.transpose(Interval("-P15")))
 song = s.play()
-display(s.notation(bars=(1, 4), caption="The first four bars of the three parts"))
+display(s.notation(bars=(9, 12), caption="Bars 9 to 12 of the three parts"))
 listen(song, caption="Eine kleine Nachtmusik, K. 525, bars 1 to 18, in three octaves")
 ```
 
-The staff shows the first four bars; the pizzicato's staff opens with the *bass clef* instead of the treble clef, which moves the letters so low notes fit on the lines, so the same shape there sounds lower. Listen for bar 2, from 1.82 s to 3.64 s, where three instruments are one rising figure, then for bar 11, at 18.2 s, where `p` halves the velocity and the bows go softer and darker, as chapter 13 built them. The three lines never leave each other, so all you can hear change is register and timbre, and that is the octave at work.
+The staff shows bars 9 to 12, with the first sixteenths, two flags on a stem, and the `p` of bar 11. Listen for bar 2, from 1.82 s to 3.64 s, where three instruments are one rising figure, then for bar 11, at 18.2 s, where `p` lowers the velocity and the bows go softer and darker, as chapter 13 built them. The three lines never leave each other, so all you can hear change is register and timbre, and that is the octave at work.
 
 It is also the arrangement's limit. In Mozart's score the strings stay in octaves for only four bars: from bar 5 the violins, violas and basses split, each on notes of its own, and the music opens up. The lines here sit an octave apart, the one distance this chapter named. Chapter 17 names all the others.
 
