@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 SCALE = 40  # percent, verovio's staff size
 PAGE_WIDTH = 960  # verovio's units: at SCALE this is 384 wide, so a figure fits a phone
-PAGE_HEIGHT = 60000  # verovio's largest page, some 600 bars of one staff
+PAGE_HEIGHT = 60000  # verovio's largest page: more than 700 bars of one staff, fewer on several
 MARGIN = 20
 # Verovio writes a metronome's note in a music font it would embed. These are the same notes in plain Unicode.
 _METRONOME = str.maketrans({"": "\U0001d15d", "": "\U0001d15e", "": "♩", "": "♪",
@@ -191,7 +191,7 @@ def roll(score: Score, part: str | None = None, peak: bool = False, note: str | 
     if not score.parts:
         raise ValueError("roll: the score has no parts")
     score.events(part)  # raises for a part it does not have
-    performed = score.performance._performed(score)
+    performed = score.performance._performed(score, 0)
     numerals = _numerals(score)
     lanes = []
     for name in score.parts if part is None else (part,):

@@ -4,6 +4,7 @@ import sys
 from fractions import Fraction
 
 import matplotlib.pyplot as plt
+from matplotlib.colors import to_hex
 import pytest
 
 from euterpe import Key, Meter, Score, chords, drums, melody
@@ -11,6 +12,7 @@ from euterpe.instruments import Harp, Kit
 from euterpe.view import display
 from euterpe.view.notation import PAGE_WIDTH, SCALE
 from euterpe.view.special import X0, X1
+from euterpe.view.widget import FONT
 
 
 def _score(text: str = "c4:q d e f | g:q a b c5 | c5:q b a g | c4:w", instrument=None, **options) -> Score:
@@ -35,6 +37,28 @@ def _shown(monkeypatch, score: Score, **options):
 
 def _text(svg: bytes) -> list[str]:
     return re.findall(r"<(?:tspan|text)\b[^>]*>([^<]+)<", svg.decode())
+
+
+def _bars(svg: bytes) -> list[float]:
+    return [float(x) for x in re.findall(r'class="eu-bar" x1="([\d.]+)"', svg.decode())]
+
+
+def _marks(svg: bytes) -> list[tuple[float, str, str]]:
+    """Each note's rectangle in a roll, as (y, fill, data-t)."""
+    return [(float(y), fill, t) for y, fill, t in re.findall(r'<rect x="[\d.]+" y="([\d.]+)"[^>]*fill="([^"]+)" data-t="([\d.]+)"', svg.decode())]
+
+
+def _numerals(view) -> list[tuple[str, float]]:
+    """Each numeral under a roll, as (text, seconds), from where it is drawn."""
+    found = re.findall(r'<text x="([\d.]+)" y="[\d.]+" font-size="9" font-style="italic">([^<]+)</text>', view.svg().decode())
+    return [(text, (float(x) - X0) / (X1 - X0) * view.seconds) for x, text in found]
+
+
+def _numeral_and_tick_rows(svg: bytes) -> tuple[float, float]:
+    text = svg.decode()
+    numeral = re.search(r'<text x="[\d.]+" y="([\d.]+)" font-size="9" font-style="italic">', text)
+    tick = re.search(r'<text x="[\d.]+" y="([\d.]+)" text-anchor="middle" fill="#6b7078">', text)
+    return float(numeral.group(1)), float(tick.group(1))
 
 
 def test_two_renders_of_a_score_are_byte_equal():
@@ -89,6 +113,12 @@ def test_the_svg_is_in_the_house_ink():
     svg = _score().notation().svg()
     assert b"#1e2430" in svg
     assert b"black" not in svg
+
+
+def test_the_svg_is_in_the_house_serif():
+    svg = _score().notation().svg().decode()
+    assert FONT in svg
+    assert "Times" not in svg
 
 
 def test_bars_shows_those_measures():
@@ -183,6 +213,18 @@ def test_display_of_a_score_with_no_instrument_shows_the_notation_alone(monkeypa
     assert b'class="note"' in view.svg()
 
 
+def test_display_of_a_score_with_one_part_without_an_instrument_has_no_player(monkeypatch):
+    s = _score("c4:q d e f", Harp())
+    s.part("written").add(melody("c3:w"))
+    assert _shown(monkeypatch, s).audio is None
+
+
+@pytest.mark.parametrize("normalize", [True, False])
+def test_display_passes_normalize_to_the_player(monkeypatch, normalize):
+    view = _shown(monkeypatch, _score("c4:q d e f", Harp()), normalize=normalize)
+    assert view.normalize is normalize
+
+
 def test_display_without_verovio_falls_back_to_the_roll_with_a_note(monkeypatch):
     s = _score("c4:q d e f", Harp())
     monkeypatch.setitem(sys.modules, "verovio", None)
@@ -195,18 +237,21 @@ def test_display_without_verovio_falls_back_to_the_roll_with_a_note(monkeypatch)
     assert view.audio is not None
 
 
-def test_peak_differs_from_the_plain_roll_and_marks_the_highest_note_in_madder():
+def test_peak_marks_the_highest_note_where_it_sounds_and_nothing_else():
     s = _score()
-    plain, peak = s.roll().svg().decode(), s.roll(peak=True).svg().decode()
-    assert plain != peak
-    assert "#b0361f" not in plain
-    assert peak.count('fill="#b0361f"') == 2  # c5 twice
+    plain, peak = _marks(s.roll().svg()), _marks(s.roll(peak=True).svg())
+    assert "#b0361f" not in {fill for _, fill, _ in plain}
+    marked = [(y, t) for y, fill, t in peak if fill == "#b0361f"]
+    assert [t for _, t in marked] == ["3.500", "4.000"]  # c5, on bar 2's last beat and bar 3's first
+    assert {y for y, _ in marked} == {min(y for y, _, _ in peak)}  # the row of the highest note
+    assert [(y, t) for y, _, t in plain] == [(y, t) for y, _, t in peak]
 
 
 def test_peak_marks_each_parts_own_highest_note():
-    s = _score("c5:q d e f")
-    s.part("low").add(melody("c2:q d e f"))
-    assert s.roll(peak=True).svg().count(b'fill="#b0361f"') == 2
+    s = _score("c5:q f e d")
+    s.part("low").add(melody("f2:q c d e"))
+    marked = [t for _, fill, t in _marks(s.roll(peak=True).svg()) if fill == "#b0361f"]
+    assert marked == ["0.500", "0.000"]  # f5 on the second beat, f2 on the first
 
 
 def test_the_roll_rules_every_bar_at_its_time():
@@ -216,14 +261,60 @@ def test_the_roll_rules_every_bar_at_its_time():
     tempo = s.tempo_map()
     starts = [tempo.seconds(Fraction(n)) for n in range(4)]
     assert starts == [0.0, 2.0, 4.0, 8.0]
-    xs = [float(x) for x in re.findall(r'class="eu-bar" x1="([\d.]+)"', view.svg().decode())]
-    assert xs == pytest.approx([X0 + (X1 - X0) * t / view.seconds for t in starts], abs=0.06)
+    assert _bars(view.svg()) == pytest.approx([X0 + (X1 - X0) * t / view.seconds for t in starts], abs=0.06)
 
 
 def test_the_roll_rules_bars_on_both_passes_of_a_repeat():
     s = _score()
     s.section("A", 1, 2, repeat=2)
     assert s.roll().svg().count(b'class="eu-bar"') == 6
+
+
+def test_the_roll_rules_a_kits_bars_at_their_time():
+    s = Score()
+    s.part("k", Kit()).add(drums({"kick": "x...", "snare": "..x."}, step="q") * 2)
+    view = s.roll()
+    assert _bars(view.svg()) == pytest.approx([X0 + (X1 - X0) * t / view.seconds for t in (0.0, 2.0)], abs=0.06)
+
+
+def test_the_roll_reaches_the_end_of_a_note_past_the_last_bar():
+    s = _score("c4:q d e f g")  # five quarters in a bar of four
+    notes = s.performance.notes(s, 0)["melody"]
+    end = notes[-1].time + notes[-1].duration
+    assert end > 2.0
+    assert s.roll().seconds == pytest.approx(end)
+
+
+def test_each_numeral_sits_on_its_beat():
+    s = _score("<c4 e4 g4>:h <g3 b3 d4>")
+    found = _numerals(s.roll())
+    assert [text for text, _ in found] == ["I", "V"]
+    assert [t for _, t in found] == pytest.approx([0.0, 1.0], abs=0.01)
+
+
+def test_an_unchanged_numeral_is_not_written_again():
+    s = _score("<c4 e4 g4>:h <c4 e4 g4> | <c4 e4 g4>:w | <g3 b3 d4>:w")
+    found = _numerals(s.roll())
+    assert [text for text, _ in found] == ["I", "V"]
+    assert [t for _, t in found] == pytest.approx([0.0, 4.0], abs=0.01)
+
+
+def test_a_repeats_short_closing_bar_leaves_out_the_beat_it_does_not_play():
+    s = Score(pickup=Fraction(1, 4))
+    s.part("a").add(melody("<c4 e4 g4>:q | <c4 e4 g4>:h."))
+    s.section("A", 1, 2, repeat=2)
+    # The first pass stops bar 2 after three beats and goes back to the pickup; only the last pass has its fourth beat.
+    found = _numerals(s.roll())
+    assert [text for text, _ in found] == ["I", "?"]
+    assert [t for _, t in found] == pytest.approx([0.0, 4.0], abs=0.01)
+
+
+def test_the_numerals_sit_under_the_notes_and_above_the_ticks():
+    s = _cadence()
+    svg = s.roll().svg()
+    numeral, tick = _numeral_and_tick_rows(svg)
+    assert numeral > max(y for y, _, _ in _marks(svg))
+    assert tick - numeral >= 9  # the font's size, so the two rows do not touch
 
 
 def test_the_roll_writes_numerals_and_a_question_mark_where_it_finds_none():
@@ -278,7 +369,7 @@ def test_the_roll_of_a_thin_score_does_not_crash():
 def test_display_of_a_thin_score_does_not_crash(monkeypatch):
     silent = Score()
     silent.part("a", Harp())
-    assert _shown(monkeypatch, silent) is not None
+    assert _shown(monkeypatch, silent).audio is None
     rests = Score()
     rests.part("a", Harp()).add(melody("r:w"))
     assert _shown(monkeypatch, rests).audio is not None
@@ -317,3 +408,28 @@ def test_the_roll_saves_as_a_png_through_its_figure(tmp_path):
     fig.savefig(path)
     plt.close(fig)
     assert path.read_bytes().startswith(b"\x89PNG")
+
+
+def test_the_figure_draws_what_the_svg_draws():
+    s = _cadence()
+    s.change(1, tempo=60)
+    fig = s.roll(peak=True).figure()
+    ax = fig.axes[0]
+    assert [line.get_xdata()[0] for line in ax.lines] == pytest.approx([0.0, 4.0, 8.0])
+    assert ax.patches  # the keyboard
+    colors = [to_hex(color) for color in ax.collections[0].get_colors()]
+    assert colors.count("#b0361f") == 2  # g4, in bars 1 and 3
+    assert colors.count("#1f5f8b") == 7
+    assert {"I", "V"} <= {text.get_text() for text in ax.texts}
+    plain = s.roll().figure()
+    assert "#b0361f" not in {to_hex(color) for color in plain.axes[0].collections[0].get_colors()}
+    plt.close(fig)
+    plt.close(plain)
+
+
+def test_the_figure_rules_a_kits_bars():
+    s = Score()
+    s.part("k", Kit()).add(drums({"kick": "x..."}, step="q") * 2)
+    fig = s.roll().figure()
+    assert len(fig.axes[0].lines) == 3  # two rules and the hits
+    plt.close(fig)
