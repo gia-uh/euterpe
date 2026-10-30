@@ -1,6 +1,7 @@
 import builtins
 import re
 import sys
+import xml.etree.ElementTree as ET
 from fractions import Fraction
 
 import matplotlib.pyplot as plt
@@ -76,7 +77,7 @@ def test_the_tempo_mark_needs_no_music_font():
     svg = _score().notation().svg().decode()
     assert "♩" in svg
     assert "Leipzig" not in svg
-    assert not re.search("[-]", svg)
+    assert not re.search("[\ue000-\uf8ff]", svg)
 
 
 @pytest.mark.parametrize("meter", ["4/4", "2/2", "6/8", "3/8", "2/1", "3/16"])
@@ -107,6 +108,15 @@ def test_the_svg_is_no_wider_than_a_phone():
     width = float(re.search(r'<svg[^>]*\bwidth="([\d.]+)', svg).group(1))
     assert width == PAGE_WIDTH * SCALE / 100 <= 390
     assert re.search(r'<svg[^>]*viewBox="0 0 [\d.]+ [\d.]+"', svg)
+
+
+def test_a_short_score_is_only_as_high_as_its_music():
+    svg = _score("c4:q d e f").notation().svg().decode()
+    assert float(re.search(r'<svg[^>]*\bheight="([\d.]+)', svg).group(1)) < 200
+
+
+def test_a_title_is_left_to_the_caption():
+    assert "Eine kleine" not in " ".join(_text(_score(title="Eine kleine").notation().svg()))
 
 
 def test_the_svg_is_in_the_house_ink():
@@ -356,6 +366,13 @@ def test_the_rows_of_a_kit_part_mark_each_hit_in_its_own_row():
     marks = re.findall(r'<rect x="[\d.]+" y="([\d.]+)"[^>]*data-t="([\d.]+)"', s.roll().svg().decode())
     assert [t for _, t in marks] == ["0.000", "1.000"]
     assert marks[0][0] != marks[1][0]
+
+
+def test_a_part_name_is_escaped_in_the_roll():
+    s = Score()
+    s.part("a<b&c").add(melody("c4:q d e f"))
+    root = ET.fromstring(s.roll().svg())
+    assert "a<b&c" in {text.text for text in root.iter("{http://www.w3.org/2000/svg}text")}
 
 
 def test_the_roll_of_a_thin_score_does_not_crash():

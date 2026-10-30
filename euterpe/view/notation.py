@@ -27,8 +27,8 @@ PAGE_WIDTH = 960  # verovio's units: at SCALE this is 384 wide, so a figure fits
 PAGE_HEIGHT = 60000  # verovio's largest page: more than 700 bars of one staff, fewer on several
 MARGIN = 20
 # Verovio writes a metronome's note in a music font it would embed. These are the same notes in plain Unicode.
-_METRONOME = str.maketrans({"": "\U0001d15d", "": "\U0001d15e", "": "♩", "": "♪",
-                            "": "\U0001d161", "": "."})
+_METRONOME = str.maketrans({"\ueca2": "\U0001d15d", "\ueca3": "\U0001d15e", "\ueca5": "♩", "\ueca7": "♪",
+                            "\ueca9": "\U0001d161", "\uecb7": "."})
 
 
 class Drawn(View):
