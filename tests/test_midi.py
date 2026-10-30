@@ -416,6 +416,15 @@ def test_the_file_lasts_until_the_last_bar_ends(tmp_path):
     assert all(_timed(track)[-1][0] == 3840 for track in midi.tracks)
 
 
+def test_the_file_lasts_until_a_note_off_past_the_last_bar(tmp_path):
+    s = Score(tempo=240)
+    s.part("drums", Kit()).add(drums({"kick": "...............x"}))
+    for performed, off in ((False, 1992), (True, 996)):
+        midi = _read(s, tmp_path, performed=performed)
+        assert _notes(midi.tracks[1])[0][1] == off
+        assert all(_timed(track)[-1][0] == off for track in midi.tracks)
+
+
 def test_a_long_delta_time_reads_back(tmp_path):
     s = Score()
     s.part("a").add(Line([*[[Rest(Fraction(1))]] * 40, [Note((C4,), Fraction(1, 4))]]))

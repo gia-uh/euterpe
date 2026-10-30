@@ -128,8 +128,6 @@ class Stomp(Kick):
     Limit: every foot is the same kick, and the hall is a plain reverb, not a stadium's echo.
     """
 
-    gm_program = 116
-
     def __init__(self, people: int = 8, spread: float = 0.02, room: float = 1.2, tune: float = 70.0,
                  sweep: float = 1.6, drop: float = 0.02, decay: float = 0.25, click: float = 0.7,
                  level: float = 0.5, variation: float = 0.15, seed: int = 0):
