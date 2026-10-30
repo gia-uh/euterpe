@@ -310,8 +310,9 @@ def _sounds(score: Score, name: str, tempo: TempoMap) -> list[list[_Sound]]:
 
 @dataclass(frozen=True)
 class Performance:
-    """How a score is played: swing, lengths, dynamics and humanization. The same notes come from the same seed, and
-    humanize=None uses no draws."""
+    """How a score is played: swing, lengths, dynamics and humanization. It changes a note's spectrum only through when
+    it starts, how long it lasts and its velocity. The same notes come from the same seed, and humanize=None uses no
+    draws."""
 
     swing: Swing | None = None
     lengths: Lengths = Lengths()
@@ -329,11 +330,13 @@ class Performance:
         from euterpe.instruments.core import Note as Performed
         from euterpe.instruments.percussion import STEPS, Open
         from euterpe.score.model import Hit
+        from euterpe.sound.core import RATE
 
         curve = _Curve(self.dynamics, part)
         events = _sounds(score, part.name, tempo)
         drums = _drums(part) if any(sound.pitch is None for sounds in events for sound in sounds) else {}
         one_voice = getattr(part.instrument, "polyphony", None) == 1 and getattr(part.instrument, "slurs", True)
+        clipped: dict[float, float] = {}  # on one voice, a written start clipped at 0 and the start it got
         notes = []
         for sounds in events:
             moves, jolts = self._draws(rng, len(sounds), not one_voice)
@@ -343,6 +346,8 @@ class Performance:
                 start = tempo.seconds(tempo._swung(self.swing, sound.start))
                 end = tempo.seconds(tempo._swung(self.swing, sound.end))
                 time = max(0.0, start + float(move))
+                if one_voice and time == 0.0:  # two written starts at one time would slur, so each takes the next sample
+                    time = clipped.setdefault(start, len(clipped) / RATE)
                 level = self.dynamics._stressed(curve.at(placed.offset), score.meter_at(placed.bar), placed.in_bar)
                 if isinstance(event, Hit):
                     velocity = _unit(level * STEPS[event.accent or "x"] + float(jolt))

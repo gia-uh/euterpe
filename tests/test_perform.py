@@ -22,9 +22,10 @@ from euterpe import (
     drums,
     melody,
 )
-from euterpe.instruments import Accent, ElectricPiano, Harp, Kit, Legato, Open, Staccato, Violin
+from euterpe.instruments import Accent, ElectricPiano, Harp, Instrument, Kit, Legato, Open, Staccato, Violin
 from euterpe.instruments.percussion import STEPS
 from euterpe.score import Hit, Line, Note, part_seeds
+from euterpe.sound import Sine
 
 Q = Fraction(1, 4)
 E = Fraction(1, 8)
@@ -592,6 +593,14 @@ def test_a_humanized_velocity_stays_inside_0_and_1():
     assert all(0.0 <= v <= 1.0 for v in velocities) and {0.0, 1.0} & set(velocities)
 
 
+def test_a_humanized_velocity_is_clipped_at_3_sd():
+    s = score("c4:s d e f g a b c " * 8, Performance(humanize=Humanize(timing=0, velocity=0.01)))
+    straight = Performance().notes(s)["a"]
+    moved = [a.velocity - b.velocity for seed in range(50) for a, b in zip(s.performance.notes(s, seed=seed)["a"], straight)]
+    assert max(abs(move) for move in moved) == pytest.approx(3 * 0.01)
+    assert np.std(moved) == pytest.approx(0.01, rel=0.1)
+
+
 def test_notes_in_one_stack_share_most_of_the_start():
     s = score("<c4 e g>:q <d f a> <e g b> <f a c5> " * 8, Performance(humanize=Humanize(timing=0.02, velocity=0)))
     notes = s.performance.notes(s)["a"]
@@ -620,6 +629,28 @@ def test_violin_in_sixteenths_under_humanize_has_no_note_starting_before_the_pre
         notes = s.performance.notes(s, seed=seed)["a"]
         assert all(a.time + a.duration <= b.time + 1e-9 for a, b in zip(notes, notes[1:]))
         assert len(Violin().play(notes).voices) == len(notes)  # no slur the score did not write
+
+
+class OneVoice(Instrument):
+    """A one-voice instrument whose voices cost nothing to build, so Phrase's slur rule can be read over many seeds."""
+
+    polyphony = 1
+
+    def voice(self, note):
+        return Sine(note.freq)
+
+
+def test_notes_clipped_at_time_0_on_one_voice_do_not_slur():
+    text = "c5:s d e f g a b c6"
+    humanize = Performance(humanize=Humanize(timing=0.03))
+    s = score(text, humanize, instrument=OneVoice(), tempo=240)
+    for seed in range(400):
+        notes = s.performance.notes(s, seed=seed)["a"]
+        assert len(OneVoice().play(notes).voices) == len(notes)
+    s = score(text, humanize, instrument=Violin(), tempo=240)
+    notes = s.performance.notes(s, seed=20)["a"]  # a seed that clips the first two notes
+    assert times(notes)[:2] == [0.0, pytest.approx(1 / 48000)]
+    assert len(Violin().play(notes).voices) == len(notes)
 
 
 def test_a_legato_note_may_start_before_the_previous_ends():
