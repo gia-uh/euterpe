@@ -1,8 +1,22 @@
 """Euterpe: compose music by writing code."""
 
-from euterpe.theory import EqualTemperament, Interval, JustIntonation, Key, Meter, Pitch, Pythagorean, Scale
+from euterpe.theory import (
+    Chord,
+    EqualTemperament,
+    Interval,
+    JustIntonation,
+    Key,
+    Meter,
+    Pitch,
+    Pythagorean,
+    Roman,
+    Scale,
+    analyze,
+    cadence,
+)
 
-__all__ = ["EqualTemperament", "Interval", "JustIntonation", "Key", "Meter", "Pitch", "Pythagorean", "Scale", "display"]
+__all__ = ["Chord", "EqualTemperament", "Interval", "JustIntonation", "Key", "Meter", "Pitch", "Pythagorean", "Roman",
+           "Scale", "analyze", "cadence", "display"]
 
 __version__ = "0.1.0.dev0"
 

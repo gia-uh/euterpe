@@ -4,9 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from euterpe.pitch import Interval, Pitch
 from euterpe.theory.scale import _FIFTHS, Scale
+
+if TYPE_CHECKING:
+    from euterpe.theory.chord import Roman
 
 _MODE_FIFTHS = {"major": 0, "ionian": 0, "lydian": 1, "mixolydian": -1, "dorian": -2, "minor": -3, "aeolian": -3,
                 "phrygian": -4, "locrian": -5}  # how far each mode's signature sits from its tonic's major
@@ -99,6 +103,12 @@ class Key:
                 yield self.degree(1) + Interval(name)
             except ValueError:
                 pass
+
+    def roman(self, text: str) -> Roman:
+        """A Roman numeral in this key: key.roman("V7")."""
+        from euterpe.theory.chord import Roman
+
+        return Roman(text, self)
 
     def __repr__(self) -> str:
         return f'Key("{self.tonic} {self.mode}")'

@@ -156,3 +156,9 @@ def test_a_key_is_a_frozen_hashable_value():
     assert len({Key("D major"), Key("D", "major"), Key("D minor")}) == 2
     with pytest.raises(AttributeError):
         Key("D major").tonic = "E"
+
+
+def test_key_roman_reads_a_numeral_in_the_key():
+    assert Key("C major").roman("V7").chord.tones == ("G", "B", "D", "F")
+    assert Key("F major").roman("V7").chord.tones == ("C", "E", "G", "Bb")
+    assert Key("C major").roman("V7").key == Key("C major")
