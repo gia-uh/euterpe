@@ -313,6 +313,19 @@ class Ride(Cymbal):
 STEPS = {"x": 0.8, "X": 1.0, "g": 0.3, "o": 0.8}  # what each step of a grid plays, at what velocity
 
 
+def _steps(row: str) -> tuple[list[tuple[int, str]], int]:
+    """One row of a step grid: its hits as (step, character), and its length in steps. A dot
+    or a space is a rest; any character outside STEPS raises."""
+    hits = []
+    for i, c in enumerate(row):
+        if c in ". ":
+            continue
+        if c not in STEPS:
+            raise ValueError(f"pattern: {c!r} at step {i} is not one of x X g o . or a space")
+        hits.append((i, c))
+    return hits, len(row)
+
+
 class Kit(Instrument):
     """A drum kit: the drums a drummer plays sitting at one kit, each one an instrument of its
     own (kit.kick, kit.toms[0]). A note sounds on the drum that made it, so a pattern may also
@@ -354,14 +367,11 @@ class Kit(Instrument):
         repeat plays it that many times."""
         if step <= 0 or repeat < 1:
             raise ValueError(f"pattern needs a step above 0 and repeat of at least 1, got {step} and {repeat}")
-        length = max((len(row) for row in grid.values()), default=0)
+        rows = {drum: _steps(row) for drum, row in grid.items()}
+        length = max((size for _, size in rows.values()), default=0)
         notes = []
-        for drum, row in grid.items():
-            for i, c in enumerate(row):
-                if c in ". ":
-                    continue
-                if c not in STEPS:
-                    raise ValueError(f"pattern: {c!r} at step {i} is not one of x X g o . or a space")
+        for drum, (hits, _) in rows.items():
+            for i, c in hits:
                 for r in range(repeat):
                     notes += drum.hit(at + (r * length + i) * step, STEPS[c], articulation=Open() if c == "o" else None)
         return sorted(notes, key=lambda n: n.time)
