@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 from euterpe.pitch import Interval, Pitch
-from euterpe.theory.scale import Scale
+from euterpe.theory.scale import _FIFTHS, Scale
 
-_FIFTHS = "FCGDAEB"  # each letter a fifth above the last; C has no sharps or flats, F has one flat
 _MODE_FIFTHS = {"major": 0, "ionian": 0, "lydian": 1, "mixolydian": -1, "dorian": -2, "minor": -3, "aeolian": -3,
                 "phrygian": -4, "locrian": -5}  # how far each mode's signature sits from its tonic's major
+
+
+def _scale(tonic: str | Pitch, mode: str) -> Scale:
+    return Scale(tonic, "natural minor" if mode == "minor" else mode)
 
 
 @dataclass(frozen=True, init=False, repr=False)
@@ -28,7 +32,7 @@ class Key:
         if mode not in _MODE_FIFTHS:
             raise ValueError(f"Key: cannot read {text!r} with mode {mode!r}; the modes are {', '.join(_MODE_FIFTHS)}")
         try:
-            scale = Scale(tonic, "natural minor" if mode == "minor" else mode)
+            scale = _scale(tonic, mode)
         except ValueError as error:
             raise ValueError(f"Key: cannot read {text!r}: {error}") from None
         object.__setattr__(self, "tonic", scale.tonic)
@@ -36,7 +40,7 @@ class Key:
 
     @property
     def scale(self) -> Scale:
-        return Scale(self.tonic, "natural minor" if self.mode == "minor" else self.mode)
+        return _scale(self.tonic, self.mode)
 
     @property
     def signature(self) -> int:
@@ -76,11 +80,9 @@ class Key:
 
     def spell(self, number: int) -> Pitch:
         """A MIDI number spelled in this key. A note of the key keeps its name; so do the lowered 7th and
-        raised 4th in major and the raised 6th and 7th in minor. Any other note takes the plain sharp, or
-        the plain flat in a key with flats."""
-        tonic = self.degree(1)
-        extra = {"major": ("m7", "A4"), "minor": ("M6", "M7")}.get(self.mode, ())
-        for pitch in (*self.scale.pitches(), *(tonic + Interval(name) for name in extra)):
+        raised 4th in major and the raised 6th and 7th in minor, where a double accidental can spell them.
+        Any other note takes the plain sharp, or the plain flat in a key with flats."""
+        for pitch in self._spellings():
             if (number - pitch.number) % 12 == 0:
                 return Pitch(pitch.letter, pitch.alter, pitch.octave + (number - pitch.number) // 12)
         plain = Pitch(number)
@@ -88,6 +90,15 @@ class Key:
             above = Pitch(number + 1)
             return Pitch(above.letter, -1, above.octave)
         return plain
+
+    def _spellings(self) -> Iterator[Pitch]:
+        """The key's own notes, then the altered ones spell keeps, skipping any no Pitch can spell."""
+        yield from self.scale.pitches()
+        for name in {"major": ("m7", "A4"), "minor": ("M6", "M7")}.get(self.mode, ()):
+            try:
+                yield self.degree(1) + Interval(name)
+            except ValueError:
+                pass
 
     def __repr__(self) -> str:
         return f'Key("{self.tonic} {self.mode}")'

@@ -9,6 +9,10 @@ from fractions import Fraction
 _METER = re.compile(r"(\d+)/(\d+)")
 
 
+def _compound(numerator: int) -> bool:
+    return numerator % 3 == 0 and numerator > 3
+
+
 def _rank(i: int, n: int) -> int:
     """How weak the ith of n equal parts is: 0 is the first, each halving of n adds one, and an odd n
     leaves all its other parts level."""
@@ -41,8 +45,7 @@ class Meter:
         if numerator < 1 or denominator < 1 or denominator & (denominator - 1):
             raise ValueError(f"Meter: cannot read {text!r}; write beats over a power of two: 6/8")
         if groups is None:
-            compound = numerator % 3 == 0 and numerator > 3
-            groups = (3,) * (numerator // 3) if compound else (1,) * numerator
+            groups = (3,) * (numerator // 3) if _compound(numerator) else (1,) * numerator
         groups = tuple(groups)
         if sum(groups) != numerator or min(groups) < 1:
             raise ValueError(f"Meter: {text} needs groups of at least one that add up to {numerator}, not {groups}")
@@ -68,7 +71,7 @@ class Meter:
     @property
     def compound(self) -> bool:
         """Whether the numerator is divisible by 3 and above 3."""
-        return self.numerator % 3 == 0 and self.numerator > 3
+        return _compound(self.numerator)
 
     def strength(self, offset: Fraction) -> int:
         """A rank for an offset from the downbeat in whole notes, smaller is stronger: in 4/4 the downbeat is

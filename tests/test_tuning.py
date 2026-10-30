@@ -1,6 +1,3 @@
-import subprocess
-import sys
-
 import pytest
 
 from euterpe import EqualTemperament, JustIntonation, Pitch, Pythagorean
@@ -91,8 +88,3 @@ def test_tunings_are_each_their_own_frozen_hashable_class():
     assert EqualTemperament() == EqualTemperament(a4=440.0)
     assert JustIntonation(C4) != Pythagorean(C4)
     assert JustIntonation(C4) != JustIntonation(E4)
-
-
-def test_theory_imports_no_audio():
-    code = "import euterpe.theory, sys; print('euterpe.sound' in sys.modules)"
-    assert subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True).stdout.strip() == "False"

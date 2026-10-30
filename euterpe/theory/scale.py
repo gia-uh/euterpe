@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from euterpe.pitch import Interval, Pitch, _signs
 
+_FIFTHS = "FCGDAEB"  # each letter a fifth above the last; C has no sharps or flats, F has one flat
 _TONIC = re.compile(r"[A-G](#{1,2}|b{1,2})?")
 _MODES = {
     "major": "P1 M2 M3 P4 P5 M6 M7",

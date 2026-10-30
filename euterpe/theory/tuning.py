@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from fractions import Fraction
 
 from euterpe.pitch import _LETTERS, _SCALE, Pitch
+from euterpe.theory.scale import _FIFTHS
 
-_FIFTHS = "FCGDAEB"  # each letter a fifth above the last
 _CHROMATIC = Fraction(25, 24)  # the just step between a note and its sharp
 _JUST = (  # ratios from the tonic, by letters above it and then by semitones off the major or perfect interval
     {0: Fraction(1)},

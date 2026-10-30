@@ -123,13 +123,27 @@ def test_degree_reads_the_scale():
         ("C# major", 60, "B#3"),
         ("Cb major", 59, "Cb4"),
         ("D# major", 67, "F##4"),
+        ("C## major", 62, "C##4"),
+        ("C## major", 68, "G#4"),
+        ("Cbb major", 68, "Ab4"),
     ],
 )
 def test_spell(key, number, name):
     assert str(Key(key).spell(number)) == name
 
 
-@pytest.mark.parametrize("key", ["C major", "F major", "A minor", "D# major", "Cb major", "D dorian"])
+def test_ionian_and_aeolian_spell_by_the_plain_table_where_major_and_minor_keep_an_altered_note():
+    assert str(Key("C", "ionian").spell(70)) == "A#4"
+    assert str(Key("C major").spell(70)) == "Bb4"
+    assert str(Key("G", "aeolian").spell(66)) == "Gb4"
+    assert str(Key("G minor").spell(66)) == "F#4"
+
+
+@pytest.mark.parametrize(
+    "key",
+    ["C major", "F major", "A minor", "D# major", "Cb major", "D dorian", "C## major", "Cbb major", "D## minor",
+     "G## minor", "A## minor"],
+)
 def test_spell_always_gives_back_the_number(key):
     for number in range(40, 90):
         assert Key(key).spell(number).number == number
