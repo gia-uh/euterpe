@@ -6,12 +6,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from fractions import Fraction
 from itertools import accumulate
-from math import ceil
+from math import ceil, lcm
 
 from euterpe.lint.finding import Finding, Severity
 from euterpe.lint.score.core import Rule, notes
 from euterpe.lint.score.profiles import THRESHOLDS
-from euterpe.score.model import Hit, Part, Placed, Score
+from euterpe.score.model import Hit, Note, Part, Placed, Score
 from euterpe.theory import Meter
 
 
@@ -81,10 +81,14 @@ def _strong_share(score: Score, params: dict, severity: Severity) -> list[Findin
 
 def _syncopated(score: Score, starts: list[Fraction], placed: Placed, stop: Fraction) -> int:
     """Longuet-Higgins and Lee's weight for one onset: how much stronger than it is the strongest place it leaves
-    unstruck, held or silent, before the next onset at stop. Only places on the onset's own grid count, so a triplet
-    is not measured against the eighth it does not fall on."""
-    own = score.meter_at(placed.bar).strength(placed.in_bar)
-    step = Fraction(1, placed.in_bar.denominator)
+    unstruck, held or silent, before the next onset at stop. Places count on a grid of the meter's note and the onset's
+    own place. A tuplet's note that stops at its written length has left nothing: the group divides the time its own way."""
+    event = placed.event
+    if isinstance(event, Note) and event.tuplet and placed.offset + event.duration >= stop:
+        return 0
+    meter = score.meter_at(placed.bar)
+    own = meter.strength(placed.in_bar)
+    step = Fraction(1, lcm(placed.in_bar.denominator, meter.denominator))
     strongest = own
     for bar in range(placed.bar, score.bars + 1):
         if starts[bar - 1] >= stop:
@@ -127,24 +131,24 @@ def _density(score: Score, params: dict, severity: Severity) -> list[Finding]:
     return findings
 
 
-def _phrases(part: Part, voice: int) -> list[tuple[int, int]]:
-    """The first and last bar of each phrase of a voice. A phrase ends at a silence or at a note of at least half a bar,
-    in the meter where the note starts, and in the bar where that note stops."""
-    phrases = []
-    first = None
+def phrases(part: Part, voice: int = 0) -> list[list[Sound]]:
+    """The sounds of each phrase of a voice. A phrase ends at a silence or at a note of at least half a bar, in the
+    meter where the note starts."""
+    found_phrases = []
+    current: list[Sound] = []
     line = sounds(part.score, part.name).get(voice, [])
     for sound, following in zip(line, [*line[1:], None]):
-        first = first or sound.first.bar
+        current.append(sound)
         long = sound.length >= part.score.meter_at(sound.first.bar).bar / 2
         if long or following is None or following.first.offset > sound.end:
-            phrases.append((first, sound.last.bar))
-            first = None
-    return phrases
+            found_phrases.append(current)
+            current = []
+    return found_phrases
 
 
 def phrase_ends(part: Part, voice: int = 0) -> list[int]:
     """The bars in which a voice's phrases end, each once."""
-    return sorted({last for _, last in _phrases(part, voice)})
+    return sorted({phrase[-1].last.bar for phrase in phrases(part, voice)})
 
 
 def _phrase(score: Score, params: dict, severity: Severity) -> list[Finding]:
@@ -152,7 +156,8 @@ def _phrase(score: Score, params: dict, severity: Severity) -> list[Finding]:
     findings = []
     for name, part in score.parts.items():
         for voice in sounds(score, name):
-            for first, last in _phrases(part, voice):
+            for phrase in phrases(part, voice):
+                first, last = phrase[0].first.bar, phrase[-1].last.bar
                 length = last - first + 1
                 message = named(voice, f"a phrase of {length} bar{'s' if length > 1 else ''}, ending in bar {last}")
                 findings.append(Finding("T-PHRASE", "metric", message, float(length), part=name, bar=first))
@@ -206,13 +211,16 @@ def _fourfloor(score: Score, params: dict, severity: Severity) -> list[Finding]:
 
 
 def _tempo(score: Score, params: dict, severity: Severity) -> list[Finding]:
-    """Two metrics for the score: its lowest and highest tempo, read at each bar's downbeat and where each ramp that
-    finishes inside the piece arrives. When one is outside the tempo range, a finding at the first bar reaching it too."""
+    """Two metrics for the score: its lowest and highest tempo, read at each bar's downbeat and where each ramp arrives,
+    or where the piece cuts it off. When one is outside the tempo range, a finding at the first bar reaching it too."""
     bars = score.bars
     if not bars:
         return []
     tempos = [(bar, score.tempo_at(bar)) for bar in range(1, bars + 1)]
-    tempos += [(ramp.bar + ramp.bars - 1, ramp.to) for ramp in score.ramps if ramp.bar + ramp.bars <= bars + 1]
+    for ramp in score.ramps:
+        if ramp.bar <= bars:
+            finished = ramp.bar + ramp.bars <= bars + 1
+            tempos.append((min(ramp.bar + ramp.bars - 1, bars), ramp.to if finished else score.tempo_at(bars + 1)))
     tempos.sort(key=lambda tempo: tempo[0])
     lowest, highest = min(tempo for _, tempo in tempos), max(tempo for _, tempo in tempos)
     findings = [Finding("T-TEMPO", "metric", f"lowest tempo {lowest:g} bpm", lowest),

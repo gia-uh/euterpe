@@ -16,13 +16,13 @@ WARNINGS = [
 ]
 
 METRICS = [
-    ("T-STRONG", [4 / 9], []),
-    ("T-SYNCOPATION", [1.0], [0.0]),
-    ("T-DENSITY", [6.0, 8.0], [5 / 3, 4.0]),
-    ("T-PHRASE", [4.0, 4.0], [8.0]),
-    ("T-BACKBEAT", [0.0], [1.0]),
-    ("T-FOURFLOOR", [0.5], [1.0]),
-    ("T-TEMPO", [90.0, 90.0], [130.0, 130.0]),
+    ("T-STRONG", "alto", [4 / 9], []),
+    ("T-SYNCOPATION", "alto", [1.0], [0.0]),
+    ("T-DENSITY", "alto", [6.0, 8.0], [5 / 3, 4.0]),
+    ("T-PHRASE", "alto", [4.0, 4.0], [8.0]),
+    ("T-BACKBEAT", "drums", [0.0], [1.0]),
+    ("T-FOURFLOOR", "drums", [0.5], [1.0]),
+    ("T-TEMPO", None, [90.0, 90.0], [130.0, 130.0]),
 ]
 
 
@@ -54,12 +54,12 @@ def _drums(grid, **kwargs):
     return s
 
 
-@pytest.mark.parametrize("rule, trigger, clean", METRICS)
-def test_a_metric_reports_its_known_values(rule, trigger, clean):
+@pytest.mark.parametrize("rule, part, trigger, clean", METRICS)
+def test_a_metric_reports_its_known_values(rule, part, trigger, clean):
     fixture = _fixture(rule)
     assert _values(fixture.trigger(), rule) == pytest.approx(trigger)
     assert _values(fixture.clean(), rule) == pytest.approx(clean)
-    assert {f.severity for f in _found(fixture.trigger(), rule)} == {"metric"}
+    assert {(f.severity, f.part) for f in _found(fixture.trigger(), rule)} == {("metric", part)}
 
 
 @pytest.mark.parametrize("rule, profile, part, bar, beat", WARNINGS)
@@ -124,6 +124,19 @@ def test_t_syncopation_a_triplet_is_not_syncopated_by_the_grid_it_is_not_on():
     assert _values(_score("3[c4:e d e] f4:q g4:h"), "T-SYNCOPATION") == [0.0]
 
 
+def test_t_syncopation_a_quarter_triplet_is_not_syncopated():
+    assert _values(_score("3[c4:q d e] f4:h"), "T-SYNCOPATION") == [0.0]
+
+
+def test_t_syncopation_a_tuplet_note_tied_past_a_beat_counts():
+    assert _values(_score("3[c4:e d e~] e4:e f4:e g4:h"), "T-SYNCOPATION") == [2.0]
+
+
+@pytest.mark.parametrize("text", ["c4:q d4:q e4:q", "c4:q d4:q~ d4:e f4:e"])
+def test_t_syncopation_in_6_8_sees_the_second_beat(text):
+    assert _values(_score(text, meter=Meter("6/8")), "T-SYNCOPATION") == [1.0]
+
+
 def test_t_syncopation_counts_within_the_beat():
     assert _values(_score("c4:s d4:e e4:s f4:q g4:h"), "T-SYNCOPATION") == [1.0]
 
@@ -148,6 +161,10 @@ def test_t_density_finds_the_bar_of_the_largest():
     mean, largest = _found(_fixture("T-DENSITY").trigger(), "T-DENSITY")
     assert (mean.part, mean.bar) == ("alto", None)
     assert (largest.part, largest.bar) == ("alto", 2)
+
+
+def test_t_phrase_sits_at_the_bar_each_phrase_starts_in():
+    assert [f.bar for f in _found(_fixture("T-PHRASE").trigger(), "T-PHRASE")] == [1, 5]
 
 
 def test_t_phrase_a_rest_ends_a_phrase():
@@ -271,6 +288,12 @@ def test_t_tempo_reaches_a_ramp_that_ends_with_the_piece():
     assert _values(s, "T-TEMPO") == [90.0, 120.0]
     [f] = _warnings(s, "T-TEMPO", Profile("my", {"T-TEMPO": "warn"}, {"tempo": (100, 150)}))
     assert (f.bar, f.value) == (1, 90.0)
+
+
+def test_t_tempo_reads_a_ramp_the_piece_cuts_off_where_it_stops():
+    s = _score("c4:w | c4:w", tempo=120)
+    s.ramp(1, 4, 60)
+    assert _values(s, "T-TEMPO") == [90.0, 120.0]
 
 
 def test_t_tempo_does_not_read_a_change_past_the_last_bar():

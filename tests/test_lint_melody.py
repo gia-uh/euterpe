@@ -164,6 +164,20 @@ def test_m_climax_phrases_are_those_of_the_voice_it_reads():
     assert not _warnings(s, "M-CLIMAX")
 
 
+@pytest.mark.parametrize("text", [
+    "g4:h g4:h",  # each long note ends its own phrase
+    "g4:q r g4:q r",  # two phrases inside one bar
+    "c4:q g4 e4 d4 | c4 r g4 e4 | d4 c4 d4 e4",  # a phrase ends in the bar the next peak is in
+])
+def test_m_climax_passes_when_a_phrase_ends_inside_a_bar(text):
+    assert not _warnings(_score(text), "M-CLIMAX")
+
+
+def test_m_climax_finds_two_peaks_in_a_phrase_that_starts_inside_a_bar():
+    [f] = _warnings(_score("c4:q r g4:q e4 | g4:q f4 e4 d4"), "M-CLIMAX")
+    assert (f.bar, f.beat) == (2, 1.0)
+
+
 def test_m_repeat_is_one_finding_per_run_at_the_note_that_goes_over():
     [first, second] = _found(_score("c4:e c c c c d d d | e e e e e f f f"), "M-REPEAT")
     assert (first.bar, first.beat, first.value) == (1, 3.0, 5.0)
@@ -204,6 +218,8 @@ def test_m_augmented_finds(text):
     "f5:q b4",  # and so is this one, going down
     "ab4:q cb5",  # a minor third is the same three semitones, spelled otherwise
     "c4:q c#4",  # an augmented unison
+    "c4:q d##4",  # a doubly augmented second
+    "f4:q b#4",  # a doubly augmented fourth
     "c#4:q cb4 c##4 cb5",  # strange spellings do not crash
 ])
 def test_m_augmented_passes(text):

@@ -3,14 +3,12 @@ rest does not break a line. Each measures with no profile, and the chorale profi
 
 from __future__ import annotations
 
-from bisect import bisect_left
-from collections import Counter
 from collections.abc import Iterator
 
 from euterpe.lint.finding import Finding, Severity
 from euterpe.lint.score.core import Rule, found
 from euterpe.lint.score.profiles import THRESHOLDS
-from euterpe.lint.score.rhythm import Sound, named, phrase_ends, sounds
+from euterpe.lint.score.rhythm import Sound, named, phrases, sounds
 from euterpe.pitch import Interval, Pitch
 from euterpe.score.model import Score
 
@@ -79,14 +77,11 @@ def _climax(score: Score, params: dict, severity: Severity) -> list[Finding]:
         often = "once" if len(peaks) == 1 else f"{len(peaks)} times"
         findings.append(Finding("M-CLIMAX", "metric", named(voice, f"the highest note occurs {often}"), count, part=name))
         if severity != "metric":
-            ends = phrase_ends(score.parts[name], voice)
-            seen = Counter()
-            for sound in peaks:
-                phrase = bisect_left(ends, sound.last.bar)
-                seen[phrase] += 1
-                if seen[phrase] == 2:
-                    message = named(voice, f"{_top(sound)!r}, the highest note, again in one phrase")
-                    findings.append(found("M-CLIMAX", severity, message, score, sound.first, count))
+            for phrase in phrases(score.parts[name], voice):
+                inside = [sound for sound in phrase if _top(sound).number == highest]
+                if len(inside) > 1:
+                    message = named(voice, f"{_top(inside[1])!r}, the highest note, again in one phrase")
+                    findings.append(found("M-CLIMAX", severity, message, score, inside[1].first, count))
     return findings
 
 
@@ -112,7 +107,7 @@ def _augmented(score: Score, params: dict, severity: Severity) -> list[Finding]:
     for name, voice, line in _lines(score):
         for before, after in zip(line, line[1:]):
             interval = Interval.between(_top(before), _top(after))
-            if interval.quality[0] == "A" and abs(interval.number) in (2, 4):
+            if interval.quality == "A" and abs(interval.number) in (2, 4):
                 size = "second" if abs(interval.number) == 2 else "fourth"
                 message = named(voice, f"{_top(before)!r} to {_top(after)!r} is an augmented {size}")
                 findings.append(found("M-AUGMENTED", severity, message, score, after.first, float(abs(interval.semitones))))
