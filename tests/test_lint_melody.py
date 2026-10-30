@@ -104,6 +104,14 @@ def test_m_range_reads_spelling_as_sound():
     assert _values(_score("g#4:q ab4"), "M-RANGE") == [0.0]
 
 
+def test_m_range_says_one_semitone_in_the_singular():
+    s = _score("c4:q c#4")
+    [f] = _found(s, "M-RANGE")
+    assert f.message == "a span of 1 semitone"
+    [_, f] = _found(s, "M-RANGE", Profile("my", {"M-RANGE": "warn"}, {"max_range": 0}))
+    assert f.message.startswith("a span of 1 semitone, above 0")
+
+
 def test_m_range_warns_only_above_its_threshold():
     assert not _warnings(_score("c4:w | g5:w"), "M-RANGE")
     [f] = _warnings(_score("c4:w | g#5:w"), "M-RANGE")

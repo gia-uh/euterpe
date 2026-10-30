@@ -163,6 +163,16 @@ def test_t_density_finds_the_bar_of_the_largest():
     assert (largest.part, largest.bar) == ("alto", 2)
 
 
+def test_t_density_says_one_onset_in_the_singular():
+    _, largest = _found(_score("c4:w"), "T-DENSITY")
+    assert largest.message == "at most 1 onset in a bar"
+
+
+def test_t_phrase_says_one_bar_in_the_singular():
+    [f] = _found(_score("c4:w"), "T-PHRASE")
+    assert f.message == "a phrase of 1 bar, ending in bar 1"
+
+
 def test_t_phrase_sits_at_the_bar_each_phrase_starts_in():
     assert [f.bar for f in _found(_fixture("T-PHRASE").trigger(), "T-PHRASE")] == [1, 5]
 

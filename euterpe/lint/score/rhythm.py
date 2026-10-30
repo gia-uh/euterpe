@@ -48,6 +48,11 @@ def named(voice: int, message: str) -> str:
     return f"voice {voice}: {message}" if voice else message
 
 
+def counted(count: int, noun: str) -> str:
+    """A count and its noun, in the singular for one."""
+    return f"{count} {noun}{'' if count == 1 else 's'}"
+
+
 def _onsets(score: Score, part: str) -> list[Placed]:
     """The places a part strikes a sound, in order: a stack or two voices together strike one place."""
     struck = {placed.offset: placed for placed in score.events(part) if isinstance(placed.event, Hit)}
@@ -126,7 +131,7 @@ def _density(score: Score, params: dict, severity: Severity) -> list[Finding]:
         if any(counts):
             mean, largest = sum(counts) / len(counts), max(counts)
             findings.append(Finding("T-DENSITY", "metric", f"{mean:.2f} onsets per bar", mean, part=name))
-            findings.append(Finding("T-DENSITY", "metric", f"at most {largest} onsets in a bar", float(largest), part=name,
+            findings.append(Finding("T-DENSITY", "metric", f"at most {counted(largest, 'onset')} in a bar", float(largest), part=name,
                                     bar=counts.index(largest) + 1))
     return findings
 
@@ -159,7 +164,7 @@ def _phrase(score: Score, params: dict, severity: Severity) -> list[Finding]:
             for phrase in phrases(part, voice):
                 first, last = phrase[0].first.bar, phrase[-1].last.bar
                 length = last - first + 1
-                message = named(voice, f"a phrase of {length} bar{'s' if length > 1 else ''}, ending in bar {last}")
+                message = named(voice, f"a phrase of {counted(length, 'bar')}, ending in bar {last}")
                 findings.append(Finding("T-PHRASE", "metric", message, float(length), part=name, bar=first))
     return findings
 

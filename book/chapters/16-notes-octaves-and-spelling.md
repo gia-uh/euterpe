@@ -186,6 +186,7 @@ Now the same question with the data. `play` performs a score into a sound, as an
 
 ```python {run continue output=code}
 import numpy as np
+from euterpe.lint import Report
 from euterpe.score.midi import midi_bytes
 from euterpe.score.musicxml import musicxml_bytes
 from euterpe.sound import render
@@ -194,10 +195,11 @@ a, b = right.play(), wrong.play()
 print("same samples:", np.array_equal(render(a, a.duration), render(b, b.duration)))
 print("same MIDI:", midi_bytes(right) == midi_bytes(wrong))
 print("same MusicXML:", musicxml_bytes(right) == musicxml_bytes(wrong))
-print(wrong.lint().to_text())
+kept = ("N-SPELLING", "R-COMFORT")
+print(Report([f for f in wrong.lint().findings if f.rule in kept]).to_text())
 ```
 
-The samples are equal to the bit, so no ear could tell. The MIDI data is equal too, since MIDI stores key numbers and has no idea what a note is called. MusicXML keeps the spelling. And `lint`, a linter for scores, reads each note against the key and reports this one by bar and beat: `N-SPELLING` is a warning, since nothing fails to play. The other line, `R-COMFORT`, is a measure, and says the whole line sits where a violin plays comfortably.
+The samples are equal to the bit, so no ear could tell. The MIDI data is equal too, since MIDI stores key numbers and has no idea what a note is called. MusicXML keeps the spelling. And `lint`, a linter for scores, reads each note against the key and reports this one by bar and beat: `N-SPELLING` is a warning, since nothing fails to play. The other line, `R-COMFORT`, is a measure, and says the whole line sits where a violin plays comfortably. `lint` measures much more than these two, and `kept` picks them out of its findings; later chapters read the rest.
 
 The rule comes from the key itself. `key.scale` holds its notes, and `key.spell` turns a number into the name this key gives it. The last column moves each spelling up by `m2`, the interval of chapter 17 that goes one semitone up and one letter on:
 

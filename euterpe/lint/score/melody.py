@@ -8,7 +8,7 @@ from collections.abc import Iterator
 from euterpe.lint.finding import Finding, Severity
 from euterpe.lint.score.core import Rule, found
 from euterpe.lint.score.profiles import THRESHOLDS
-from euterpe.lint.score.rhythm import Sound, named, phrases, sounds
+from euterpe.lint.score.rhythm import Sound, counted, named, phrases, sounds
 from euterpe.pitch import Interval, Pitch
 from euterpe.score.model import Score
 
@@ -40,11 +40,11 @@ def _range(score: Score, params: dict, severity: Severity) -> list[Finding]:
     for name, voice, line in _lines(score):
         numbers = [_top(sound).number for sound in line]
         span = max(numbers) - min(numbers)
-        findings.append(Finding("M-RANGE", "metric", named(voice, f"a span of {span} semitones"), float(span), part=name))
+        findings.append(Finding("M-RANGE", "metric", named(voice, f"a span of {counted(span, 'semitone')}"), float(span), part=name))
         if span > limit and severity != "metric":
             over = next(sound for count, sound in enumerate(line, 1)
                         if max(numbers[:count]) - min(numbers[:count]) > limit)
-            findings.append(found("M-RANGE", severity, named(voice, f"a span of {span} semitones, above {limit}"), score,
+            findings.append(found("M-RANGE", severity, named(voice, f"a span of {counted(span, 'semitone')}, above {limit}"), score,
                                   over.first, float(span)))
     return findings
 
