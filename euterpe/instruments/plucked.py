@@ -332,6 +332,7 @@ class Harp(Plucked):
     pedal mechanism, and no damping by the hand between chords.
     """
 
+    gm_program = 46
     polyphony = 16
     playable = (C1, G7)
     comfortable = (C2, C6)
@@ -358,6 +359,7 @@ class PizzicatoStrings(Plucked):
     the low notes sound through a violin's body even where a cello's would be larger.
     """
 
+    gm_program = 45
     polyphony = 12
     playable = (C2, A7)
     comfortable = (G2, E6)

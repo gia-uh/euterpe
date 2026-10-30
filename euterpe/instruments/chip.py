@@ -149,6 +149,7 @@ class PulseChannel(_Channel):
     Limit: the duty is fixed for the channel; the console's sweep is a smooth exponential here.
     """
 
+    gm_program = 80
     playable = (C2, C8)
     comfortable = (C3, C7)
 
@@ -180,6 +181,7 @@ class WaveChannel(_Channel):
     Limit: the steps' edges are not band-limited, so a high note folds some back.
     """
 
+    gm_program = 82
     clock = WAVE_CLOCK
     playable = (C1, C8)
     comfortable = (C1, C6)
@@ -224,6 +226,7 @@ class NoiseChannel(Instrument):
     line and each hit starts the register elsewhere.
     """
 
+    gm_program = 122
     polyphony = 1
     slurs = False
 

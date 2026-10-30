@@ -119,6 +119,7 @@ class Violin(Bowed):
     col legno or harmonics; the body is three modes, not a violin's hundreds.
     """
 
+    gm_program = 40
     playable = (G3, A7)
     comfortable = (G3, E6)
 
@@ -139,6 +140,7 @@ class StringSection(Bowed):
     players, one Bow each.
     """
 
+    gm_program = 48
     polyphony = 8
     playable = (C2, A7)
     comfortable = (C2, E6)
