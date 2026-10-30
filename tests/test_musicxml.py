@@ -1,3 +1,4 @@
+import random
 import xml.etree.ElementTree as ET
 from fractions import Fraction
 
@@ -7,7 +8,7 @@ import verovio
 from euterpe import Key, Meter, Score, drums, melody
 from euterpe.instruments import Harp, Kit
 from euterpe.pitch import Pitch
-from euterpe.score import Line, Note, Rest
+from euterpe.score import Line, Note, Rest, Tuplet
 from euterpe.score.musicxml import musicxml_bytes
 
 
@@ -27,6 +28,23 @@ def _measures(root: ET.Element, part: int = 0) -> list[ET.Element]:
 
 def _notes(element: ET.Element) -> list[ET.Element]:
     return element.findall(".//note")
+
+
+def _replay(measure: ET.Element) -> list[tuple[str, int]]:
+    """Each pitched note's step and start in ticks, moving through the measure as a reader does."""
+    position = 0
+    starts = []
+    for element in measure:
+        if element.tag == "note" and element.find("chord") is None:
+            if element.find("pitch") is not None:
+                starts.append((element.findtext("pitch/step"), position))
+            position += int(element.findtext("duration"))
+        elif element.tag == "forward":
+            position += int(element.findtext("duration"))
+        elif element.tag == "backup":
+            position -= int(element.findtext("duration"))
+        assert position >= 0
+    return starts
 
 
 def _engraved(data: bytes) -> str:
@@ -203,6 +221,19 @@ def test_a_quintuplet_and_a_duplet_write_their_ratios():
     notes = _notes(_root(_score("5:4[c4:s d4 e4 f4 g4] 2:3[a4:e b4] r:q", meter=Meter("7/8"))))
     assert [(n.findtext("time-modification/actual-notes"), n.findtext("time-modification/normal-notes"),
              n.findtext("type")) for n in notes[:7]] == [("5", "4", "16th")] * 5 + [("2", "3", "eighth")] * 2
+
+
+@pytest.mark.parametrize("text,count", [("2:3[c4:e d4]", 2), ("4:3[c4:e d4 e4 f4]", 4), ("6:4[c4:s d4 e4 f4 g4 a4]", 6),
+                                        ("5:4[c4:s d4 e4 f4 g4]", 5), ("3[c4:q d4:e]", 2)])
+def test_a_tuplet_has_one_bracket_over_its_whole_group(text, count):
+    notes = _notes(_root(_score(text)))[:count]
+    assert [[t.get("type") for t in n.findall("notations/tuplet")] for n in notes] == [
+        ["start"], *[[]] * (count - 2), ["stop"]]
+
+
+def test_two_tuplets_of_an_even_count_in_a_row_stay_two():
+    notes = _notes(_root(_score("2:3[c4:e d4] 2:3[e4 f4]")))[:4]
+    assert [[t.get("type") for t in n.findall("notations/tuplet")] for n in notes] == [["start"], ["stop"], ["start"], ["stop"]]
 
 
 def test_a_note_in_no_written_tuplet_still_writes_its_ratio():
@@ -416,6 +447,47 @@ def test_a_bar_written_too_long_runs_into_the_next_as_a_second_layer():
     _engraved(musicxml_bytes(_score("c4:w d4:q | e4:w")))
 
 
+def test_two_events_overflowing_land_at_their_own_places():
+    s = Score()
+    s.part("a").add(Line([[Note(Pitch("C4"), Fraction(9, 8)), Note(Pitch("D4"), Fraction(1, 8))],
+                          [Note(Pitch("F4"), Fraction(3, 8)), Note(Pitch("G4"), Fraction(1, 8)), Note(Pitch("A4"), Fraction(1, 2))]]))
+    root = _root(s)
+    assert root.findtext(".//divisions") == "2"
+    second = _measures(root)[1]
+    assert _replay(second) == [("C", 0), ("F", 0), ("D", 1), ("G", 3), ("A", 4)]
+    forward = second.find("forward")
+    assert (forward.findtext("duration"), forward.findtext("voice")) == ("1", "1")
+
+
+def test_a_meter_change_that_makes_a_bar_too_long_keeps_every_start():
+    s = _score("c4:h d4:h e4:q | f4:h g4:q", tempo=60)
+    s.change(2, meter=Meter("2/4"))
+    measures = _measures(_root(s))
+    assert len(measures) == 3
+    assert _replay(measures[0]) == [("C", 0), ("D", 2)]
+    assert _replay(measures[1]) == [("E", 0), ("F", 0)]
+    assert _replay(measures[2]) == [("G", 0)]
+
+
+@pytest.mark.parametrize("seed", range(40))
+def test_any_bars_too_long_keep_every_note_at_its_offset(seed):
+    rng = random.Random(seed)
+    s = Score(pickup=rng.choice([Fraction(0), Fraction(1, 4)]))
+    letters = "CDEFGAB"
+    bars = [[Note(Pitch(rng.choice(letters) + "4"), Fraction(rng.randint(1, 12), 8)) for _ in range(rng.randint(1, 4))]
+            for _ in range(rng.randint(2, 5))]
+    s.part("a").add(Line(bars))
+    if rng.random() < 0.5:
+        s.change(2, meter=Meter("3/4"))
+    root = _root(s)
+    divisions = int(root.findtext(".//divisions"))
+    starts = s._starts(len(_measures(root)))
+    written = sorted((starts[int(m.get("number")) - 1] + Fraction(tick, 4 * divisions), step)
+                     for m in _measures(root) for step, tick in _replay(m))
+    wanted = {(p.offset, p.event.pitches[0].letter) for p in s.events()}
+    assert wanted <= set(written)
+
+
 def test_a_tie_reaches_over_the_rests_that_fill_a_bar():
     notes = _notes(_root(_score("c4:q~ | c4:q r:h.")))
     pitched = [n for n in notes if n.find("pitch") is not None]
@@ -617,6 +689,15 @@ def test_bars_drops_a_tie_and_a_slur_cut_by_its_edge():
     assert first.find(".//tie") is None and first.find(".//slur") is None
     second = _root(s, bars=(2, 3))
     assert second.find(".//tie") is None and second.find(".//slur") is None
+
+
+def test_bars_drops_a_tuplet_bracket_cut_by_its_edge():
+    s = Score()
+    triplet = [Note(Pitch("C4"), Fraction(1, 6), tuplet=Tuplet(3, 2)) for _ in range(3)]
+    s.part("a").add(Line([[Note(Pitch("D4"), Fraction(5, 6)), *triplet[:1]], [*triplet[1:], Note(Pitch("E4"), Fraction(2, 3))]]))
+    assert sorted(t.get("type") for t in _root(s).findall(".//tuplet")) == ["start", "stop"]
+    assert _root(s, bars=(1, 1)).find(".//tuplet") is None
+    assert _root(s, bars=(2, 2)).find(".//tuplet") is None
 
 
 def test_bars_keeps_ties_and_slurs_inside_it():

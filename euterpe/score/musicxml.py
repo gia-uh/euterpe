@@ -35,8 +35,8 @@ _STOP, _MARK, _START = 1, 2, 3  # at one place a hairpin stops, then a dynamic s
 @dataclass
 class _Piece:
     """One written note value: a whole event, or the part of it inside a bar or a beat. at counts from the bar's start
-    as written, so a pickup's first note is at 0. A tie or a slur knows the bar of its other end, to be left out when a
-    range of bars cuts it."""
+    as written, so a pickup's first note is at 0. A tie, a slur or a tuplet bracket knows the bar of its other end, to be
+    left out when a range of bars cuts it."""
 
     event: Event
     bar: int
@@ -49,7 +49,7 @@ class _Piece:
     tied_from: tuple = ()
     from_bar: int = 0
     slur: tuple[str, int] | None = None
-    bracket: tuple[str, ...] = ()
+    bracket: tuple[tuple[str, int], ...] = ()
 
 
 def _ratio(length: Fraction, tuplet: Tuplet | None) -> tuple[int, int]:
@@ -341,6 +341,10 @@ class _Writer:
             for piece in voices[voice].get(bar, ()):
                 if piece.at < position:
                     _text(ET.SubElement(element, "backup"), "duration", self._ticks(position - piece.at))
+                elif piece.at > position:
+                    forward = ET.SubElement(element, "forward")
+                    _text(forward, "duration", self._ticks(piece.at - position))
+                    _text(forward, "voice", voice + 1)
                 position = piece.at
                 while voice == 0 and marks and marks[0][0] < piece.at + piece.length:
                     self._mark(element, marks.pop(0), position)
@@ -450,7 +454,7 @@ class _Writer:
             event = piece.event
             if piece.slur and self.first <= piece.slur[1] <= self.last:
                 ET.SubElement(notations, "slur", {"type": piece.slur[0], "number": "1"})
-            for kind in piece.bracket:
+            for kind in (kind for kind, other in piece.bracket if self.first <= other <= self.last):
                 tuplet = ET.SubElement(notations, "tuplet", {"type": kind, "number": "1"})
                 if kind == "start":
                     tuplet.set("bracket", "yes")
@@ -531,10 +535,11 @@ def _tie(piece: _Piece, after: _Piece, sounds: tuple) -> None:
 
 def _join(split: list[list[_Piece]]) -> None:
     """Joins a voice's events, each split into pieces, in order: written ties to the next event's shared sounds, slurs
-    to their other end, and each tuplet group's bracket. A group closes once it holds a whole number of one note value
-    times its actual notes, so two triplets in a row stay two."""
+    to their other end, and each tuplet group's bracket. A group closes once its written total is its actual count of
+    its smallest written value, so a duplet closes on its second note and two triplets in a row stay two."""
     slur: _Piece | None = None
-    filled = Fraction(0)
+    group: _Piece | None = None
+    filled = smallest = Fraction(0)
     for index, pieces in enumerate(split):
         event, head, tail = pieces[0].event, pieces[0], pieces[-1]
         after = split[index + 1][0] if index + 1 < len(split) else None
@@ -549,15 +554,15 @@ def _join(split: list[list[_Piece]]) -> None:
             slur = None
         tuplet = getattr(event, "tuplet", None)
         if tuplet:
-            opening = not filled
-            filled += event.duration * tuplet.actual / tuplet.normal
-            closing = (getattr(after and after.event, "tuplet", None) != tuplet
-                       or _VALUES.get(filled / tuplet.actual, ("", 1))[1] == 0)
-            if opening:
-                head.bracket = ("start",)
-            if closing:
-                tail.bracket = (*tail.bracket, "stop")
-                filled = Fraction(0)
+            written = event.duration * tuplet.actual / tuplet.normal
+            if group is None:
+                group, filled, smallest = head, Fraction(0), written
+            filled += written
+            smallest = min(smallest, written)
+            if getattr(after and after.event, "tuplet", None) != tuplet or filled == tuplet.actual * smallest:
+                group.bracket = (("start", tail.bar),)
+                tail.bracket = (*tail.bracket, ("stop", group.bar))
+                group = None
 
 
 def musicxml_bytes(score: Score, bars: tuple[int, int] | None = None, numerals: bool = False) -> bytes:
