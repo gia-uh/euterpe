@@ -22,13 +22,13 @@ Beethoven's *Ode to Joy*, sung by a theremin over chords on a three-voice therem
 
 ## Pitches and notes
 
-Chapter 2 tuned the twelve notes of an octave in equal steps, each 2^(1/12) times the one below, with A4 at 440 Hz. `euterpe.pitch` has one constant per note, from `A0` to `C8`. A sharp is written with an `s` (`Cs4` is C♯4) and a flat with a `b` (`Db4` is D♭4); in equal steps they are the same note, so `Cs4` and `Db4` are the same object. Adding a number moves a pitch by that many semitones, and subtracting two pitches gives the distance between them:
+Chapter 2 tuned the twelve notes of an octave in equal steps, each 2^(1/12) times the one below, with A4 at 440 Hz. `euterpe.pitch` has one constant per note, from `A0` to `C8`. A sharp is written with an `s` (`Cs4` is C♯4) and a flat with a `b` (`Db4` is D♭4); in equal steps they sound the same, so `Cs4.sounds_as(Db4)` is true, though they stay two spellings, which chapter 16 takes up. Adding a number moves a pitch by that many semitones, and subtracting two pitches gives the distance between them:
 
 ```python {run output=code}
 from euterpe.pitch import A4, C4, Cs4, Db4, E5
 
 print(A4.freq, (A4 + 12).freq, round(C4.freq, 2))
-print(A4 + 7, E5 - A4, Cs4 is Db4)
+print(A4 + 7, E5 - A4, Cs4.sounds_as(Db4))
 ```
 
 A4 is 440 Hz and the A an octave up, 12 semitones higher, is 880. Seven semitones up from A4 is E5, the fifth of chapter 2. The numbers behind the names are those of MIDI, the standard that keyboards and synthesizers use to send notes to each other as numbers: 60 for C4 and 69 for A4, so a pitch is a whole number of semitones and its frequency is 440 × 2^((number − 69) / 12).
