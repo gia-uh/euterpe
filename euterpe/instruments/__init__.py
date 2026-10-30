@@ -12,6 +12,7 @@ from euterpe.instruments.core import (
     Vibrato,
     play,
 )
+from euterpe.instruments.bowed import Bowed, Bowing, StringSection, Violin
 from euterpe.instruments.fretted import BassGuitar, Electric, ElectricBass, ElectricGuitar, Fretted, Guitar, Shape
 from euterpe.instruments.keys import ElectricPiano, Organ
 from euterpe.instruments.synths import AcidBass, Lead, Pad, Patch, Supersaw, SynthPluck
@@ -21,6 +22,7 @@ from euterpe.instruments.phrase import Phrase
 from euterpe.instruments.plucked import (
     BassBody,
     Bridge,
+    CelloBody,
     Exciter,
     Finger,
     GuitarBody,
@@ -42,6 +44,11 @@ from euterpe.instruments.plucked import (
 )
 
 __all__ = [
+    "Bowed",
+    "Bowing",
+    "CelloBody",
+    "StringSection",
+    "Violin",
     "PalmMute",
     "Electric",
     "ElectricBass",

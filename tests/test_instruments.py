@@ -104,6 +104,17 @@ def test_vibrato_moves_the_pitch_by_its_cents_after_its_delay_and_not_before():
     assert swing.max() == pytest.approx(18, abs=0.1) and swing.min() == pytest.approx(-18, abs=0.1)
 
 
+def test_vibrato_starts_its_swing_at_its_phase():
+    from euterpe.instruments import Vibrato
+    from euterpe.sound import render
+
+    v = Vibrato(rate=6.0, delay=0.0, rise=0.0, variation=0.0)  # a period of 8000 samples
+    a = render(v.of(440.0, _vibrato_note()), 0.3)
+    b = render(v.of(440.0, _vibrato_note(), phase=0.25), 0.3)
+    assert b[1:6000] == pytest.approx(a[2001:8000], rel=1e-6)
+    assert 1200 * np.log2(b[1] / 440.0) == pytest.approx(18, abs=0.1)
+
+
 def test_vibrato_varies_per_note_and_follows_a_moving_freq():
     from euterpe.instruments import Vibrato
     from euterpe.sound import Segments, render
