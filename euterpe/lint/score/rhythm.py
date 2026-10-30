@@ -228,14 +228,14 @@ def _tempo(score: Score, params: dict, severity: Severity) -> list[Finding]:
             tempos.append((min(ramp.bar + ramp.bars - 1, bars), ramp.to if finished else score.tempo_at(bars + 1)))
     tempos.sort(key=lambda tempo: tempo[0])
     lowest, highest = min(tempo for _, tempo in tempos), max(tempo for _, tempo in tempos)
-    findings = [Finding("T-TEMPO", "metric", f"lowest tempo {lowest:g} bpm", lowest),
-                Finding("T-TEMPO", "metric", f"highest tempo {highest:g} bpm", highest)]
+    findings = [Finding("T-TEMPO", "metric", f"lowest tempo {lowest:g} bpm", float(lowest)),
+                Finding("T-TEMPO", "metric", f"highest tempo {highest:g} bpm", float(highest))]
     low, high = params.get("tempo", THRESHOLDS["tempo"])
     if severity != "metric":
         for bar, tempo in tempos:
             if not low <= tempo <= high:
                 message = f"{tempo:g} bpm is outside {low:g} to {high:g} bpm"
-                findings.append(Finding("T-TEMPO", severity, message, tempo, bar=bar))
+                findings.append(Finding("T-TEMPO", severity, message, float(tempo), bar=bar))
                 break
     return findings
 

@@ -76,6 +76,7 @@ def test_a_warning_under_chorale_says_so():
 def test_a_stack_contributes_its_top_pitch():
     assert _values(_score("<c4 g4>:q <d4 a4> <e4 b4> <f4 c5>"), "M-RANGE") == [5.0]
     assert _values(_score("<c4 g4>:q <d4 a4>"), "M-CONTOUR") == pytest.approx([1.0, 0.0, 1.0])
+    assert _values(_score("<c4 g4>:q <c4 a4>"), "M-RANGE") == [2.0]
 
 
 def test_each_voice_is_a_line():
@@ -179,6 +180,10 @@ def test_m_climax_phrases_are_those_of_the_voice_it_reads():
 ])
 def test_m_climax_passes_when_a_phrase_ends_inside_a_bar(text):
     assert not _warnings(_score(text), "M-CLIMAX")
+
+
+def test_a_tie_across_a_rest_joins_nothing():
+    assert _values(_score("g4:q~ r:q g4:q c4:q"), "M-CLIMAX") == [2.0]
 
 
 def test_m_climax_finds_two_peaks_in_a_phrase_that_starts_inside_a_bar():

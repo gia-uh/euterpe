@@ -145,6 +145,10 @@ def test_t_syncopation_after_a_pickup_counts_in_the_bar_it_borrows_from():
     assert _values(_score("g4:e a4:q~ | a4:e b4:e c5:q d5:h", pickup=Fraction(3, 8)), "T-SYNCOPATION") == [2.0]
 
 
+def test_t_syncopation_inside_a_pickup_bar_counts_from_its_borrowed_beats():
+    assert _values(_score("r:e c4:q. d4:q | e4:w", pickup=Fraction(3, 4)), "T-SYNCOPATION") == [2.0]
+
+
 def test_t_syncopation_across_a_meter_change_finds_the_new_downbeat():
     s = _score("c4:h d4:q e4:e f4:e~ | f4:q g4:h")
     s.change(2, meter=Meter("3/4"))
@@ -304,6 +308,17 @@ def test_t_tempo_reads_a_ramp_the_piece_cuts_off_where_it_stops():
     s = _score("c4:w | c4:w", tempo=120)
     s.ramp(1, 4, 60)
     assert _values(s, "T-TEMPO") == [90.0, 120.0]
+
+
+def test_t_tempo_warns_at_the_bar_a_ramp_arrives_before_a_later_downbeat():
+    s = _score("c4:w | c4:w", tempo=120)
+    s.ramp(1, 1, 90)
+    [f] = _warnings(s, "T-TEMPO", Profile("my", {"T-TEMPO": "warn"}, {"tempo": (100, 150)}))
+    assert f.bar == 1
+
+
+def test_t_tempo_is_a_float_however_it_is_written():
+    assert all(isinstance(f.value, float) for f in _found(_fixture("T-TEMPO").trigger(), "T-TEMPO", "techno"))
 
 
 def test_t_tempo_does_not_read_a_change_past_the_last_bar():
