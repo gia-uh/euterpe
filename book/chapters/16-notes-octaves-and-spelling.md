@@ -194,11 +194,12 @@ a, b = right.play(), wrong.play()
 print("same samples:", np.array_equal(render(a, a.duration), render(b, b.duration)))
 print("same MIDI:", midi_bytes(right) == midi_bytes(wrong))
 print("same MusicXML:", musicxml_bytes(right) == musicxml_bytes(wrong))
+print(wrong.lint().to_text())
 ```
 
-The samples are equal to the bit, so no ear could tell. The MIDI data is equal too, since MIDI stores key numbers and has no idea what a note is called. MusicXML keeps the spelling.
+The samples are equal to the bit, so no ear could tell. The MIDI data is equal too, since MIDI stores key numbers and has no idea what a note is called. MusicXML keeps the spelling. And `lint`, a linter for scores, reads each note against the key and reports this one by bar and beat: `N-SPELLING` is a warning, since nothing fails to play. The other line, `R-COMFORT`, is a measure, and says the whole line sits where a violin plays comfortably.
 
-A key can check this. `key.scale` holds its notes, and `key.spell` turns a number into the name this key gives it. The last column moves each spelling up by `m2`, the interval of chapter 17 that goes one semitone up and one letter on:
+The rule comes from the key itself. `key.scale` holds its notes, and `key.spell` turns a number into the name this key gives it. The last column moves each spelling up by `m2`, the interval of chapter 17 that goes one semitone up and one letter on:
 
 ```python {run continue output=code}
 from euterpe import Interval, Key
@@ -266,7 +267,7 @@ It is also the arrangement's limit. In Mozart's score the strings stay in octave
 - An octave is 12 semitones and a doubling of frequency. Every partial of the upper note is a partial of the lower one, so the two blend; it is the smallest distance that does, and the letters start over there.
 - A sharp raises a letter a semitone and a flat lowers it. C♯ and D♭ are one key and two names: `==` compares names, and `sounds_as` compares sounds.
 - `melody` reads notes as text, `Score` holds a key and a tempo, `part(...).add(...)` gives a line an instrument, `play` performs it, and `display` or `notation` engraves it on a staff. A line's `transpose` moves it by an interval.
-- A key uses each letter once, so the key decides the spelling: `key.scale` holds its notes and `key.spell(number)` names any number in it. A wrong spelling changes no sample and still changes what is written, and where it goes when it moves.
+- A key uses each letter once, so the key decides the spelling: `key.scale` holds its notes and `key.spell(number)` names any number in it. A wrong spelling changes no sample and still changes what is written, and where it goes when it moves. `s.lint()` reports it as `N-SPELLING`.
 
 ## Exercises
 
