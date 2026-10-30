@@ -4,7 +4,7 @@ each chapter's text, not on this file: after changing a tune, clear the cache.""
 
 from euterpe.instruments import Note
 from euterpe.pitch import (A2, A3, A4, A5, B2, B3, B4, B5, C5, C6, Cs3, Cs4, Cs5, D2, D3, D4, D5, Ds4, Ds5,
-                           E2, E3, E4, E5, F4, Fs2, Fs3, Fs4, Fs5, G2, G3, G4, G5, Gs3, Gs4, Gs5)
+                           E2, E3, E4, E5, F4, F5, Fs2, Fs3, Fs4, Fs5, G2, G3, G4, G5, Gs3, Gs4, Gs5)
 
 s = 1 / 6  # a sixth of a beat
 TUNES = {
@@ -40,6 +40,16 @@ TUNES = {
                (5.25, C5, .25), (5.5, A4, .25), (5.75, G4, .25), (6, E4, .25), (6.25, F4, .25), (6.5, G4, .5),
                (7, A4, 2), (9, G4, .5), (9.5, A4, .25), (9.75, B4, .25), (10, D5, .5), (10.5, C5, .25),
                (10.75, B4, .25), (11, C5, 1)],
+    # Korobeiniki, the folk melody of Nekrasov's poem (1861): the first theme, 8 bars of 4 beats
+    "korobeiniki": [(0, E5, 1), (1, B4, .5), (1.5, C5, .5), (2, D5, 1), (3, C5, .5), (3.5, B4, .5),
+                    (4, A4, 1), (5, A4, .5), (5.5, C5, .5), (6, E5, 1), (7, D5, .5), (7.5, C5, .5),
+                    (8, B4, 1.5), (9.5, C5, .5), (10, D5, 1), (11, E5, 1), (12, C5, 1), (13, A4, 1), (14, A4, 2),
+                    (16, D5, 1.5), (17.5, F5, .5), (18, A5, 1), (19, G5, .5), (19.5, F5, .5),
+                    (20, E5, 1.5), (21.5, C5, .5), (22, E5, 1), (23, D5, .5), (23.5, C5, .5),
+                    (24, B4, 1), (25, B4, .5), (25.5, C5, .5), (26, D5, 1), (27, E5, 1), (28, C5, 1), (29, A4, 1), (30, A4, 2)],
+    # and its second theme, 8 bars of half notes
+    "korobeiniki2": [(0, E5, 2), (2, C5, 2), (4, D5, 2), (6, B4, 2), (8, C5, 2), (10, A4, 2), (12, Gs4, 2), (14, B4, 2),
+                     (16, E5, 2), (18, C5, 2), (20, D5, 2), (22, B4, 2), (24, C5, 1), (25, E5, 1), (26, A5, 2), (28, Gs5, 4)],
 }
 
 

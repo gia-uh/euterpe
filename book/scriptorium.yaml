@@ -26,6 +26,7 @@ files:
   - chapters/12-keys-and-synthesizers.md
   - chapters/13-bowed-strings-winds-and-brass.md
   - chapters/14-drums-and-percussion.md
+  - chapters/15-chip-sounds.md
 
 outputs:
   site:
