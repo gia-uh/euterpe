@@ -52,7 +52,8 @@ class Fade:
 
     def __post_init__(self):
         if self.start not in range(16) or self.pace not in range(8):
-            raise ValueError(f"Fade needs a whole start from 0 to 15 and pace from 0 to 7, got {self.start} and {self.pace}")
+            raise ValueError(f"Fade needs a whole start from 0 to 15 and pace from 0 to 7, "
+                             f"got {self.start} and {self.pace}")
 
     @property
     def length(self) -> float | None:
@@ -121,11 +122,11 @@ class PulseChannel(_Channel):
     """A pulse channel: a band-limited Square at duty, the fraction of each cycle it is high.
 
     Duty 0.5 holds the odd harmonics only; 0.25 and 0.75 share one spectrum with every harmonic
-    but each 4th; 0.125 is thin and nasal, its first four harmonics within 4 dB of each other, then
-    falling to a gap at every 8th. With steps
-    the duty must be one of the console's four (else ValueError) and the volume follows
-    envelope, a Fade (by default held at 15) started at the note's velocity times its start;
-    without steps any duty is allowed and the volume is a smooth ADSR times the velocity.
+    but each 4th; 0.125 is thin and nasal, its first four harmonics within 4 dB of each other,
+    then falling to a gap at every 8th. With steps the duty must be one of the console's four
+    (else ValueError) and the volume follows envelope, a Fade (by default held at 15) started at
+    the note's velocity times its start; without steps any duty is allowed and the volume is a
+    smooth ADSR times the velocity.
     quantize moves each note to the nearest 131 072 / (2048 - n) Hz, so high notes land up to
     tens of cents off. sweep bends the pitch by that many semitones per second during the note
     (negative falls), for drums and laser shots. detune is in cents. glide: the seconds a
@@ -224,8 +225,8 @@ class NoiseChannel(Instrument):
 
     def pattern(self, grid: dict[NoiseDrum, str], step: float, at: float = 0.0, repeat: int = 1) -> list[Note]:
         """Notes from a step grid, read as Kit.pattern reads one: a row of characters per drum,
-        one per step of step seconds; x a hit, X an accent, g a ghost note, o a hit as x (the hi-hat's open stroke has no meaning
-        here), a dot or a space a rest."""
+        one per step of step seconds; x or o a hit, X an accent, g a ghost note, a dot or a space
+        a rest."""
         if step <= 0 or repeat < 1:
             raise ValueError(f"pattern needs a step above 0 and repeat of at least 1, got {step} and {repeat}")
         rows = {drum: _steps(row) for drum, row in grid.items()}
@@ -260,7 +261,8 @@ class _Chip:
 class ClassicChip(_Chip):
     """The console as it was: pulse1 (duty 0.5), pulse2 (duty 0.25), wave (TRIANGLE) and noise,
     all with stepped volume and quantized pitch, no vibrato and no glide, each at level 0.2.
-    play sums them at those fixed levels, mono, through a high-pass at 20 Hz, as the output capacitor that blocks DC."""
+    play sums them at those fixed levels, mono, through a high-pass at 20 Hz, as the output
+    capacitor that blocks DC."""
 
     def __init__(self, seed: int = 0):
         self.seed = seed
@@ -281,12 +283,21 @@ class ModernChip(_Chip):
     """
 
     def __init__(self, detune: float = 6.0, echo: float = 0.3, room: float = 0.2, seed: int = 0):
-        self.detune, self.echo, self.room, self.seed = float(detune), float(echo), float(room), seed
+        self.echo, self.room, self.seed = float(echo), float(room), seed
         vibrato = Vibrato(rate=5.5, cents=12.0, delay=0.3, rise=0.3)
         smooth = dict(steps=False, quantize=False, vibrato=vibrato, glide=0.04, level=LEVEL, seed=seed)
         self.pulse1 = PulseChannel(0.5, **smooth)
-        self.pulse2 = PulseChannel(0.25, detune=self.detune, **smooth)
+        self.pulse2 = PulseChannel(0.25, detune=detune, **smooth)
         self.wave, self.noise = WaveChannel(**smooth), NoiseChannel(steps=False, level=LEVEL, seed=seed)
+
+    @property
+    def detune(self) -> float:
+        """pulse2's detune in cents."""
+        return self.pulse2.detune
+
+    @detune.setter
+    def detune(self, cents: float) -> None:
+        self.pulse2.detune = float(cents)
 
     def _out(self, parts: dict[str, Unit]) -> Unit:
         pulses = [Pan(parts[name], pos) for name, pos in (("pulse1", -0.3), ("pulse2", 0.3)) if name in parts]

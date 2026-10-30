@@ -197,6 +197,14 @@ def test_modern_plays_exact_pitch_and_detunes_pulse2():
     assert abs(_cents(peak_hz(x), C8.freq)) < 5
 
 
+def test_modern_detune_set_later_moves_pulse2():
+    chip = ModernChip()
+    chip.detune = 100.0
+    assert chip.pulse2.detune == 100.0
+    x = render(chip.pulse2.note(750.0, 0.2, 1.0), 0.2)[RATE // 20:RATE // 5]
+    assert _cents(peak_hz(x), 750.0) == pytest.approx(100, abs=5)
+
+
 def test_classic_channels_have_steps_and_no_effects():
     chip = ClassicChip()
     for c in (chip.pulse1, chip.pulse2, chip.wave):
