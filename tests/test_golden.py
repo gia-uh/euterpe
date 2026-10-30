@@ -5,6 +5,7 @@ import hashlib
 
 import numpy as np
 import pytest
+from euterpe import Humanize, Performance, Score, melody
 from euterpe.instruments import (AcidBass, BassGuitar, BrassSection, Celesta, ClassicChip, Clarinet, ElectricBass,
                                  ElectricGuitar, ElectricPiano, Flute, Glockenspiel, Guitar, Harp, Kit, Lead, Marimba,
                                  ModernChip, Organ, Pad, PizzicatoStrings, StringSection, Supersaw, SynthPluck,
@@ -68,6 +69,7 @@ HASHES = {
     "Kit": "ee3456cbbc2eb7257b85cfa171088ea6a3a3c1de9c72dfa937ab652ddb661485",
     "ClassicChip": "8f2502e3d01b5cd56db9221e1570945572c91148b6e4430cde86a86a20cfb411",
     "ModernChip": "a73a87704b90c5949b695e75fad3edcca1c1c47ee49fe57208fe0ab57667cfca",
+    "Score": "cc0565d3df07664c652081c67a2faec5c4ff0108cc2ea5f7b885455cdc7e8b1f",
 }
 
 
@@ -91,7 +93,15 @@ def _chip(make) -> np.ndarray:
     return render(make(seed=SEED).play(pulse1=notes, wave=notes), SECONDS)
 
 
-OTHERS = {"Kit": _kit, "ClassicChip": lambda: _chip(ClassicChip), "ModernChip": lambda: _chip(ModernChip)}
+def _score() -> np.ndarray:
+    s = Score(tempo=240, performance=Performance(humanize=Humanize()))
+    s.part("upper", Harp(seed=SEED)).add(melody("c5:e f#5"))
+    s.part("lower", ElectricPiano(seed=SEED), gain=0.5).add(melody("c3:q"))
+    return render(s.play(seed=SEED), SECONDS)
+
+
+OTHERS = {"Kit": _kit, "ClassicChip": lambda: _chip(ClassicChip), "ModernChip": lambda: _chip(ModernChip),
+          "Score": _score}
 
 
 @pytest.mark.parametrize("name", PRESETS)
