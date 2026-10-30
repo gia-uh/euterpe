@@ -244,3 +244,9 @@ def test_an_arpeggio_needs_pitches_and_a_step():
         PulseChannel().arpeggio(0.0, [], 1.0)
     with pytest.raises(ValueError):
         WaveChannel().arpeggio(0.0, [A4], 1.0, step=0.0)
+
+
+def test_arpeggios_play_each_chord_for_its_time():
+    notes = PulseChannel().arpeggios(0.5, [[A4, C5], [E4, G4, B4]], 0.1, step=0.05)
+    assert [n.pitch for n in notes] == [A4, C5, E4, G4]
+    assert notes[2].time == pytest.approx(0.6)

@@ -109,6 +109,11 @@ class _Channel(Instrument):
             raise ValueError(f"arpeggio needs pitches and a step above 0, got {list(pitches)} and {step}")
         return [Note(at + k * step, pitches[k % len(pitches)], step, velocity) for k in range(round(length / step))]
 
+    def arpeggios(self, at: float, chords: Sequence[Sequence], each: float, step: float = 1 / 60,
+                  velocity: float = 0.8) -> list[Note]:
+        """An arpeggio of each chord in turn, each seconds apiece, from at: a progression on one channel."""
+        return [n for k, chord in enumerate(chords) for n in self.arpeggio(at + k * each, chord, each, step, velocity)]
+
     def perform(self, notes: list[Note], controls) -> list[Note]:
         if not self.quantize:
             return notes
