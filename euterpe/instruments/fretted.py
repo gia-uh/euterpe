@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from itertools import permutations
 from typing import ClassVar
 
-from euterpe.instruments.core import Control, Feedback, Note
+from euterpe.instruments.core import Accent, Control, Feedback, Legato, Note, PalmMute, Staccato, Tenuto
 from euterpe.instruments.plucked import (
     BassBody,
     Bridge,
@@ -329,6 +329,7 @@ class ElectricGuitar(Electric):
     """
 
     gm_program = 27
+    articulations = frozenset({Staccato, Accent, Legato, Tenuto, PalmMute, Feedback})
     tuning = (E2, A2, D3, G3, B3, E4)
     frets = 22
     polyphony = 6
