@@ -18,7 +18,7 @@ from euterpe.theory import EqualTemperament, Meter
 if TYPE_CHECKING:
     from euterpe.instruments.core import Articulation
     from euterpe.instruments.core import Note as Performed
-    from euterpe.score.model import Note, Part, Placed, Score
+    from euterpe.score.model import Dynamic, Note, Part, Placed, Score, Section
 
 _LEVELS = {"pp": .25, "p": .38, "mp": .5, "mf": .62, "f": .76, "ff": .9}
 _SPREAD = 0.25  # how far the notes of one stack differ in start, as a share of the start they share
@@ -134,7 +134,8 @@ class _Curve:
             if ahead:
                 self._add(offset, ahead.offset, level, dynamics._level(ahead.mark))
             else:
-                self._add(offset, item.end, level, _one_level_on(dynamics, level, item.kind))
+                after = next((mark for mark in marks if mark.offset > item.end), None)
+                self._add(offset, item.end, level, _hairpin_end(dynamics, level, item.kind, after))
 
     def _add(self, start: Fraction, end: Fraction, first: float, last: float) -> None:
         self.starts.append(start)
@@ -150,8 +151,12 @@ class _Curve:
         return first + (last - first) * float((offset - self.starts[index]) / (end - self.starts[index]))
 
 
-def _one_level_on(dynamics: Dynamics, level: float, kind: str) -> float:
-    """The next level up or down from this one, or this one at the end of the levels."""
+def _hairpin_end(dynamics: Dynamics, level: float, kind: str, after: Dynamic | None) -> float:
+    """Where a hairpin that holds no mark ends: at the next mark after it, if that lies its way, or else one level on
+    from where it starts, or there at the end of the levels."""
+    target = None if after is None else dynamics._level(after.mark)
+    if target is not None and (target > level if kind == "<" else target < level):
+        return target
     if kind == "<":
         return min((other for other in dynamics.levels.values() if other > level), default=level)
     return max((other for other in dynamics.levels.values() if other < level), default=level)
@@ -201,9 +206,9 @@ class TempoMap:
     def __init__(self, score: Score):
         self.played: list[_Bar] = []
         start = Fraction(0)
-        for bar in _played_bars(score):
+        for bar, length in _played_bars(score):
             first, last = _tempos(score, bar)
-            length = score._bar_length(bar)
+            last = first + (last - first) * float(length / score._bar_length(bar))  # a shortened bar stops partway
             self.played.append(_Bar(bar, start, length, score._lead(bar), first, last, score.meter_at(bar)))
             start += length
         end = self.played[-1]
@@ -236,8 +241,8 @@ class TempoMap:
         return max(Fraction(0), offset + swing.moved(in_bar, bar.meter) - in_bar)
 
 
-def _played_bars(score: Score) -> list[int]:
-    """The written bars in the order they play, up to the last bar the score names."""
+def _played_bars(score: Score) -> list[tuple[int, Fraction]]:
+    """The written bars in the order they play, each with its played length, up to the last bar the score names."""
     last = max(1, score.bars, *(ramp.bar + ramp.bars - 1 for ramp in score.ramps),
                *(change.bar for change in score.changes), *(section.last for section in score.sections))
     sections = {section.first: section for section in score.sections}
@@ -246,12 +251,24 @@ def _played_bars(score: Score) -> list[int]:
     while bar <= last:
         section = sections.get(bar)
         if section is None:
-            played.append(bar)
+            played.append((bar, score._bar_length(bar)))
             bar += 1
         else:
-            played += list(range(section.first, section.last + 1)) * section.repeat
+            full = [(number, score._bar_length(number)) for number in range(section.first, section.last + 1)]
+            played += (full[:-1] + [(section.last, _closing(score, section))]) * (section.repeat - 1) + full
             bar = section.last + 1
     return played
+
+
+def _closing(score: Score, section: Section) -> Fraction:
+    """The length of a section's last bar on a pass that repeats. A section repeating from a pickup goes back to it, so
+    a last bar whose events leave the pickup's room stops there and the pickup completes it, as a written repeat does."""
+    length = score._bar_length(section.last)
+    if not score.pickup or section.first != 1 or section.last == 1:
+        return length
+    room = length - score.pickup
+    ends = [placed.in_bar + placed.event.duration for placed in score.events() if placed.bar == section.last]
+    return room if room > 0 and max(ends, default=Fraction(0)) <= room else length
 
 
 def _tempos(score: Score, bar: int) -> tuple[float, float]:
@@ -421,12 +438,13 @@ def _detach(notes: list[Performed]) -> None:
     start of the next one that is not Legato. Notes at one time are left for the instrument to slur."""
     from euterpe.instruments.core import Legato
 
-    limit = float("inf")
+    at = limit = upcoming = float("inf")
     for note in reversed(notes):
-        if note.time < limit:
-            note.duration = min(note.duration, limit - note.time)
+        if note.time != at:
+            at, limit = note.time, upcoming
+        note.duration = min(note.duration, limit - note.time)
         if not isinstance(note.articulation, Legato):
-            limit = note.time
+            upcoming = note.time
 
 
 def part_seeds(seed: int, count: int) -> list[tuple[np.random.SeedSequence, int]]:

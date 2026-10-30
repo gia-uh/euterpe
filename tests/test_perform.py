@@ -173,6 +173,53 @@ def test_a_ramp_in_a_repeated_section_lasts_its_time_on_both_passes():
     assert s.tempo_map().seconds(Fraction(3)) - tempo.seconds(Fraction(2)) == pytest.approx(4.0)  # 60 held after it
 
 
+def repeat_from_a_pickup(last="f5:h."):
+    s = Score(tempo=120, pickup=Q)
+    s.part("a").add(melody(f"g4:q | c5:w | d5:h. e5:q | {last}"))
+    s.section("A", 1, 4, repeat=2)
+    return s
+
+
+def test_a_section_repeating_from_a_pickup_completes_its_last_bar_with_it():
+    s = repeat_from_a_pickup()
+    assert times(s.performance.notes(s)["a"]) == pytest.approx([0, 0.5, 2.5, 4.0, 4.5, 6.0, 6.5, 8.5, 10.0, 10.5])
+    tempo = s.tempo_map()
+    downbeat = Fraction(1, 4) + 2  # bar 4, on the first pass
+    assert tempo.seconds(downbeat + 1) - tempo.seconds(downbeat) == pytest.approx(2.0)  # bar 4 and the pickup
+    assert tempo.seconds(downbeat + Fraction(3, 4)) == pytest.approx(6.0)
+    assert tempo.seconds(Fraction(25, 4)) == pytest.approx(10.5 + 2.0)  # the last pass plays its bar in full
+
+
+def test_a_last_bar_that_fills_its_room_keeps_its_length():
+    s = repeat_from_a_pickup("f5:w")
+    assert times(s.performance.notes(s)["a"])[5] == pytest.approx(6.5)
+    s = repeat_from_a_pickup("f5:h. r:q")
+    assert times(s.performance.notes(s)["a"])[5] == pytest.approx(6.5)
+
+
+def test_any_part_can_fill_the_last_bar():
+    s = repeat_from_a_pickup()
+    s.part("b").add(melody("g3:q | c4:w | d4:w | e4:w"))
+    assert times(s.performance.notes(s)["a"])[5] == pytest.approx(6.5)
+
+
+def test_a_section_not_from_the_pickup_keeps_its_bars():
+    s = Score(tempo=120, pickup=Q)
+    s.part("a").add(melody("g4:q | c5:w | d5:h."))
+    s.section("A", 2, 3, repeat=2)
+    assert times(s.performance.notes(s)["a"]) == pytest.approx([0, 0.5, 2.5, 4.5, 6.5])
+
+
+def test_a_ramp_stops_partway_in_a_shortened_bar():
+    s = repeat_from_a_pickup()
+    s.ramp(4, 1, 60)
+    tempo = s.tempo_map()
+    downbeat = Fraction(1, 4) + 2
+    closed = 60 * 3 * log(120 / 75) / (120 - 75)  # three of the ramp's four beats, 120 to 75
+    assert tempo.seconds(downbeat + Fraction(3, 4)) - tempo.seconds(downbeat) == pytest.approx(closed)
+    assert tempo.offset(tempo.seconds(downbeat + Fraction(3, 8))) == pytest.approx(downbeat + Fraction(3, 8))
+
+
 # Swing
 
 
@@ -443,6 +490,24 @@ def test_a_hairpin_with_no_mark_after_it_ends_one_level_on():
     assert velocities[4:] == pytest.approx([.5] * 8)  # the level it reached holds
 
 
+def test_a_hairpin_ends_at_the_next_mark_after_it_that_lies_its_way():
+    s = Score(performance=Performance(dynamics=Dynamics(stress=0)))
+    part = s.part("a").add(melody("c4:q d e f | g a b c"))
+    part.dynamic(1, 1, "p").hairpin((1, 1), (2, 1), "<").dynamic(2, 2, "ff")
+    velocities = [n.velocity for n in s.performance.notes(s)["a"]]
+    assert velocities[1] == pytest.approx(.38 + (.9 - .38) / 4)
+    assert velocities[4:] == pytest.approx([.9] * 4)
+
+
+def test_a_mark_after_a_hairpin_against_its_way_leaves_it_one_level_on():
+    s = Score(performance=Performance(dynamics=Dynamics(stress=0)))
+    part = s.part("a").add(melody("c4:q d e f | g a b c"))
+    part.dynamic(1, 1, "p").hairpin((1, 1), (2, 1), "<").dynamic(2, 2, "pp")
+    velocities = [n.velocity for n in s.performance.notes(s)["a"]]
+    assert velocities[4] == pytest.approx(.5)
+    assert velocities[5] == pytest.approx(.25)
+
+
 def test_a_hairpin_at_the_top_level_stays_there():
     notes = played("ff < c4:q d e f", Performance(dynamics=Dynamics(stress=0)))
     assert {n.velocity for n in notes} == {.9}
@@ -669,6 +734,15 @@ def test_a_stack_on_one_voice_starts_together_as_it_does_without_humanize():
     assert first.time == second.time
     assert first.duration == pytest.approx(0.45) and second.duration == pytest.approx(0.45)
     assert len(Violin().play([first, second, third]).voices) == 2
+
+
+def test_a_humanized_stack_on_one_voice_does_not_slur_into_the_next_note():
+    text = "<c4 e4>:s d4 <e4 g4>:s f4 g4 a4 b4 c5 c4 d e f g a b c"
+    s = score(text, Performance(humanize=Humanize(timing=0.03)), instrument=Violin())
+    violin = Violin()
+    assert len(violin.play(Performance().notes(s)["a"]).voices) == 16
+    for seed in range(20):
+        assert len(violin.play(s.performance.notes(s, seed=seed)["a"]).voices) == 16
 
 
 def test_a_full_length_one_voice_line_does_not_slur_without_humanize():
