@@ -100,6 +100,15 @@ class _Channel(Instrument):
         """freq moved to the nearest pitch the channel's divider makes."""
         return divided(freq, self.clock)
 
+    def arpeggio(self, at: float, pitches: Sequence, length: float, step: float = 1 / 60,
+                 velocity: float = 0.8) -> list[Note]:
+        """Notes playing pitches in turn, step seconds each, over and over for length seconds from
+        at: how a channel that sounds one note at a time plays a chord. The default step is one
+        frame of a 60 Hz screen, the pace at which a console's music program changed its notes."""
+        if step <= 0 or not pitches:
+            raise ValueError(f"arpeggio needs pitches and a step above 0, got {list(pitches)} and {step}")
+        return [Note(at + k * step, pitches[k % len(pitches)], step, velocity) for k in range(round(length / step))]
+
     def perform(self, notes: list[Note], controls) -> list[Note]:
         if not self.quantize:
             return notes
