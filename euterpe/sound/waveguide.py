@@ -177,7 +177,8 @@ class Bore(Unit):
     The spectrum is the mouthpiece's: with a Reed, the odd harmonics of freq, the even ones
     weak, strongest in the low register, and brighter with more pressure. Below a pressure of
     about 0.25 in the low register (higher for higher notes) no mode starts, and only the
-    breath sounds. The output rises 6 dB an octave up to bell, since a bell radiates its high frequencies best.
+    breath sounds. The output rises 6 dB an octave up to bell, since a bell radiates its high
+    frequencies best.
 
     mouth, damping and bell fix the loop and take data or numbers only. freq, pressure and noise
     may move every sample; freq is clipped to 20 Hz and above. It sounds while driven: an
