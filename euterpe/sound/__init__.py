@@ -35,7 +35,7 @@ from euterpe.sound.space import (
     Width,
 )
 from euterpe.sound.synth import FM, Additive, Modal, Pluck
-from euterpe.sound.waveguide import Bore, Bow, Reed
+from euterpe.sound.waveguide import Bore, Bow, Jet, Lips, Reed
 
 __all__ = [
     "Amp",
@@ -59,6 +59,7 @@ __all__ = [
     "Delay",
     "EnvelopeFollower",
     "FDNReverb",
+    "Jet",
     "Leslie",
     "Flanger",
     "FM",
@@ -69,6 +70,7 @@ __all__ = [
     "HighPass",
     "LFSRNoise",
     "Limiter",
+    "Lips",
     "HighShelf",
     "LowPass",
     "Ladder",

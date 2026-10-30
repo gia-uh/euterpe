@@ -1,7 +1,8 @@
 """Digital waveguides: a bowed string and a blown tube, each a delay-line loop with its
 excitation inside it, written from the published descriptions of the waveguide models: the
 bowed string and its friction table, and the clarinet and its reed table, of Julius O. Smith's
-digital waveguide synthesis."""
+digital waveguide synthesis, with the lip valve of the brass models and the jet-and-edge model of
+the flute from the physical-modelling literature."""
 
 from __future__ import annotations
 
@@ -16,6 +17,7 @@ from euterpe.sound.core import RATE, Unit, _arg, _signal, rng
 # the lowest frequency a loop is sized for; a moving freq below it is clipped
 _LOWEST = 20.0
 _SIZE = 4096  # a power of two above RATE / _LOWEST, the longest loop
+_JET = 0.3  # the jet's swing against the tube's
 
 
 class _Line:
@@ -150,8 +152,10 @@ class Reed:
 
     def blow(self, pressure: np.ndarray) -> np.ndarray:
         """The mouth pressure for a player's pressure from 0 to 1: the reed starts to beat near
-        0.25 and is not yet held shut at 1."""
-        return 0.95 * np.sqrt(np.maximum(pressure, 0.0))
+        0.25, and above it the pressure rises slowly enough that the reed closes harder each
+        step without being held shut at 1, so a harder breath is always a brighter one."""
+        p = np.maximum(pressure, 0.0)
+        return np.where(p < 0.25, 0.95 * np.sqrt(p), 0.475 + 0.35 * (p - 0.25))
 
     def start(self) -> list[float]:
         """The mouthpiece's state before the first sample: a reed has none."""
@@ -166,6 +170,96 @@ class Reed:
         return mouth + diff * r
 
 
+@dataclass(frozen=True)
+class Lips:
+    """A player's lips in a cup mouthpiece, a mass on a spring that the pressure difference
+    across them pushes open: a resonant two-pole low-pass tuned to tension times the note's
+    frequency, q its sharpness, is the lips' opening. The opening squared, clipped to 1, lets
+    air through at the speed the pressure difference gives it (its square root), and that air
+    joins the wave going into the bore; the bell lets the mean flow out. Lips blown open play a
+    little above their own resonance, so the loop and the lips are both tuned down to bring the
+    note to freq. The tube sounds a full period, so the spectrum has every harmonic, the second
+    close to the first. More pressure swings the lips shut for longer each cycle and the puffs
+    of air grow sharper: the upper harmonics grow fast, and brass gets brighter as it gets
+    louder, and about 20 cents sharper from pressure 0.5 to 1. Below a pressure of about 0.3
+    no mode starts; just above it a note takes a few tenths of a second to speak in the low
+    register, as a tuba's does."""
+
+    tension: float = 1.0
+    q: float = 5.0
+
+    loop: ClassVar[float] = 2 ** (94 / 1200)  # lips blown open play this far above the loop
+
+    def blow(self, pressure: np.ndarray) -> np.ndarray:
+        """The mouth pressure for a player's pressure from 0 to 1."""
+        return 0.75 * np.maximum(pressure, 0.0)
+
+    def start(self) -> list[float]:
+        """The lips at rest: the filter's last two outputs, its coefficients for the period they
+        were last worked out for, and a DC blocker's last input and output."""
+        return [0.0] * 8
+
+    def junction(self, state: list[float], mouth: float, bore: float, period: float) -> float:
+        if period != state[2]:
+            w = 2 * math.pi * self.tension / (period * self.loop)
+            r = math.exp(-w / (2 * max(self.q, 0.5)))
+            state[2], state[3], state[4] = period, 2 * r * math.cos(w), r * r
+            state[5] = 1 - state[3] + state[4]  # a gain of 1 at DC: the mean pressure holds them open
+        # the lips close the tube: the wave reflects without changing sign
+        back = state[7] = -bore - state[6] + 0.9995 * state[7]
+        state[6] = -bore
+        diff = mouth - back
+        y = state[5] * diff + state[3] * state[0] - state[4] * state[1]
+        state[1], state[0] = state[0], y
+        opening = 0.4 * y
+        flow = opening * opening if opening > 0.0 else 0.0
+        flow = 1.0 if flow > 1.0 else flow
+        return back + flow * math.sqrt(diff) if diff > 0.0 else back
+
+
+@dataclass(frozen=True)
+class Jet:
+    """A jet of air blown across an edge, as in a flute. Both ends of the tube are open, so it
+    sounds a full period and every harmonic. The wave at the mouth hole deflects the jet, the
+    deflection takes length of a period to cross to the edge (a second delay), and the edge
+    splits the jet through the cubic x - x ** 3 with a small offset, since the jet does not
+    aim at the edge's centre; the blowing pressure sets the gain. Half a period's crossing
+    sounds the note in tune. The spectrum is close to a sine with a few soft harmonics, the
+    second the strongest, plus the breath the tube filters. Below a pressure of about 0.3 no
+    mode starts. Above 0.8 the jet crosses sooner, the faster it goes, until it drives the
+    second mode: near full pressure the note jumps an octave, as a flautist overblows to reach
+    the second register."""
+
+    length: float = 0.5
+
+    loop: ClassVar[float] = 2 ** (25 / 1200)  # the edge and the DC blocker shorten the loop; this restores a period
+
+    def blow(self, pressure: np.ndarray) -> np.ndarray:
+        """The mouth pressure for a player's pressure from 0 to 1: the same."""
+        return np.maximum(pressure, 0.0)
+
+    def start(self) -> list:
+        """The jet's own delay line, the mean pressure the player holds, and a DC blocker's
+        last input and output on the wave coming back from the tube."""
+        return [_Line(), 0.0, 0.0, 0.0]
+
+    def junction(self, state: list, mouth: float, bore: float, period: float) -> float:
+        back = -bore  # the open mouth hole reflects with -1, as the bell does
+        y = back - state[2] + 0.995 * state[3]
+        state[2], state[3] = back, y
+        held = state[1] = state[1] + 0.002 * (mouth - state[1])
+        jet = state[0]
+        # the jet runs at 1 / _JET of the tube's scale, so the tube stays below full scale
+        jet.write(mouth - held - 0.5 * y / _JET)
+        cross = self.length * period
+        if held > 0.8:
+            cross *= (0.8 / held) ** 3
+        x = jet.read(cross if cross > 1.0 else 1.0) + 0.1
+        e = held * (x - x * x * x)
+        e = -1.0 if e < -1.0 else 1.0 if e > 1.0 else e
+        return _JET * e + 0.9 * y
+
+
 class Bore(Unit):
     """A column of air in a cylindrical tube, driven at one end by a mouthpiece. The tube is a
     delay line whose round trip sets the pitch; at the far end the bell reflects the low
@@ -175,9 +269,11 @@ class Bore(Unit):
     seeded white noise to it, the breath.
 
     The spectrum is the mouthpiece's: with a Reed, the odd harmonics of freq, the even ones
-    weak, strongest in the low register, and brighter with more pressure. Below a pressure of
-    about 0.25 in the low register (higher for higher notes) no mode starts, and only the
-    breath sounds. The output rises 6 dB an octave up to bell, since a bell radiates its high
+    weak, strongest in the low register; with Lips, every harmonic, the upper ones growing fast
+    with pressure; with a Jet, close to a sine with a soft second harmonic, jumping an octave
+    near full pressure. All grow brighter with more pressure. Below a threshold pressure, which
+    each mouthpiece's docstring gives (about 0.25 to 0.35, higher for high notes), no mode
+    starts, and only the breath sounds. The output rises 6 dB an octave up to bell, since a bell radiates its high
     frequencies best.
 
     mouth, damping and bell fix the loop and take data or numbers only. freq, pressure and noise
@@ -192,7 +288,7 @@ class Bore(Unit):
         self,
         freq: float | Unit,
         pressure: float | Unit = 0.5,
-        mouth: Reed = Reed(),
+        mouth: Reed | Lips | Jet = Reed(),
         noise: float | Unit = 0.02,
         damping: float = 0.995,
         bell: float = 3000.0,

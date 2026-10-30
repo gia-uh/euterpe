@@ -15,6 +15,7 @@ from euterpe.instruments.core import (
 from euterpe.instruments.bowed import Bowed, Bowing, StringSection, Violin
 from euterpe.instruments.fretted import BassGuitar, Electric, ElectricBass, ElectricGuitar, Fretted, Guitar, Shape
 from euterpe.instruments.keys import ElectricPiano, Organ
+from euterpe.instruments.winds import Blown, BrassSection, Breath, Clarinet, Flute
 from euterpe.instruments.synths import AcidBass, Lead, Pad, Patch, Supersaw, SynthPluck
 from euterpe.instruments.mallets import Bar, Barred, Celesta, Glockenspiel, Marimba, Xylophone
 from euterpe.instruments.percussion import Clap, Crash, Cymbal, HiHat, Kick, Kit, Mallet, Open, Ride, Snare, Stomp, Struck, Timpani, Tom
@@ -44,7 +45,12 @@ from euterpe.instruments.plucked import (
 )
 
 __all__ = [
+    "Blown",
     "Bowed",
+    "BrassSection",
+    "Breath",
+    "Clarinet",
+    "Flute",
     "Bowing",
     "CelloBody",
     "StringSection",
