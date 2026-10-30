@@ -12,7 +12,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from euterpe.pitch import Pitch
-from euterpe.sound.core import Unit
+from euterpe.sound.core import RATE, Unit, _signal
+from euterpe.sound.env import Segments
 
 if TYPE_CHECKING:
     from euterpe.instruments.phrase import Phrase
@@ -102,6 +103,48 @@ class Control:
     that control reads it in perform()."""
 
     time: float
+
+
+@dataclass(frozen=True)
+class Vibrato:
+    """A player's vibrato, a part of an instrument: the pitch held steady for delay seconds,
+    then swinging rate times a second by up to cents either way, the swing growing from
+    nothing over rise seconds. Each note moves its rate and depth by up to variation (a
+    fraction) from the note's generator, so no two notes swing alike. Vibrato(cents=0) is
+    none. On a sound, each harmonic k swings by k times the fundamental's swing in Hz."""
+
+    rate: float = 5.5
+    cents: float = 18.0
+    delay: float = 0.25
+    rise: float = 0.3
+    variation: float = 0.1
+
+    def of(self, freq: float | Unit, note: Note) -> float | Unit:
+        """The note's moving frequency: freq (a number, or a unit such as a slur's) with this
+        vibrato on it; freq itself when cents is 0."""
+        if self.cents == 0:
+            return freq
+        rate, depth = (1 + self.variation * note.rng.uniform(-1.0, 1.0, 2)) * (self.rate, self.cents)
+        swing = Segments([(0.0, 0.0), (self.delay, 0.0), (self.delay + self.rise, float(depth))])
+        return _Swing(freq, float(rate), swing)
+
+
+class _Swing(Unit):
+    """freq times 2 ** (depth * sin(2 pi rate t) / 1200): a sine of rate Hz, depth cents deep."""
+
+    def __init__(self, freq: float | Unit, rate: float, depth: Unit):
+        self.freq, self.rate, self.depth = freq, rate, depth
+        self.reset()
+
+    def reset(self) -> None:
+        super().reset()
+        self._done = 0
+
+    def block(self, n: int) -> np.ndarray:
+        t = (self._done + np.arange(n)) / RATE
+        self._done += n
+        cents = _signal(self.depth, n) * np.sin(2 * np.pi * self.rate * t)
+        return (_signal(self.freq, n) * 2.0 ** (cents / 1200)).astype(np.float32)
 
 
 class Instrument:
