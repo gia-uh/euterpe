@@ -156,7 +156,7 @@ disco = {kit.kick: "x...x...x...x...", kit.snare: "....x.......x...", kit.hihat:
 display(kit.play(kit.pattern(disco, step=60 / 120 / 4, repeat=4)).take(8.5, "Four on the floor"))
 ```
 
-Ravel's *Boléro* (1928) rests on one snare ostinato of two bars of three beats each, repeated from the first bar to the last while everything grows around it. Six steps a beat, at 72 bpm; the velocities grow over the three repeats:
+Ravel's *Boléro* (1928) rests on one snare ostinato of two bars of three beats each, repeated from the first bar to the last while everything grows around it. It is the same ostinato that runs under chapter 13's finale. Six steps a beat, at 72 bpm; the velocities grow over the three repeats:
 
 ```python {run}
 import numpy as np
@@ -340,7 +340,7 @@ song = celesta.play(notes) + PizzicatoStrings().play(bass)
 song.take(28.5, "Tchaikovsky, Dance of the Sugar Plum Fairy")
 ```
 
-The kit's drums are noise and sines, and the celesta and the strings are models of real objects. The 1980s had a cheaper way to make all of these sounds, from the few square waves and noise channels of a game console's sound chip: chapter 15. And the timpani, the celesta and the strings belong together in one orchestra, which chapter 16 assembles.
+The kit's drums are noise and sines, and the celesta and the strings are models of real objects. The 1980s had a cheaper way to make all of these sounds, from the few square waves and noise channels of a game console's sound chip: chapter 15. And the timpani, the celesta and the strings belong together in one orchestra, which chapter 26, on orchestration, assembles.
 
 ## Summary
 
