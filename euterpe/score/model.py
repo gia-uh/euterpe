@@ -7,7 +7,7 @@ from bisect import bisect_right
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, replace
 from fractions import Fraction
-from itertools import accumulate
+from itertools import accumulate, zip_longest
 from math import floor
 from typing import TYPE_CHECKING, Any, Union
 
@@ -52,7 +52,8 @@ class Tuplet:
 class Note:
     """A written note: one or more pitches that sound together for a Fraction of a whole note. Inside a triplet of
     eighths the duration is 1/12, the sounding one, and tuplet records the group for export and lint. dynamic is a
-    mark from this note on, and slur records a slur's ends for export."""
+    mark from this note on, slur records a slur's ends for export, and hairpin is a "<" or ">" that starts here and
+    runs up to the next dynamic. Part.dynamics and Part.hairpins read both marks."""
 
     pitches: tuple[Pitch, ...]
     duration: Fraction
@@ -61,6 +62,7 @@ class Note:
     dynamic: str | None = None
     tuplet: Tuplet | None = None
     slur: str | None = None
+    hairpin: str | None = None
 
     def __post_init__(self):
         pitches = (self.pitches,) if isinstance(self.pitches, Pitch) else tuple(self.pitches)
@@ -69,6 +71,8 @@ class Note:
         object.__setattr__(self, "pitches", pitches)
         object.__setattr__(self, "duration", _length(self.duration, "Note"))
         object.__setattr__(self, "articulations", tuple(self.articulations))
+        if self.hairpin is not None and self.hairpin not in _KINDS:
+            raise ValueError(f"Note: a hairpin's kind is < or >, not {self.hairpin!r}")
 
 
 @dataclass(frozen=True)
@@ -131,10 +135,12 @@ def _moved(item: Event | BarRest | Numeral, interval: Interval, bar: int) -> Eve
 @dataclass(frozen=True)
 class Line:
     """Bars of events, as melody() and chords() write them, not yet in a score. A bar may hold a Numeral or a BarRest
-    until Part.add places it. meter measures a BarRest for Line.duration when the line has one."""
+    until Part.add places it. meter measures a BarRest for Line.duration when the line has one. together holds lines
+    that sound with this one, as a grid's other drums do, and Part.add gives each the next voice."""
 
     bars: tuple[tuple[Event | BarRest | Numeral, ...], ...]
     meter: Meter | None = None
+    together: tuple[Line, ...] = ()
 
     def __post_init__(self):
         object.__setattr__(self, "bars", tuple(tuple(bar) for bar in self.bars))
@@ -160,15 +166,18 @@ class Line:
     def _moved(self, interval: Interval, first: int) -> Line:
         """The line moved by an interval, its bars numbered from first in any error."""
         bars = [[_moved(item, interval, number) for item in bar] for number, bar in enumerate(self.bars, first)]
-        return Line(bars, self.meter)
+        return Line(bars, self.meter, tuple(line._moved(interval, first) for line in self.together))
 
     def __add__(self, other: Line) -> Line:
-        """The bars of both. A meter one line knows carries over; two that differ measure no single bar, so neither does."""
+        """The bars of both. A meter one line knows carries over; two that differ measure no single bar, so neither does.
+        Lines sounding together join by their order, and one with no partner stays silent over the other's bars."""
         meters = {meter for meter in (self.meter, other.meter) if meter is not None}
-        return Line(self.bars + other.bars, meters.pop() if len(meters) == 1 else None)
+        joined = [(a.bars if a else ((),) * len(self.bars)) + (b.bars if b else ((),) * len(other.bars))
+                  for a, b in zip_longest((self, *self.together), (other, *other.together))]
+        return Line(joined[0], meters.pop() if len(meters) == 1 else None, tuple(Line(bars) for bars in joined[1:]))
 
     def __mul__(self, times: int) -> Line:
-        return Line(self.bars * times, self.meter)
+        return Line(self.bars * times, self.meter, tuple(line * times for line in self.together))
 
     __rmul__ = __mul__
 
@@ -270,20 +279,23 @@ class Part:
 
     def add(self, line: Line, voice: int = 0, at: int | None = None) -> Part:
         """Appends the line's bars after what the voice already holds, or places them from bar at. A numeral resolves
-        against the key in force at its bar, and a voice cannot be written twice over one bar."""
+        against the key in force at its bar, and a voice cannot be written twice over one bar. Lines sounding with
+        this one take the voices after it."""
         if voice < 0:
             raise ValueError(f"part {self.name!r}: no voice {voice}; voices count from 0")
         first = self._next(voice) if at is None else at
         if first < 1:
             raise ValueError(f"part {self.name!r}: no bar {first}; bars count from 1")
         last = first + len(line.bars) - 1
-        for other, start, written in self._written:
-            end = start + len(written.bars) - 1
-            if other == voice and start <= last and first <= end:
-                raise ValueError(f"part {self.name!r}: voice {voice} already holds bar {max(first, start)}")
-        self._check_hits(line)
-        self._resolve(first, line)
-        self._written.append((voice, first, line))
+        layers = list(enumerate((line, *line.together), voice))
+        for number, layer in layers:
+            for other, start, written in self._written:
+                end = start + len(written.bars) - 1
+                if other == number and start <= last and first <= end:
+                    raise ValueError(f"part {self.name!r}: voice {number} already holds bar {max(first, start)}")
+            self._check_hits(layer)
+            self._resolve(first, layer)
+        self._written += [(number, first, layer) for number, layer in layers]
         return self
 
     def dynamic(self, bar: int, beat: int | Fraction, mark: str) -> Part:
@@ -319,8 +331,7 @@ class Part:
     @property
     def dynamics(self) -> list[Dynamic]:
         """The marks in order, placed in the meters in force now."""
-        marks = [Dynamic(bar, *self.score._place(bar, beat), mark) for bar, beat, mark in self._dynamics]
-        return sorted(marks, key=lambda mark: mark.offset)
+        return sorted(self._placed_marks() + self._written_marks()[0], key=lambda mark: mark.offset)
 
     @property
     def hairpins(self) -> list[Hairpin]:
@@ -330,7 +341,40 @@ class Part:
             start_in_bar, start_offset = self.score._place(*start)
             end_in_bar, end_offset = self.score._place(*end)
             pins.append(Hairpin(start_offset, end_offset, kind, (start[0], start_in_bar), (end[0], end_in_bar)))
-        return sorted(pins, key=lambda pin: pin.start)
+        return sorted(pins + self._written_marks()[1], key=lambda pin: pin.start)
+
+    def _placed_marks(self) -> list[Dynamic]:
+        """The marks placed with Part.dynamic."""
+        return [Dynamic(bar, *self.score._place(bar, beat), mark) for bar, beat, mark in self._dynamics]
+
+    def _written_marks(self) -> tuple[list[Dynamic], list[Hairpin]]:
+        """The marks written on the notes, placed. A hairpin ends at the voice's next dynamic or hairpin, at the next
+        dynamic placed with Part.dynamic, whichever comes first, or else where the voice ends."""
+        marks, pins = [], []
+        placed = sorted(self._placed_marks(), key=lambda mark: mark.offset)
+        starts = self.score._starts(self.bars)
+        measures = self.measures
+        for voice in range(len(measures[0].voices) if measures else 0):
+            opened = None
+            for measure in measures:
+                lead = self.score._lead(measure.number)
+                position = Fraction(0)
+                for event in measure.voices[voice]:
+                    at = (measure.number, lead + position), starts[measure.number - 1] + position
+                    if isinstance(event, Note):
+                        if opened and (event.dynamic or event.hairpin):
+                            pins.append(_pin(opened, at, placed))
+                            opened = None
+                        if event.dynamic:
+                            marks.append(Dynamic(*at[0], at[1], event.dynamic))
+                        if event.hairpin:
+                            opened = at, event.hairpin
+                    position += event.duration
+                if measure.voices[voice]:
+                    last = (measure.number, lead + position), starts[measure.number - 1] + position
+            if opened:
+                pins.append(_pin(opened, last, placed))
+        return marks, pins
 
     def _next(self, voice: int) -> int:
         return max((first + len(line.bars) for other, first, line in self._written if other == voice), default=1)
@@ -583,6 +627,18 @@ class Score:
                     beats.append((bar, number, starts[bar - 1] + max(position, lead) - lead, starts[bar - 1] + end - lead))
                 position = end
         return beats
+
+
+def _pin(opened: tuple[tuple[tuple[int, Fraction], Fraction], str], end: tuple[tuple[int, Fraction], Fraction],
+         placed: list[Dynamic]) -> Hairpin:
+    """A hairpin from where it opened to end, or to the first placed mark between them, which are in order."""
+    (start_at, start), kind = opened
+    end_at, end_offset = end
+    for mark in placed:
+        if start < mark.offset < end_offset:
+            end_at, end_offset = (mark.bar, mark.in_bar), mark.offset
+            break
+    return Hairpin(start, end_offset, kind, start_at, end_at)
 
 
 def _moved_key(key: Key, interval: Interval) -> Key:
