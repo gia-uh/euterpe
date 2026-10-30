@@ -3,7 +3,7 @@ skipped. Each measures with no profile, and the chorale profile makes the cadenc
 
 from __future__ import annotations
 
-from bisect import bisect_right
+from bisect import bisect_left, bisect_right
 from collections.abc import Iterable, Iterator
 from fractions import Fraction
 
@@ -70,44 +70,47 @@ def _soprano(score: Score, start: Fraction, end: Fraction) -> Pitch | None:
 
 def _cadence(score: Score, params: dict, severity: Severity) -> list[Finding]:
     """Each section that ends before the piece does, and the piece, whose last chords make no cadence, at the last
-    chord's arrival. final_cadences, when a profile gives it, is what the piece itself must end on."""
+    chord's arrival, with how many chords that stretch holds as the value. A chord held through its inversions is one,
+    read as it last sounded. final_cadences, when a profile gives it, is what the piece itself must end on."""
     findings = []
     beats = list(zip(score._beats(), score.harmony()))
     ends = [(f"section {section.name}", section.first, section.last)
             for section in score.sections if section.last < score.bars]
     final = params.get("final_cadences")
     for what, first, last in [*ends, ("the piece", 1, score.bars)]:
-        heard = []
+        heard = []  # each chord as (the beat it arrives on, the beat it last sounds on, that beat's window)
         for window, beat in beats:
-            if first <= beat.bar <= last and beat.chord and not (heard and _same(heard[-1][1].chord, beat.chord)):
-                heard.append((window, beat))
+            if first <= beat.bar <= last and beat.chord:
+                arrival = heard.pop()[0] if heard and _same(heard[-1][1].chord, beat.chord) else beat
+                heard.append((arrival, beat, window))
         if heard:
-            (_, _, start, end), arrival = heard[-1]
-            kind = cadence([beat.chord for _, beat in heard], score.key_at(arrival.bar), _soprano(score, start, end))
-            ending = _label(arrival)
+            arrival, sounding, (_, _, start, end) = heard[-1]
+            kind = cadence([beat.chord for _, beat, _ in heard], score.key_at(sounding.bar), _soprano(score, start, end))
             message = None
             if kind is None:
-                message = f"{what} ends on {ending}, which makes no cadence"
+                message = f"{what} ends on {_label(sounding)}, which makes no cadence"
             elif what == "the piece" and final and kind not in final:
                 message = f"{what} ends on {kind}, not {' or '.join(final)}"
             if message:
-                findings.append(Finding("H-CADENCE", severity, message, bar=arrival.bar, beat=float(arrival.beat)))
+                findings.append(Finding("H-CADENCE", severity, message, float(len(heard)), bar=arrival.bar,
+                                        beat=float(arrival.beat)))
     return findings
 
 
 def _moves(score: Score, read: Iterable[VoiceLine]) -> Iterator[tuple[VoiceLine, Harmony, Pitch, Pitch, int, float]]:
     """Each move of each line out of a chord with a numeral, as (line, the beat it leaves, from, to, the bar and beat it
-    lands on). A note that stays, or goes to a tone of the chord it is on, has not left it yet."""
+    lands on). A note is read at its last moment, so one held over a chord change leaves the later chord. A note that
+    stays, or goes to a tone of the chord it is on, has not left it yet. This measures what the beats read as: a passing
+    tone that fills its own beat makes that beat another chord, so the move into it counts as leaving."""
     harmony = score.harmony()
     ends = [end for _, _, _, end in score._beats()]
 
-    def beat_of(offset: Fraction) -> Harmony | None:  # None past the end of an overfull last bar
-        index = bisect_right(ends, offset)
+    def at(index: int) -> Harmony | None:  # None past the end of an overfull last bar
         return harmony[index] if index < len(harmony) else None
 
     for line in read:
-        for (offset, _, pitch), (after, _, landing) in zip(line, line[1:]):
-            here, there = beat_of(offset), beat_of(after)
+        for (_, until, pitch), (after, _, landing) in zip(line, line[1:]):
+            here, there = at(bisect_left(ends, until)), at(bisect_right(ends, after))
             if (here is not None and here.roman is not None and there is not None
                     and pitch.number != landing.number and not _same(here.chord, there.chord)):
                 in_bar = after - score.bar_start(there.bar) + score._lead(there.bar)
@@ -122,7 +125,7 @@ def _leading(score: Score, params: dict, severity: Severity) -> list[Finding]:
         roman = beat.roman
         if (roman.function == "dominant" and not roman.secondary and _name(pitch) in roman.chord.tones
                 and _name(pitch) == _name(roman.key.leading_tone)
-                and not (landing > pitch and _name(landing) == _name(roman.key.degree(1)))):
+                and not (Interval.between(pitch, landing).number == 2 and _name(landing) == _name(roman.key.degree(1)))):
             message = named(line.voice, f"{pitch!r} in {roman.text} goes to {landing!r}, not up to the tonic")
             findings.append(Finding("H-LEADING", severity, message, float(landing - pitch), part=line.part, bar=bar,
                                     beat=place))

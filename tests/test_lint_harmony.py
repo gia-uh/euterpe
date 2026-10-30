@@ -101,6 +101,7 @@ def test_h_roman_reads_each_bar_in_its_key():
 def test_h_cadence_says_what_it_ends_on():
     [f] = _found(_fixture("H-CADENCE").trigger(), "H-CADENCE")
     assert f.message == "the piece ends on ii, which makes no cadence"
+    assert f.value == 2.0
 
 
 def test_h_cadence_holds_a_chord_as_one():
@@ -109,6 +110,20 @@ def test_h_cadence_holds_a_chord_as_one():
 
 def test_h_cadence_holds_a_chord_through_its_inversions():
     assert not _found(_score("<g3 b3 d4>:h <e4 g4 c5>:h | <c4 e4 g4>:w"), "H-CADENCE")
+
+
+@pytest.mark.parametrize("text", [
+    "<b3 d4 g4 g4>:h <g3 d4 g4 b4>:h | <c3 g3 e4 c5>:w",  # V6, V, I: root V to root I with the tonic on top
+    "<g3 b3 d4 g4>:w | <e3 g3 c4 g4>:h <c3 g3 e4 c5>:h",  # V, I6, I: and it ends on root I with C5 on top
+])
+def test_h_cadence_reads_each_chord_as_it_last_sounded(text):
+    assert not _found(_score(text), "H-CADENCE", "chorale")
+
+
+def test_h_cadence_places_a_chord_held_through_its_inversions_at_its_arrival():
+    [f] = _found(_score("<c4 e4 g4>:h <f3 a3 d4>:h | <a3 d4 f4>:w"), "H-CADENCE")
+    assert (f.bar, f.beat, f.value) == (1, 3.0, 2.0)
+    assert f.message == "the piece ends on ii64, which makes no cadence"
 
 
 def test_h_cadence_leaves_out_what_has_no_chord_after_it():
@@ -183,7 +198,7 @@ def test_a_custom_profile_chooses_the_final_cadences():
 
 def test_h_leading_names_the_move_and_gives_its_semitones():
     [f] = _found(_fixture("H-LEADING").trigger(), "H-LEADING")
-    assert "B4" in f.message and "G4" in f.message and "V" in f.message
+    assert f.message == "B4 in V goes to G4, not up to the tonic"
     assert f.value == -4.0
 
 
@@ -218,19 +233,49 @@ def test_h_leading_passes(text):
     assert not _found(_score(text), "H-LEADING")
 
 
+def _over(top, lower, part="soprano"):
+    s = Score()
+    s.part(part).add(melody(top))
+    s.part("lower").add(melody(lower))
+    return s
+
+
+@pytest.mark.parametrize("top", ["b4:w | g4:w", "b4:h~ b4:h | g4:w", "b4:h b4:h | g4:w"])
+def test_h_leading_reads_the_chord_a_held_note_leaves(top):
+    [f] = _found(_over(top, "<e3 g3>:h <g3 d4>:h | <c4 e4>:w"), "H-LEADING")
+    assert (f.bar, f.beat) == (2, 1.0)
+    assert f.message == "B4 in V goes to G4, not up to the tonic"
+
+
+@pytest.mark.parametrize("top", ["b4:w | a4:w", "b4:h~ b4:h | a4:w"])
+def test_h_leading_passes_a_note_held_out_of_v_into_another_chord(top):
+    assert not _found(_over(top, "<g3 d4>:h <e3 g3>:h | <f3 c4>:w"), "H-LEADING")
+
+
+def test_h_leading_wants_the_tonic_a_step_up():
+    [f] = _found(_score("<g3 b3 d4 b4>:h <c4 e4 g4 c6>:h"), "H-LEADING")
+    assert f.message == "B4 in V goes to C6, not up to the tonic"
+
+
+def test_h_leading_takes_a_passing_tone_on_its_own_beat_for_a_chord():
+    [f] = _found(_over("b4:q a4:q g4:h", "<g3 d4>:w"), "H-LEADING")
+    assert (f.bar, f.beat) == (1, 2.0)
+    assert f.message == "B4 in V goes to A4, not up to the tonic"
+
+
 def test_h_leading_skips_a_beat_with_no_numeral():
     assert not _found(_score("b4:h g4:h"), "H-LEADING")
 
 
 def test_h_seventh_names_the_move():
     [f] = _found(_fixture("H-SEVENTH").trigger(), "H-SEVENTH")
-    assert "F4" in f.message and "G4" in f.message and "V7" in f.message
+    assert f.message == "F4, the seventh of V7, goes to G4, not down by step"
     assert f.value == 2.0
 
 
 def test_h_seventh_reads_every_line():
     [f] = _found(_score("<g3 b3 d4 f4 g4>:h <g3 c4 e4 g4 c5>:h"), "H-SEVENTH")
-    assert "F4" in f.message
+    assert f.message == "F4, the seventh of V7, goes to G4, not down by step"
     assert not _found(_score("<g3 b3 d4 f4 g4>:h <g3 c4 c4 e4 c5>:h"), "H-SEVENTH")
 
 
@@ -250,6 +295,17 @@ def test_h_seventh_finds_any_move_but_a_falling_step(text):
 ])
 def test_h_seventh_passes(text):
     assert not _found(_score(text), "H-SEVENTH")
+
+
+@pytest.mark.parametrize("top", ["f4:w | g4:w", "f4:h~ f4:h | g4:w", "f4:h f4:h | g4:w"])
+def test_h_seventh_finds_a_prepared_seventh_that_rises(top):
+    [f] = _found(_over(top, "<d3 a3>:h <g3 b3 d4>:h | <c3 g3 c4>:w", "alto"), "H-SEVENTH")
+    assert (f.part, f.bar, f.beat) == ("alto", 2, 1.0)
+    assert f.message == "F4, the seventh of V7, goes to G4, not down by step"
+
+
+def test_h_seventh_passes_a_prepared_seventh_that_falls():
+    assert not _found(_over("f4:w | e4:w", "<d3 a3>:h <g3 b3 d4>:h | <c3 g3 c4>:w", "alto"), "H-SEVENTH")
 
 
 def test_an_overfull_last_bar_does_not_crash_the_chord_rules():

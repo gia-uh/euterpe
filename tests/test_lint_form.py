@@ -70,7 +70,7 @@ def test_f_repeat_is_high_on_a_variation_and_low_on_another_section():
     assert (high.severity, high.part) == ("metric", None)
     assert high.value > 0.5 > low.value
     assert low.value == 0.0
-    assert "A" in high.message and "B" in high.message
+    assert high.message == "sections A and B hold 64% of their n-grams in common"
 
 
 def test_f_repeat_is_one_for_equal_sections_and_reads_each_pair():
