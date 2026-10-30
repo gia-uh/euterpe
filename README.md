@@ -2,7 +2,7 @@
 
 Euterpe is a Python library in which an agent composes music by writing code: sound synthesized from scratch, instruments built from that sound, scores written with the concepts of European tonal theory, and a linter that measures what can be measured. Its documentation is a book that teaches a computer scientist music from the physics of a wave up to a full orchestral score, with every example rendered from Euterpe's own code. Euterpe settles the mechanics of music; a human judges whether a piece is good.
 
-Status: milestone 1 (sound) is in progress. See the pinned vision issue.
+Status: v0.2.0. Two of the four layers exist: sound (oscillators, filters, envelopes, physical models, effects) and instruments (plucked and bowed strings, electric guitar, keys and synthesizers, winds and brass, drums and percussion, chip channels), with lint rules for audio and note ranges. The book's Parts I and II, chapters 1 to 15, are published at https://uhgia.org/euterpe/. Theory and score, then arrangement and mix, come next; see the pinned vision issue.
 
 ## Install
 

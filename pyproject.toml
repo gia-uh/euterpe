@@ -1,6 +1,6 @@
 [project]
 name = "euterpe"
-version = "0.1.0.dev0"
+version = "0.2.0"
 description = "Compose music by writing code: synthesis, instruments, tonal theory and a linter."
 readme = "README.md"
 requires-python = ">=3.12"
