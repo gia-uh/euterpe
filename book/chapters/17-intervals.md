@@ -24,7 +24,7 @@ Bach's Invention No. 1 in C, BWV 772, written in 1723 to teach a student to play
 
 ## Counting letters
 
-An interval has a number and a quality. The number counts letters, with both ends included: C up to E is C, D, E, so a third. C up to C is a unison, a first, and C up to the next C is the octave of chapter 16, an eighth. The quality then says how many semitones that number holds, because the same three letters can hold several. `Interval("M3")` is a major third, and `C4 + Interval("M3")` is the pitch that far up, spelled by its letters.
+An interval has a number and a quality. The number counts letters, with both ends included: C up to E is C, D, E, so a third. C up to C is a unison, a first, and C up to the next C is the octave of chapter 16, an eighth. The quality then says how many semitones that number holds, because the same three letters can hold several. `Interval("M3")` is a major third, and `C4 + Interval("M3")` is the pitch that far up, spelled by its letters, and `Interval.between(p, q)` measures one.
 
 Unisons, fourths, fifths and octaves take the word *perfect* (`P`), and the others take major (`M`) and minor (`m`), one semitone less. *Augmented* (`A`) is a semitone wider than perfect or major, and *diminished* (`d`) a semitone narrower than perfect or minor. A minus sign goes down, as `-P8` did in chapter 16. Mind the letter A: `Interval("A4")` is an augmented fourth and `Pitch("A4")` is the note at 440 Hz, and each class reads the text its own way. All four thirds of C:
 
@@ -44,7 +44,7 @@ Each quality moves the top note by one semitone and keeps its letter E. The last
 Two of those thirds, one note after the other and then together, on chapter 10's harp:
 
 ```python {run}
-from euterpe import Interval
+from euterpe import Interval, display
 from euterpe.instruments import Harp
 from euterpe.pitch import C4
 
@@ -56,7 +56,7 @@ for name in ("m3", "M3"):
 
 One semitone is all that separates them, and the minor third sounds darker than the major one. Chapter 21 builds chords on that difference.
 
-Intervals also add, turn over and stretch:
+Intervals also add, turn over and stretch. *Inversion* moves the lower note up an octave, so the two intervals fill an octave between them, and `inverted` gives the second one. A *compound* interval is wider than an octave, and `simple` takes the octaves out, keeping the quality:
 
 ```python {run output=code}
 from euterpe import Interval
@@ -67,7 +67,7 @@ print(Interval("M3").inverted, Interval("P5").inverted, Interval("A4").inverted)
 print(Interval.between(C4, E5), Interval.between(C4, E5).simple, Interval("M10").semitones)
 ```
 
-A minor third on a major third is a perfect fifth: C to E♭ to G. *Inversion* moves the lower note up an octave, so the two intervals fill an octave between them: C up to E is `M3`, and E up to the next C is `m6`. Their numbers add up to 9 and their semitones to 12, major swaps with minor, augmented with diminished, and perfect stays perfect. A *compound* interval is wider than an octave, and `simple` takes the octaves out, keeping the quality: C4 to E5 is a major tenth, a major third with an octave added. The third bar of the Invention starts on exactly that pair.
+A minor third on a major third is a perfect fifth: C to E♭ to G. C up to E is `M3`, and E up to the next C is `m6`. An interval and its inversion have numbers that add up to 9 and semitones that add up to 12; major swaps with minor, augmented with diminished, and perfect stays perfect. C4 to E5 is a major tenth, a major third with an octave added. The third bar of the Invention starts on exactly that pair.
 
 ## Hearing each one
 
@@ -84,16 +84,7 @@ violin = Violin().play([(2.0 * i, C4, 1.8) for i in range(12)])
 (flute + violin * 0.8).take(24.5, "Each interval from C4: m2, M2, m3, M3, P4, A4, P5, m6, M6, m7, M7, P8")
 ```
 
-Listen to how much each pair rubs. The m2 at the start grinds, and so does the M7 near the end, one semitone short of closing the octave. The thirds and sixths are sweet. The P5 and the P8 are so plain that they are almost one note. The A4, the middle of the octave and called the *tritone*, is restless and wants to move. `consonance` is the name for this, and `Interval` gives it three grades:
-
-```python {run output=code}
-from euterpe import Interval
-
-for name in ("P5", "M3", "m2"):
-    print(name, Interval(name).consonance)
-```
-
-The *perfect* consonances are the open ones, the *imperfect* ones the sweet ones, and the rest *dissonant*: they want to go somewhere. The fourth depends on context. `consonance` calls P4 perfect, as its partials do, but when four lines are written together a fourth above the lowest line counts as a dissonance, and chapter 23 follows that rule.
+Listen to how much each pair rubs. The m2 at the start grinds, and so does the M7 near the end, one semitone short of closing the octave. The thirds and sixths are sweet. The P5 and the P8 are so plain that they are almost one note. The A4, the middle of the octave and called the *tritone*, is restless and wants to move. `consonance` is the name for this, and `Interval` gives it three grades: `Interval("P5").consonance` is `perfect`, `Interval("M3").consonance` is `imperfect` and `Interval("m2").consonance` is `dissonant`. The *perfect* consonances are the open ones, the *imperfect* ones the sweet ones, and the rest *dissonant*: they want to go somewhere. The fourth depends on context. `consonance` calls P4 perfect, as its partials do, but when four lines are written together a fourth above the lowest line counts as a dissonance, and chapter 23 follows that rule.
 
 ## Transposing
 
@@ -144,7 +135,7 @@ for answer, how in ((moved, "moved down a minor third"), (bach, "as Bach writes 
 A note is a stack of partials, as chapter 3 showed, and so two notes are two stacks. Chapter 16 heard the case of the octave, where every partial of the upper note lands on one of the lower. Other intervals line up less often. A saw has all its partials, so two saws on A3, 220 Hz, show which ones meet. First a perfect fifth, then a minor second, each as a sound and as stems, one panel per note, since `f0` can take one fundamental per clip:
 
 ```python {run}
-from euterpe import Interval
+from euterpe import Interval, display
 from euterpe.pitch import A3
 from euterpe.sound import Saw
 from euterpe.view import spectrum
@@ -178,6 +169,18 @@ for name in "P8 P5 P4 M6 M3 m3 m6 m7 M2 M7 m2 A4".split():
 
 Low partials are the loud ones, so the smaller these two numbers, the more of the sound lines up: 2 and 1 for the octave, 3 and 2 for the fifth, 5 and 4 for the major third. The dissonances wait until the 9th or the 15th partial, where a saw has little level left. The order follows the grades, with one exception, and it shows what this measure leaves out. The tritone meets at 7 and 5, yet it sounds rough: well below that, its lower note's 3rd partial and its upper note's 2nd miss by 1200 log2(3 / (2 × 2^(6/12))) = 102 cents, about a semitone. Partials that meet make an interval smooth, and partials that nearly meet make it rough.
 
+The Invention's third bar opens on a pair this table can read: C4 under E5, the major tenth. E5's 2nd partial meets C4's 5th, the same 5 and 4 as the major third, an octave higher, and they miss by the same 13.7 cents. Under the fast upper line the strings walk in eighths through more of these distances:
+
+```python {run}
+from euterpe import Key, Score, display, melody
+from euterpe.instruments import Flute, StringSection
+
+s = Score(key=Key("C major"), tempo=72)
+s.part("flute", Flute()).add(melody("e5:s a g f e g f a g f e d c e d f"))
+s.part("section", StringSection(players=2)).add(melody("c4:e b3 c4 d e g3 a b"))
+display(s, caption="Bar 3 of the Invention, which opens with C4 under E5")
+```
+
 ## Just and equal
 
 The cents column has a sting: only the octave is at 0. The major third's two partials meet at 13.7 cents apart, and so they beat. Twelve equal semitones can't be whole-number ratios, because no power of 2^(1/12) other than the octaves is a ratio of whole numbers. Tuning that uses the ratios themselves is called *just*: `JustIntonation(C4)` keeps C4 and sets each note by a ratio from it, and `EqualTemperament()` is the default, every note `Pitch.freq` gives. A tuning's `freq` answers for a spelled pitch. Here is E4 in both, then the 5th partial of C4 and the 4th partial of E4, the pair that should meet, and the beats between them in Hz:
@@ -195,7 +198,7 @@ for tuning, name in ((EqualTemperament(), "equal"), (JustIntonation(C4), "just")
 Moving E4 down by 2.6 Hz puts its 4th partial right onto C4's 5th. Now `Score` takes the tuning, and one sustained third plays in each, written `<c4 e4>:w`: angle brackets sound notes together. An organ is the instrument for this: chapter 12's organ builds a note from sines at exact multiples and holds them at one level, so nothing moves but the beat. `"008888800"` pulls out the first five. Under each player is the sound through chapter 5's `BandPass`, centred between the two partials so that nothing else gets through:
 
 ```python {run}
-from euterpe import EqualTemperament, JustIntonation, Key, Score, melody
+from euterpe import EqualTemperament, JustIntonation, Key, Score, display, melody
 from euterpe.instruments import Organ
 from euterpe.pitch import C4
 from euterpe.sound import BandPass
@@ -211,7 +214,21 @@ for tuning, name in ((EqualTemperament(), "equal"), (JustIntonation(C4), "just")
 
 Listen high up: the equal third shimmers, and its band swells 10 times in that second. The just third is still, and its band is flat.
 
-So why does every piano use the other one? Because just tuning fits one key. `JustIntonation(C4)` sets D at 9/8 and A at 5/3, so the fifth from D up to A is (5/3) / (9/8) = 40/27, which is 680 cents instead of a pure fifth's 702, and it howls. In this tuning G♯ and A♭ are even two frequencies, so a keyboard would need more keys. Equal temperament spreads the error evenly: each fifth is 2 cents narrow, each major third 13.7 cents wide, and every key is equally usable and equally a little out of tune. Chapter 18 needs that freedom. The rest of this book plays in equal temperament.
+So why does every piano use the other one? Because just tuning fits one key. `JustIntonation(C4)` sets D at 9/8 and A at 5/3, so the fifth from D up to A is (5/3) / (9/8) = 40/27, which is 680 cents instead of a pure fifth's 702. The Invention has that pair at the end of bar 5, D3 under A4, a fifth with an octave added. D3's 3rd partial should land on A4. In equal tuning it is 440.5 Hz against 440.0 Hz, 0.5 Hz apart, and in just tuning 441.5 Hz against 436.0 Hz, 5.5 Hz apart:
+
+```python {run}
+from euterpe import EqualTemperament, JustIntonation, Key, Score, display, melody
+from euterpe.instruments import Organ
+from euterpe.pitch import C4
+from euterpe.view import listen
+
+for tuning, name in ((EqualTemperament(), "equal"), (JustIntonation(C4), "just")):
+    s = Score(key=Key("C major"), tempo=60, tuning=tuning)
+    s.part("organ", Organ(drawbars="008888800")).add(melody("<d3 a4>:w"))
+    display(listen(s.play(), 4.0, f"D3 and A4 on an organ, in {name} tuning"))
+```
+
+Here the two tunings swap places: the equal pair is almost still, and the just one wavers about five times a second. In this tuning G♯ and A♭ are even two frequencies, so a keyboard would need more keys. Equal temperament spreads the error evenly: each fifth is 2 cents narrow, each major third 13.7 cents wide, and every key is equally usable and equally a little out of tune. Chapter 18 needs that freedom. The rest of this book plays in equal temperament.
 
 ## Putting it all together
 
@@ -272,12 +289,12 @@ There is something this chapter cannot explain. For three bars the Invention use
 
 1. In the block with the four thirds, change `C4 + third` to `D4 + third`, importing `D4`. What are the four thirds of D now?
 2. In the block that prints E4 in each tuning, change `(JustIntonation(C4), "just")` to `(Pythagorean(C4), "pure fifths")`, importing `Pythagorean` from `euterpe`, a third tuning that builds every note from pure fifths. How fast does the third beat now, and why?
-3. In the closing piece, change `Score(key=Key("C major"), tempo=72, title="Invention No. 1")` by adding `tuning=JustIntonation(C4)`, importing `JustIntonation` from `euterpe` and `C4` from `euterpe.pitch`. What improves, and where does it go wrong?
+3. In the closing piece, change `Score(key=Key("C major"), tempo=72, title="Invention No. 1")` by adding `tuning=JustIntonation(C4)`, importing `JustIntonation` from `euterpe` and `C4` from `euterpe.pitch`. What improves, and what happens to the D3 under A4 at the end of bar 5, about 16.5 s in?
 
 ### Answers
 
 1. `Fb4`, `F4`, `F#4` and `F##4`: each keeps the letter F, two letters above D. The semitones are the same as from C, 2, 3, 4 and 5, since the interval decides them and the starting note does not.
-2. E4 is now 331.1 Hz, 81/64 of C4, a stack of four pure fifths. Its 4th partial is 1324.4 Hz against C4's 5th at 1308.1 Hz, so it beats at 16.3 Hz, faster than equal temperament's 10.4. A tuning built on pure fifths gets its thirds worse.
+2. E4 is now 331.1 Hz, 81/64 of C4, a stack of four pure fifths. Its 4th partial is 1324.5 Hz against C4's 5th at 1308.1 Hz, so it beats at 16.4 Hz, faster than equal temperament's 10.4. A tuning built on pure fifths gets its thirds worse.
 3. The thirds and tenths sound stiller. But D is 9/8 and A is 5/3, so D to A is the 680-cent fifth from the section on tuning: D3 falls under A4 at the end of bar 5, and for that sixteenth it sounds sour. The one tuning cannot make every fifth pure as well as every third, which is why the piece, and the book, stays in equal temperament.
 
 ```python {run echo=false}
