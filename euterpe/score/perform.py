@@ -7,7 +7,6 @@ from __future__ import annotations
 from bisect import bisect_right
 from dataclasses import dataclass, field
 from fractions import Fraction
-from functools import cache
 from math import expm1, log1p
 from typing import TYPE_CHECKING
 
@@ -19,7 +18,6 @@ from euterpe.theory import EqualTemperament, Meter
 if TYPE_CHECKING:
     from euterpe.instruments.core import Articulation
     from euterpe.instruments.core import Note as Performed
-    from euterpe.instruments.percussion import Kit
     from euterpe.score.model import Dynamic, Note, Part, Placed, Score, Section
 
 _LEVELS = {"pp": .25, "p": .38, "mp": .5, "mf": .62, "f": .76, "ff": .9}
@@ -340,12 +338,18 @@ class Performance:
 
     def notes(self, score: Score, seed: int = 0) -> dict[str, list[Performed]]:
         """Each part's layer 2 notes, in time order, for that part's instrument to play."""
+        return {name: notes for name, (notes, _) in self._performed(score, seed).items()}
+
+    def _performed(self, score: Score, seed: int = 0) -> dict[str, tuple[list[Performed], dict[int, str]]]:
+        """Each part's notes, with the name each hit was written with by the id of its note: a Kit may hold one drum in
+        two places, so a note's drum does not say which of them was written."""
         tempo = TempoMap(score)
         seeds = part_seeds(seed, len(score.parts))
         return {name: self._part(score, part, tempo, np.random.default_rng(stream))
                 for (name, part), (stream, _) in zip(score.parts.items(), seeds)}
 
-    def _part(self, score: Score, part: Part, tempo: TempoMap, rng: np.random.Generator) -> list[Performed]:
+    def _part(self, score: Score, part: Part, tempo: TempoMap,
+              rng: np.random.Generator) -> tuple[list[Performed], dict[int, str]]:
         from euterpe.instruments.core import Note as Performed
         from euterpe.instruments.percussion import STEPS, Open
         from euterpe.score.model import Hit
@@ -357,6 +361,7 @@ class Performance:
         one_voice = getattr(part.instrument, "polyphony", None) == 1 and getattr(part.instrument, "slurs", True)
         clipped: dict[float, float] = {}  # on one voice, a written start clipped at 0 and the start it got
         notes = []
+        names: dict[int, str] = {}
         for sounds in events:
             moves, jolts = self._draws(rng, len(sounds), not one_voice)
             for sound, move, jolt in zip(sounds, moves, jolts):
@@ -372,7 +377,9 @@ class Performance:
                     velocity = _unit(level * STEPS[event.accent or "x"] + float(jolt))
                     if event.drum not in drums:
                         raise ValueError(f"part {part.name!r}: its kit has no drum {event.drum!r}; it has {', '.join(drums)}")
-                    notes += drums[event.drum].hit(time, velocity, articulation=Open() if event.accent == "o" else None)
+                    hits = drums[event.drum].hit(time, velocity, articulation=Open() if event.accent == "o" else None)
+                    names.update((id(note), event.drum) for note in hits)
+                    notes += hits
                     continue
                 sent = _sent(event)
                 pitch = sound.pitch if score.tuning == EqualTemperament() else score.tuning.freq(sound.pitch)
@@ -381,7 +388,7 @@ class Performance:
         notes.sort(key=lambda note: note.time)
         if one_voice:
             _detach(notes)
-        return notes
+        return notes, names
 
     def _draws(self, rng: np.random.Generator, count: int, spread: bool) -> tuple[np.ndarray, np.ndarray]:
         """How far each of a written event's notes moves, in seconds and in velocity. They share most of the start, or
@@ -426,17 +433,11 @@ def _sent(event: Note) -> Articulation | None:
                 readable[0] if readable else None)
 
 
-@cache
-def _export_kit() -> Kit:
-    """The Kit a part with no instrument yet performs on, for export. One for all, so a note's drum can be named."""
+def _drums(part: Part) -> dict:
+    """A Kit's drums by the names a Hit uses. A part with no instrument yet performs on a Kit of its own, for export."""
     from euterpe.instruments.percussion import Kit
 
-    return Kit()
-
-
-def _drums(part: Part) -> dict:
-    """A Kit's drums by the names a Hit uses."""
-    kit = part.instrument if part.instrument is not None else _export_kit()
+    kit = part.instrument if part.instrument is not None else Kit()
     return {"kick": kit.kick, "snare": kit.snare, "hihat": kit.hihat, "crash": kit.crash, "ride": kit.ride,
             **{f"tom{number}": tom for number, tom in enumerate(kit.toms, 1)}}
 

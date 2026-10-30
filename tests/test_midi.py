@@ -318,9 +318,25 @@ def test_a_part_with_hits_and_no_instrument_is_on_channel_10(tmp_path):
     assert [(note[2], note[4]) for note in notes] == [(36, 9), (46, 9)]
 
 
+def _hit_notes(kit: Kit, name: str, tmp_path: Path) -> list[int]:
+    s = Score()
+    s.part("drums", kit).add(Line([[Hit(name, Fraction(1, 4))]]))
+    return [note[2] for note in _notes(_read(s, tmp_path).tracks[1])]
+
+
+def test_a_kit_with_a_shared_drum_writes_each_hit_by_the_name_used(tmp_path):
+    tom, cymbal, hat = instruments.Tom(100.0), instruments.Crash(), instruments.HiHat()
+    assert _hit_notes(Kit(toms=(tom, tom, tom)), "tom1", tmp_path) == [50]
+    assert _hit_notes(Kit(toms=(tom, tom, tom, tom)), "tom1", tmp_path) == [50]
+    assert _hit_notes(Kit(crash=cymbal, ride=cymbal), "crash", tmp_path) == [49]
+    assert _hit_notes(Kit(crash=cymbal, ride=cymbal), "ride", tmp_path) == [51]
+    assert _hit_notes(Kit(hihat=hat, crash=hat), "hihat", tmp_path) == [42]
+
+
 def test_a_drum_without_a_general_midi_note_raises(tmp_path):
     s = Score()
-    s.part("drums", Kit(toms=(instruments.Tom(1.0),) * 4)).add(Line([[Hit("tom4", Fraction(1, 4))]]))
+    toms = tuple(instruments.Tom(tune) for tune in (200.0, 150.0, 100.0, 75.0))
+    s.part("drums", Kit(toms=toms)).add(Line([[Hit("tom4", Fraction(1, 4))]]))
     with pytest.raises(ValueError, match="tom4"):
         s.to_midi(tmp_path / "s.mid")
 
@@ -364,7 +380,7 @@ def test_the_presets_the_arrangements_play_have_their_program(make, program):
     assert make.gm_program == program
 
 
-def test_every_preset_has_a_program_of_its_own():
+def test_every_preset_sets_a_program():
     bases = {"Instrument", "Kit", "Plucked", "PluckedString", "Fretted", "Electric", "Bowed", "Blown", "Patch", "Barred",
              "Struck", "Cymbal"}
     presets = [value for name, value in vars(instruments).items()
@@ -385,6 +401,13 @@ def test_a_note_outside_midi_s_range_raises_naming_the_part(tmp_path):
     s.part("high").add(Line([[Note((Pitch(130),), Fraction(1, 4))]]))
     with pytest.raises(ValueError, match="high"):
         s.to_midi(tmp_path / "s.mid")
+
+
+def test_a_tempo_a_tempo_event_cannot_hold_raises_unless_performed(tmp_path):
+    s = _score("c4:w", tempo=2)
+    with pytest.raises(ValueError, match="slower"):
+        s.to_midi(tmp_path / "s.mid")
+    assert _tempos(_read(s, tmp_path, performed=True)) == [(0, 500000)]
 
 
 def test_the_file_lasts_until_the_last_bar_ends(tmp_path):

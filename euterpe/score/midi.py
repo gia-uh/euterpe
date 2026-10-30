@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 from euterpe.pitch import Pitch
 from euterpe.score.model import Part, Score
 from euterpe.score.musicxml import _DRUMS, _percussive
-from euterpe.score.perform import TempoMap, _Bar, _drums
+from euterpe.score.perform import TempoMap, _Bar
 from euterpe.theory import Key, Meter
 
 if TYPE_CHECKING:
@@ -77,7 +77,9 @@ def _key_signature(key: Key) -> bytes:
 
 
 def _tempo(micros: int) -> bytes:
-    return _meta(0x51, struct.pack(">I", min(micros, 0xFFFFFF))[1:])
+    if micros > 0xFFFFFF:
+        raise ValueError(f"midi: a quarter of {micros / 1e6:.1f} s is slower than the 16.8 s a tempo event can hold")
+    return _meta(0x51, struct.pack(">I", micros)[1:])
 
 
 def _bar_tempos(bar: _Bar) -> Iterator[tuple[Fraction, int]]:
@@ -119,11 +121,11 @@ def _performed_meta(score: Score) -> list[tuple[int, int, bytes]]:
             (0, _META, _tempo(500000))]
 
 
-def _number(part: Part, note: Performed, names: dict) -> int:
+def _number(part: Part, note: Performed, names: dict[int, str]) -> int:
     """The key a performed note goes on: a drum's General MIDI note, or the nearest key to its pitch."""
     from euterpe.instruments.percussion import Open
 
-    name = names.get(note.resource)
+    name = names.get(id(note))
     if name is not None:
         if name not in _DRUMS:
             raise ValueError(f"part {part.name!r}: no General MIDI note for the drum {name!r}; the drums are {', '.join(_DRUMS)}")
@@ -134,7 +136,7 @@ def _number(part: Part, note: Performed, names: dict) -> int:
     return number
 
 
-def _note_events(part: Part, notes: list[Performed], channel: int, names: dict,
+def _note_events(part: Part, notes: list[Performed], channel: int, names: dict[int, str],
                  tick: Callable[[float], int]) -> list[tuple[int, int, bytes]]:
     """A part's notes on a channel. One key cannot sound twice on a channel, since the first note-off would stop both, so
     a note stops where the next one on its key starts."""
@@ -163,24 +165,23 @@ def midi_bytes(score: Score, performed: bool = False) -> bytes:
         raise ValueError("midi: the score has no parts")
     tempo = TempoMap(score)
     if performed:
-        notes = score.performance.notes(score)
+        performance = score.performance
         meta = _performed_meta(score)
         tick = lambda seconds: round(seconds * _PER_SECOND)
     else:
-        notes = replace(score.performance, swing=None, humanize=None).notes(score)
+        performance = replace(score.performance, swing=None, humanize=None)
         meta = _notated_meta(score, tempo)
         tick = lambda seconds: round(tempo.offset(seconds) * _WHOLE)
+    played = performance._performed(score)
     last = tempo.played[-1]
     end = tick(tempo.seconds(last.start + last.length))
     pitched = cycle(channel for channel in range(16) if channel != _DRUM_CHANNEL)
     tracks = [([(0, _META, _meta(0x03, score.title.encode()))] if score.title else []) + meta]
     for name, part in score.parts.items():
-        percussive = _percussive(part, list(score.events(name)))
-        channel = _DRUM_CHANNEL if percussive else next(pitched)
-        names = {drum: drum_name for drum_name, drum in _drums(part).items()} if percussive else {}
+        channel = _DRUM_CHANNEL if _percussive(part, list(score.events(name))) else next(pitched)
         program = bytes((0xC0 | channel, getattr(part.instrument, "gm_program", 0)))
         tracks.append([(0, _META, _meta(0x03, name.encode())), (0, _META, program),
-                       *_note_events(part, notes[name], channel, names, tick)])
+                       *_note_events(part, played[name][0], channel, played[name][1], tick)])
     end = max(end, *(event[0] for track in tracks for event in track))
     chunks = [_track(events, end) for events in tracks]
     return b"MThd" + struct.pack(">IHHH", 6, 1, len(chunks), _QUARTER) + b"".join(chunks)
