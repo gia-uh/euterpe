@@ -141,3 +141,19 @@ def test_a_stomp_is_wood_not_hiss():
     m = np.abs(np.fft.rfft(x))
     f = np.fft.rfftfreq(len(x), 1 / RATE)
     assert m[f > 2000].sum() / m.sum() < 0.27  # the kick's high-passed click put 33 % up there
+
+
+def test_roll_gaps_are_one_over_rate_to_a_sample():
+    from euterpe.sound.core import RATE
+    rate = 13.0
+    p = Block().play(Block().roll(0.0, 2.0, rate=rate))
+    assert all(abs(d - RATE / rate) <= 1 for d in np.diff(p.starts))
+
+
+def test_a_decay_of_zero_names_the_decay():
+    from euterpe.instruments import Kick
+    from euterpe.instruments.percussion import fall
+    with pytest.raises(ValueError, match="fall needs time60 above 0 s, got 0: a drum's decay must be above 0"):
+        fall(0)
+    with pytest.raises(ValueError, match="decay"):
+        Kick(decay=0).play(Kick().hit(0.0)).take(0.01)

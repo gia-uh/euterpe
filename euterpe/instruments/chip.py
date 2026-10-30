@@ -225,8 +225,8 @@ class NoiseChannel(Instrument):
 
     def pattern(self, grid: dict[NoiseDrum, str], step: float, at: float = 0.0, repeat: int = 1) -> list[Note]:
         """Notes from a step grid, read as Kit.pattern reads one: a row of characters per drum,
-        one per step of step seconds; x or o a hit, X an accent, g a ghost note, a dot or a space
-        a rest."""
+        one per step of step seconds; x or o a hit, X an accent, g a ghost note, a dot a rest, and
+        a space or a | a group that takes no step."""
         if step <= 0 or repeat < 1:
             raise ValueError(f"pattern needs a step above 0 and repeat of at least 1, got {step} and {repeat}")
         rows = {drum: _steps(row) for drum, row in grid.items()}
