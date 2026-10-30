@@ -8,11 +8,11 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import to_hex
 import pytest
 
-from euterpe import Key, Meter, Score, chords, drums, melody
-from euterpe.instruments import Harp, Kit
+from euterpe import Key, Meter, Pitch, Score, chords, drums, melody
+from euterpe.instruments import Harp, Kit, Note
 from euterpe.view import display
 from euterpe.view.notation import PAGE_WIDTH, SCALE
-from euterpe.view.special import X0, X1
+from euterpe.view.special import X0, X1, roll as special_roll
 from euterpe.view.widget import FONT
 
 
@@ -450,3 +450,8 @@ def test_the_figure_rules_a_kits_bars():
     fig = s.roll().figure()
     assert len(fig.axes[0].lines) == 3  # two rules and the hits
     plt.close(fig)
+
+
+def test_a_roll_names_a_pitch_as_it_is_spelled():
+    body, *_ = special_roll([Note(0.0, Pitch("Eb4"), 1.0), Note(1.0, Pitch("D#4"), 1.0), Note(2.0, 311.13, 1.0)], 3.0)
+    assert ">E♭4<" in body and body.count(">D♯4<") == 2

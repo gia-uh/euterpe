@@ -166,14 +166,19 @@ class Waveform(_Many):
 
 
 class Spectrum(_Many):
-    """Level over frequency. With f0, one numbered stem per harmonic, each source its own panel;
-    without, a smoothed line on a log axis, sources overlaid."""
+    """Level over frequency. With f0, one numbered stem per harmonic, each source its own panel; a list
+    gives each source its own f0, so two notes' partials can be compared. Without, a smoothed line on a
+    log axis, sources overlaid."""
 
-    def __init__(self, *xs, upto: float = 6000.0, f0: float | None = None, harmonics: int | None = None, **kw):
+    def __init__(self, *xs, upto: float = 6000.0, f0: float | list[float] | None = None, harmonics: int | None = None,
+                 **kw):
         super().__init__(*xs, **kw)
         self.upto, self.f0, self.harmonics = upto, f0, harmonics
 
-    def _stems(self, ax, c, color):
+    def _f0s(self) -> list[float]:
+        return list(self.f0) if isinstance(self.f0, (list, tuple)) else [self.f0] * len(self.clips)
+
+    def _stems(self, ax, c, color, f0):
         ax.set_ylim(-60, 8)
         ax.set_yticks([-60, -30, 0])
         if _too_short(ax, [c]):
@@ -181,9 +186,9 @@ class Spectrum(_Many):
         win = np.hanning(len(c))
         mag = np.sqrt(sum(np.abs(np.fft.rfft(ch * win)) ** 2 for ch in _channels(c))) / max(win.sum() / 2, 1e-12)
         f = np.fft.rfftfreq(len(c), 1 / c.rate)
-        n = self.harmonics or int(self.upto // self.f0)
+        n = self.harmonics or int(self.upto // f0)
         for h in range(1, n + 1):
-            fh = self.f0 * h
+            fh = f0 * h
             if fh > self.upto:
                 break
             k = int(np.argmin(np.abs(f - fh)))
@@ -205,13 +210,14 @@ class Spectrum(_Many):
             fig, axes = plt.subplots(k, 1, figsize=(self.width, 1.0 + 1.15 * k), sharex=True, squeeze=False,
                                      gridspec_kw={"hspace": 0.35})
             axes = axes[:, 0]
+            f0s = self._f0s()
             for i, (c, ax) in enumerate(zip(self.clips, axes)):
                 color = SERIES[i % len(SERIES)]
-                self._stems(ax, c, color)
+                self._stems(ax, c, color, f0s[i])
                 if self.labels:
                     ax.text(1.0, 0.55, self.labels[i], transform=ax.transAxes, ha="right", fontstyle="italic",
                             color=color, fontsize=10)
-                octave_ruler(ax, max(self.f0 * 1.5, 20), self.upto, names=i == 0)
+                octave_ruler(ax, max(min(f0s) * 1.5, 20), self.upto, names=i == 0)
                 ax.spines["left"].set_position(("outward", 4))
             axes[-1].set_xlim(0, self.upto)
             label_axis(axes[-1], "frequency (Hz)")

@@ -704,3 +704,12 @@ def test_the_spec_piece_is_written_from_the_top_of_the_package():
     assert s.bars == 3
     assert [str(p.event.pitches[0]) for p in s.events("melody")] == ["F#4", "A4", "D5", "C#5", "B4", "A4"]
     assert [h.chord.root for h in s.harmony() if h.beat == 1] == ["D", "A", "D"]
+
+
+def test_then_carries_a_line_on_inside_its_last_bar():
+    subject = melody("r:s c4 d e f d e c")
+    entry = melody("r:h").then(subject.transpose(Interval("-P8")))
+    assert len(entry.bars) == 1
+    assert entry.duration == Fraction(1)
+    assert entry.bars[0][2].pitches == (Pitch("C3"),)
+    assert len(melody("c4:h | d4:h").then(melody("e4:h | f4:w")).bars) == 3
