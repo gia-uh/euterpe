@@ -9,6 +9,7 @@ from euterpe.instruments.core import (
     Note,
     PalmMute,
     Staccato,
+    Vibrato,
     play,
 )
 from euterpe.instruments.fretted import BassGuitar, Electric, ElectricBass, ElectricGuitar, Fretted, Guitar, Shape
@@ -105,5 +106,6 @@ __all__ = [
     "String",
     "Struck",
     "Tolerance",
+    "Vibrato",
     "ViolinBody",
 ]

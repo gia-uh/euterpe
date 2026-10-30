@@ -35,6 +35,7 @@ from euterpe.sound.space import (
     Width,
 )
 from euterpe.sound.synth import FM, Additive, Modal, Pluck
+from euterpe.sound.waveguide import Bore, Bow, Reed
 
 __all__ = [
     "Amp",
@@ -45,6 +46,8 @@ __all__ = [
     "BandPass",
     "BitCrush",
     "BLOCK",
+    "Bore",
+    "Bow",
     "Body",
     "BrownNoise",
     "Clip",
@@ -81,6 +84,7 @@ __all__ = [
     "PinkNoise",
     "Pluck",
     "RATE",
+    "Reed",
     "Saturator",
     "Saw",
     "Unison",

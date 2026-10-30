@@ -86,3 +86,51 @@ def test_play_warns_about_an_unplayable_note():
     from euterpe.pitch import B7
     with pytest.warns(UserWarning, match="B7"):
         Theremin().play([(0.0, B7, 0.5)])
+
+
+def _vibrato_note(seed=0):
+    note = Note(0.0, A4, 1.0)
+    note.rng = np.random.default_rng(seed)
+    return note
+
+
+def test_vibrato_moves_the_pitch_by_its_cents_after_its_delay_and_not_before():
+    from euterpe.instruments import Vibrato
+    from euterpe.sound import render
+
+    f = render(Vibrato(cents=18, delay=0.25, rise=0.3, variation=0.0).of(440.0, _vibrato_note()), 1.0)
+    assert np.all(f[: round(0.25 * RATE)] == np.float32(440.0))
+    swing = 1200 * np.log2(f[round(0.55 * RATE):] / 440.0)
+    assert swing.max() == pytest.approx(18, abs=0.1) and swing.min() == pytest.approx(-18, abs=0.1)
+
+
+def test_vibrato_varies_per_note_and_follows_a_moving_freq():
+    from euterpe.instruments import Vibrato
+    from euterpe.sound import Segments, render
+
+    v = Vibrato(delay=0.0, rise=0.0)
+    a, b = (render(v.of(440.0, _vibrato_note(s)), 0.5) for s in (1, 2))
+    assert not np.array_equal(a, b)
+    assert np.abs(1200 * np.log2(a / 440.0)).max() <= 18 * 1.1 + 1e-3
+    step = Segments([(0.0, 440.0), (0.6, 440.0), (0.6, 493.88)])
+    slur = render(Vibrato(cents=12, variation=0.0).of(step, _vibrato_note()), 1.2)
+    before = 1200 * np.log2(slur[round(0.56 * RATE):round(0.6 * RATE)] / 440.0)
+    after = 1200 * np.log2(slur[round(0.6 * RATE):] / 493.88)
+    assert np.abs(before).max() <= 12 + 1e-3 and np.abs(before).min() < 12
+    assert after.max() == pytest.approx(12, abs=0.1) and after.min() == pytest.approx(-12, abs=0.1)
+
+
+def test_vibrato_does_not_depend_on_the_block_size():
+    from euterpe.instruments import Vibrato
+    from euterpe.sound import render
+
+    swing = lambda: Vibrato(delay=0.01, rise=0.02).of(440.0, _vibrato_note(3))  # noqa: E731
+    whole = render(swing(), 0.05)
+    assert np.array_equal(whole, render(swing(), 0.05, block=1))
+    assert np.array_equal(whole, render(swing(), 0.05, block=37))
+
+
+def test_no_vibrato_is_the_frequency_itself():
+    from euterpe.instruments import Vibrato
+
+    assert Vibrato(cents=0).of(440.0, _vibrato_note()) == 440.0
