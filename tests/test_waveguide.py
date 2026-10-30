@@ -4,7 +4,7 @@ import pytest
 from euterpe.sound.core import RATE, render
 from euterpe.sound.env import Segments
 from euterpe.sound.osc import Sine
-from euterpe.sound.waveguide import Bore, Bow, Reed
+from euterpe.sound.waveguide import Bore, Bow, Jet, Lips, Reed
 from tests.helpers import _power, peak_hz
 
 
@@ -81,14 +81,55 @@ def test_bore_loop_parameters_take_numbers_or_data_only(kw):
         Bore(147.0, **kw)
 
 
-def test_reed_is_frozen_data():
+@pytest.mark.parametrize("mouth", [Reed(), Lips(), Jet()])
+def test_mouthpieces_are_frozen_data(mouth):
     with pytest.raises(AttributeError):
-        Reed().stiffness = 0.2  # type: ignore[misc]
+        mouth.loop = 0.2  # type: ignore[misc]
+    with pytest.raises(AttributeError):
+        setattr(mouth, next(iter(vars(mouth))), 0.2)
+
+
+def upper_db(x, f0):
+    """The energy in harmonics 6 to 15 against the fundamental's, in dB."""
+    freqs, power = _power(x)
+    near = lambda k: power[np.abs(freqs - k * f0) < 0.2 * f0].sum()  # noqa: E731
+    return float(10 * np.log10(sum(near(k) for k in range(6, 16)) / near(1)))
+
+
+@pytest.mark.parametrize("make", [
+    lambda: Bore(220.0, pressure=0.7, mouth=Lips()),
+    lambda: Bore(440.0, pressure=0.7, mouth=Jet(), bell=2200.0),
+])
+def test_lips_and_jet_sound_every_harmonic(make):
+    x = settled(render(make(), 0.5))
+    f0 = float(make().freq)
+    assert harmonic_db(x, f0, 1) - harmonic_db(x, f0, 2) < 10
+    assert abs(cents(peak_hz(x), f0)) < 15
+
+
+def test_lips_grow_brassy_with_pressure():
+    soft, loud = (upper_db(settled(render(Bore(110.0, pressure=p, mouth=Lips()), 0.5)), 110.0) for p in (0.5, 0.9))
+    assert loud - soft >= 6
+
+
+def test_a_jet_blown_at_full_pressure_jumps_an_octave():
+    played = settled(render(Bore(440.0, pressure=0.6, mouth=Jet(), bell=2200.0), 0.5))
+    overblown = settled(render(Bore(440.0, pressure=1.0, mouth=Jet(), bell=2200.0), 0.5))
+    assert abs(cents(peak_hz(played), 440.0)) < 15
+    assert abs(cents(peak_hz(overblown), 880.0)) < 30
+
+
+@pytest.mark.parametrize("mouth", [Lips(), Jet()])
+def test_lips_and_jet_below_the_threshold_are_only_breath(mouth):
+    rms = lambda p: np.sqrt(np.mean(settled(render(Bore(220.0, pressure=p, mouth=mouth, bell=2200.0), 0.5)) ** 2))  # noqa: E731
+    assert 20 * np.log10(rms(0.15) / rms(0.6)) < -20
 
 
 @pytest.mark.parametrize("make", [
     lambda seed: Bow(Sine(6.0) * 20 + 440, force=Sine(3.0) * 0.1 + 0.5, seed=seed),
     lambda seed: Bore(Sine(6.0) * 10 + 220, pressure=Sine(3.0) * 0.1 + 0.6, seed=seed),
+    lambda seed: Bore(Sine(6.0) * 10 + 220, pressure=Sine(3.0) * 0.1 + 0.6, mouth=Lips(), seed=seed),
+    lambda seed: Bore(Sine(6.0) * 10 + 440, pressure=Sine(3.0) * 0.1 + 0.6, mouth=Jet(), seed=seed),
 ])
 def test_waveguides_are_deterministic_in_any_block_size(make):
     whole = render(make(3), 0.05)
@@ -97,7 +138,9 @@ def test_waveguides_are_deterministic_in_any_block_size(make):
     assert not np.array_equal(whole, render(make(4), 0.05))
 
 
-@pytest.mark.parametrize("unit", [Bow(196.0), Bore(147.0), Bow(880.0, force=1.0, speed=1.0), Bore(880.0, pressure=1.0)])
+@pytest.mark.parametrize("unit", [Bow(196.0), Bore(147.0), Bow(880.0, force=1.0, speed=1.0), Bore(880.0, pressure=1.0),
+                                  Bore(82.0, pressure=1.0, mouth=Lips()), Bore(1175.0, pressure=1.0, mouth=Lips(), bell=14000.0),
+                                  Bore(262.0, pressure=1.0, mouth=Jet(), bell=1310.0), Bore(2349.0, pressure=1.0, mouth=Jet(), bell=11745.0)])
 def test_waveguides_stay_finite_and_below_full_scale(unit):
     x = render(unit, 0.3)
     assert np.all(np.isfinite(x)) and np.abs(x).max() < 1.0
