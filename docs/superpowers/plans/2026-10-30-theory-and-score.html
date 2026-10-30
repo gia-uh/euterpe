@@ -418,11 +418,12 @@ Produces: Finding(..., part=None, bar=None, beat=None); Rule(id, group, reads, s
   Profile(name, severities, params); PROFILES; lint_score(score, profile=None) -> Report
   lint_piece(score, profile=None, seed=0, audio=True) -> Report; s.lint(profile=None) -> Report
   Instrument.articulations: frozenset[type] | None = None
+  lines(score) -> a list, top to bottom, of lists of (offset, end, Pitch)
   tests/fixtures/score/&lt;rule&gt;.py each with trigger() -> Score and clean() -> Score</pre>
 <ol>
 <li>Write the failing tests for <code>Finding</code>: an audio finding's JSON gains the three keys as <code>null</code>; <code>to_text</code> prints <code>part alto, bar 3, beat 2:</code> when set; <code>beat</code> is a float counting from 1.</li>
 <li>For N-MEASURE, N-TUPLET, N-TIE, N-SPELLING, N-ARTIC, R-PLAYABLE, R-COMFORT, R-POLYPHONY and R-ARTIC: one fixture file each with §08's two cases, and a parametrized test that <code>trigger()</code> finds the rule, with the right <code>part</code>, <code>bar</code> and <code>beat</code>, and <code>clean()</code> does not. Also: a short last bar passes <code>N-MEASURE</code> when a pickup completes it, and only then (review focus 1); a bar of <code>R</code> passes; two parts sharing one instrument object count together for <code>R-POLYPHONY</code> (review focus 4); a part with <code>instrument=None</code> gets no R finding; <code>Score().lint()</code> has no findings.</li>
-<li>Implement. <code>lint_score</code> runs the rules of every group in §08's order, looks up severity and params from the profile (<code>None</code> turns a rule off), and adds the profile to style messages: <code>..., an error under the chorale profile</code>. R rules reuse <code>outside</code>; their old <code>lint_notes</code> stays for phrases.</li>
+<li>Implement. <code>lint_score</code> runs the rules of every group in §08's order, looks up severity and params from the profile (<code>None</code> turns a rule off), and adds the profile to style messages: <code>..., an error under the chorale profile</code>. R rules reuse <code>outside</code>; their old <code>lint_notes</code> stays for phrases. <code>lines(score)</code> lives in <code>core.py</code> (the H and V rules of slices 13 and 14 read it): each voice of each part, a stack of n pitches counting as n lines, ordered by mean pitch, and a stack whose size changes leaves the missing line as a rest; test it on a part going from three pitches to two.</li>
 <li><code>profiles.py</code> starts with the three profiles holding the N, R and A rows of §08's table; slices 12 to 14 add their rows. <code>lint_piece</code> runs <code>lint_score</code>, then <code>lint_audio</code> on <code>score.play(seed)</code> unless <code>audio=False</code>, with the audio rules and <code>A-LUFS</code> unchanged (§02).</li>
 <li>Set <code>articulations</code> on <code>Violin</code> and <code>ElectricGuitar</code>, so R-ARTIC has both a declaring and a listing case; other presets stay <code>None</code>.</li>
 </ol>
@@ -433,7 +434,7 @@ Produces: Finding(..., part=None, bar=None, beat=None); Rule(id, group, reads, s
 <pre>Consumes: Rule, Profile, fixture convention, s.events(), Meter.strength, Interval.between.
 Produces: T-PHRASE's phrase_ends(part) -> list[bar], used by M-CLIMAX.</pre>
 <ol>
-<li>One fixture file per rule with §08's two cases; a parametrized test per group; known values on the metrics: T-DENSITY's mean and largest, T-STRONG's share on two bars, M-CONTOUR's three shares, T-SYNCOPATION above 0 on a tied off-beat and 0 on quarters.</li>
+<li>One fixture file per rule with §08's two cases; a parametrized test per group that <code>trigger()</code> finds the rule with the right <code>part</code>, <code>bar</code> and <code>beat</code> and <code>clean()</code> does not; known values on the metrics: T-DENSITY's mean and largest, T-STRONG's share on two bars, M-CONTOUR's three shares, T-SYNCOPATION above 0 on a tied off-beat and 0 on quarters.</li>
 <li>T-SYNCOPATION from Longuet-Higgins and Lee's description over <code>Meter.strength</code>. T-PHRASE ends a phrase at a rest or a note of at least half a bar. T-BACKBEAT and T-FOURFLOOR read <code>Hit.drum</code> and report nothing on a part with no drums. T-TEMPO reads the tempo range including ramps.</li>
 <li>M rules read each voice as a line; a stack contributes its top pitch. M-AUGMENTED reads spelling through <code>Interval.between</code>: <code>F</code> to <code>B</code> and <code>Ab</code> to <code>B</code> trigger, <code>G#</code> to <code>A</code> does not.</li>
 <li>Add §08's T and M rows to the three profiles, with thresholds as params (<code>min_backbeat</code> 0.5, <code>min_floor</code> 0.9, <code>tempo</code> (118, 150), <code>max_range</code> 19, <code>max_repeat</code> 4). Test: T-BACKBEAT is a warning under pop and a metric with no profile; M-LEAP is off under techno; one custom <code>Profile("my", ...)</code> with a changed param.</li>
@@ -442,11 +443,11 @@ Produces: T-PHRASE's phrase_ends(part) -> list[bar], used by M-CLIMAX.</pre>
 
 <details class="task" id="slice-lint-harmony-form" data-state="pending"><summary>13 · lint-harmony-form · H and F rules<span class="s"></span><span class="f">euterpe/lint/score/harmony.py, form.py (new), euterpe/lint/score/profiles.py, tests/test_lint_harmony.py, tests/test_lint_form.py (new), tests/fixtures/score/</span></summary>
 <p>§08's H and F rows: H-KEY, H-ROMAN, H-CADENCE, H-LEADING, H-SEVENTH; F-MOTIF, F-REPEAT.</p>
-<pre>Consumes: Rule, Profile, s.harmony(), cadence, s.key_at, s.section.
+<pre>Consumes: Rule, Profile, lines(score), s.harmony(), cadence, s.key_at, s.section.
 Produces: nothing later slices read.</pre>
 <ol>
-<li>One fixture file per rule with §08's two cases; a parametrized test per group. Also: H-KEY follows a <code>change</code> (a C♯ in bars in D major is inside); H-ROMAN's message on I–IV–V–I reads as such, and a single line reports nothing; H-CADENCE under chorale wants a <code>PAC</code> or <code>plagal</code> at the end of the piece.</li>
-<li>H-LEADING and H-SEVENTH read the lines in order top to bottom by mean pitch and <code>Roman.chord</code>'s seventh and <code>Key.leading_tone</code>. When <code>harmony()</code> returns <code>None</code> for a beat, they skip it.</li>
+<li>One fixture file per rule with §08's two cases; a parametrized test per group that <code>trigger()</code> finds the rule with the right <code>part</code>, <code>bar</code> and <code>beat</code> and <code>clean()</code> does not. Also: H-KEY follows a <code>change</code> (a C♯ in bars in D major is inside); H-ROMAN's message on I–IV–V–I reads as such, and a single line reports nothing; H-CADENCE under chorale wants a <code>PAC</code> or <code>plagal</code> at the end of the piece.</li>
+<li>H-LEADING and H-SEVENTH read <code>lines(score)</code> from <code>lint-core</code>, top to bottom by mean pitch, and <code>Roman.chord</code>'s seventh and <code>Key.leading_tone</code>. When <code>harmony()</code> returns <code>None</code> for a beat, they skip it.</li>
 <li>F-MOTIF and F-REPEAT count n-grams (n = 3 and 4) of signed interval numbers, that is letter distance rather than semitones, so a motif moved by step inside a key counts as one motif even when a third changes from major to minor. A scale run reports only steps.</li>
 <li>Add §08's H and F rows to the profiles. Test one rule per group under each profile.</li>
 </ol>
@@ -454,11 +455,11 @@ Produces: nothing later slices read.</pre>
 
 <details class="task" id="slice-lint-voice" data-state="pending"><summary>14 · lint-voice · V rules and the finished profile table<span class="s"></span><span class="f">euterpe/lint/score/voice.py (new), euterpe/lint/score/profiles.py, euterpe/lint/__init__.py, tests/test_lint_voice.py, tests/test_lint_profiles.py (new), tests/fixtures/score/</span></summary>
 <p>§08's V rows: V-PARALLEL, V-DIRECT, V-CROSSING, V-OVERLAP, V-SPACING, V-RANGE, V-DOUBLING, and the paragraph on lines below the table.</p>
-<pre>Consumes: Rule, Profile, s.events(), Interval.between, Key.leading_tone.
-Produces: lines(score) -> a list, top to bottom, of lists of (offset, end, Pitch); PROFILES complete.</pre>
+<pre>Consumes: Rule, Profile, lines(score), Interval.between, Key.leading_tone.
+Produces: PROFILES complete.</pre>
 <ol>
-<li>One fixture file per rule with §08's two cases, including a four-bar chorale with parallel fifths and its corrected version, and §08's message exactly: <code>part alto, bar 3, beat 2: parallel fifths with the soprano (D4–A4 to E4–B4), an error under the chorale profile</code>.</li>
-<li><code>lines(score)</code>: each voice of each part, a stack of n pitches counting as n lines, ordered by mean pitch. A stack whose size changes leaves the missing line as a rest, so <code>V-PARALLEL</code> compares only where both lines sound (review focus 5); test on a part going from three pitches to two.</li>
+<li>One fixture file per rule with §08's two cases, a parametrized test that <code>trigger()</code> finds the rule with the right <code>part</code>, <code>bar</code> and <code>beat</code> and <code>clean()</code> does not, including a four-bar chorale with parallel fifths and its corrected version, and §08's message exactly: <code>part alto, bar 3, beat 2: parallel fifths with the soprano (D4–A4 to E4–B4), an error under the chorale profile</code>.</li>
+<li><code>lines(score)</code> comes from <code>lint-core</code>: each voice of each part, a stack of n pitches counting as n lines, ordered by mean pitch. A stack whose size changes leaves the missing line as a rest, so <code>V-PARALLEL</code> compares only where both lines sound (review focus 5); test on a part going from three pitches to two.</li>
 <li><code>V-RANGE</code> and <code>V-SPACING</code> run on exactly four lines, and otherwise report one metric saying so.</li>
 <li>Finish <code>PROFILES</code> with §08's V row. <code>tests/test_lint_profiles.py</code> walks §08's whole table: each cell's severity for one rule per group, under no profile, chorale, pop and techno. Export <code>lint_score</code>, <code>lint_piece</code>, <code>Profile</code> and <code>PROFILES</code> from <code>euterpe.lint</code>. A test counts 36 rule ids on a score, 33 of them new.</li>
 </ol>
