@@ -124,6 +124,16 @@ def test_tempo_after_a_ramp_holds_until_the_next_change():
     assert tempo.seconds(Fraction(7)) - tempo.seconds(Fraction(6)) == pytest.approx(1.0)  # past every bar named
 
 
+def test_a_ramp_reaches_its_to_even_with_a_change_on_the_next_bar():
+    s = Score(tempo=120)
+    s.part("a").add(melody("c4:w | d4:w"))
+    s.ramp(1, 1, 60)
+    s.change(2, tempo=90)
+    tempo = s.tempo_map()
+    assert tempo.seconds(Fraction(1)) == pytest.approx(4 * log(2))
+    assert tempo.seconds(Fraction(2)) - tempo.seconds(Fraction(1)) == pytest.approx(60 * 4 / 90)
+
+
 def test_a_meter_change_changes_what_a_number_tempo_counts():
     s = Score(tempo=60)
     s.change(2, meter=Meter("6/8"))
@@ -664,6 +674,11 @@ def test_a_humanized_velocity_is_clipped_at_3_sd():
     moved = [a.velocity - b.velocity for seed in range(50) for a, b in zip(s.performance.notes(s, seed=seed)["a"], straight)]
     assert max(abs(move) for move in moved) == pytest.approx(3 * 0.01)
     assert np.std(moved) == pytest.approx(0.01, rel=0.1)
+
+
+def test_notes_in_one_stack_draw_their_own_velocities():
+    s = score("<c4 e g>:q", Performance(humanize=Humanize(timing=0, velocity=0.02)))
+    assert len({n.velocity for n in s.performance.notes(s)["a"]}) == 3
 
 
 def test_notes_in_one_stack_share_most_of_the_start():
