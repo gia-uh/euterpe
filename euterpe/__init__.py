@@ -1,5 +1,6 @@
 """Euterpe: compose music by writing code."""
 
+from euterpe.score import Score
 from euterpe.theory import (
     Chord,
     EqualTemperament,
@@ -16,7 +17,7 @@ from euterpe.theory import (
 )
 
 __all__ = ["Chord", "EqualTemperament", "Interval", "JustIntonation", "Key", "Meter", "Pitch", "Pythagorean", "Roman",
-           "Scale", "analyze", "cadence", "display"]
+           "Scale", "Score", "analyze", "cadence", "display"]
 
 __version__ = "0.1.0.dev0"
 
