@@ -119,21 +119,22 @@ class Vibrato:
     rise: float = 0.3
     variation: float = 0.1
 
-    def of(self, freq: float | Unit, note: Note) -> float | Unit:
+    def of(self, freq: float | Unit, note: Note, phase: float = 0.0) -> float | Unit:
         """The note's moving frequency: freq (a number, or a unit such as a slur's) with this
-        vibrato on it; freq itself when cents is 0."""
+        vibrato on it, the sine starting phase cycles in; freq itself when cents is 0."""
         if self.cents == 0:
             return freq
         rate, depth = (1 + self.variation * note.rng.uniform(-1.0, 1.0, 2)) * (self.rate, self.cents)
         swing = Segments([(0.0, 0.0), (self.delay, 0.0), (self.delay + self.rise, float(depth))])
-        return _Swing(freq, float(rate), swing)
+        return _Swing(freq, float(rate), swing, phase)
 
 
 class _Swing(Unit):
-    """freq times 2 ** (depth * sin(2 pi rate t) / 1200): a sine of rate Hz, depth cents deep."""
+    """freq times 2 ** (depth * sin(2 pi (rate t + phase)) / 1200): a sine of rate Hz, depth
+    cents deep, starting phase cycles in."""
 
-    def __init__(self, freq: float | Unit, rate: float, depth: Unit):
-        self.freq, self.rate, self.depth = freq, rate, depth
+    def __init__(self, freq: float | Unit, rate: float, depth: Unit, phase: float = 0.0):
+        self.freq, self.rate, self.depth, self.phase = freq, rate, depth, phase
         self.reset()
 
     def reset(self) -> None:
@@ -143,7 +144,7 @@ class _Swing(Unit):
     def block(self, n: int) -> np.ndarray:
         t = (self._done + np.arange(n)) / RATE
         self._done += n
-        cents = _signal(self.depth, n) * np.sin(2 * np.pi * self.rate * t)
+        cents = _signal(self.depth, n) * np.sin(2 * np.pi * (self.rate * t + self.phase))
         return (_signal(self.freq, n) * 2.0 ** (cents / 1200)).astype(np.float32)
 
 
