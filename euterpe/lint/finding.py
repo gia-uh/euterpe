@@ -6,16 +6,29 @@ import json
 from dataclasses import asdict, dataclass, field
 from typing import Literal
 
+Severity = Literal["error", "warn", "metric"]
+
 
 @dataclass
 class Finding:
-    """One result of one rule: an error, a warning or a measurement. at is in seconds."""
+    """One result of one rule: an error, a warning or a measurement. at is in seconds. part, bar and beat place a
+    finding on a score, and beat counts from 1, as a float."""
 
     rule: str
-    severity: Literal["error", "warn", "metric"]
+    severity: Severity
     message: str
     value: float | None = None
     at: float | None = None
+    part: str | None = None
+    bar: int | None = None
+    beat: float | None = None
+
+    @property
+    def place(self) -> str:
+        """Where the finding is, as "part alto, bar 3, beat 2: ", or nothing when it has no place."""
+        named = (self.part is not None and f"part {self.part}", self.bar is not None and f"bar {self.bar}",
+                 self.beat is not None and f"beat {self.beat:g}")
+        return ", ".join(filter(None, named)) + ": " if any(named) else ""
 
 
 @dataclass
@@ -34,9 +47,9 @@ class Report:
         return next((f.value for f in self.findings if f.rule == rule), None)
 
     def to_json(self) -> str:
-        """The findings as JSON: {"findings": [{rule, severity, message, value, at}, ...]}."""
+        """The findings as JSON: {"findings": [{rule, severity, message, value, at, part, bar, beat}, ...]}."""
         return json.dumps({"findings": [asdict(f) for f in self.findings]}, indent=2)
 
     def to_text(self) -> str:
-        """One line per finding: severity, rule, message."""
-        return "\n".join(f"{f.severity:<6} {f.rule:<14} {f.message}" for f in self.findings)
+        """One line per finding: severity, rule, place if it has one, message."""
+        return "\n".join(f"{f.severity:<6} {f.rule:<14} {f.place}{f.message}" for f in self.findings)

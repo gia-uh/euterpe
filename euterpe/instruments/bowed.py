@@ -6,7 +6,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from euterpe.instruments.core import Instrument, Note, Staccato, Vibrato, _hz
+from euterpe.instruments.core import Accent, Instrument, Legato, Note, Staccato, Tenuto, Vibrato, _hz
 from euterpe.instruments.plucked import CelloBody, Gut, Soundboard, String, ViolinBody, _string_of
 from euterpe.pitch import A7, C2, C3, E6, G3
 from euterpe.sound import Bow, Peak, Segments
@@ -120,6 +120,7 @@ class Violin(Bowed):
     """
 
     gm_program = 40
+    articulations = frozenset({Staccato, Accent, Legato, Tenuto})
     playable = (G3, A7)
     comfortable = (G3, E6)
 
