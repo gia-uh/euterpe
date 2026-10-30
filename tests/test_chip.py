@@ -88,6 +88,26 @@ def test_fade_checks_its_numbers():
             Fade(**bad)
 
 
+@pytest.mark.parametrize("fade", [Fade(15, pace=7), Fade(15), Fade(3, pace=1, up=True)])
+def test_a_stepped_note_stops_at_its_end(fade):
+    x = render(PulseChannel(envelope=fade, quantize=False).note(750.0, 0.1, 1.0), 0.3)
+    assert np.abs(x[:int(0.09 * RATE)]).max() > 0.1
+    assert len(x) <= int(0.11 * RATE) or not np.any(x[int(0.11 * RATE):])
+
+
+def test_a_held_wave_note_stops_at_its_end():
+    x = render(WaveChannel(quantize=False).note(750.0, 0.1), 0.3)
+    assert len(x) <= int(0.11 * RATE) or not np.any(x[int(0.11 * RATE):])
+
+
+def test_a_noise_hit_lasts_its_fade():
+    noise = NoiseChannel()
+    (note,) = noise.hit(0.0, noise.kick)
+    assert note.duration == pytest.approx(15 / 64)
+    (held,) = noise.hit(0.0, NoiseDrum(4_000.0, fade=Fade(15)))
+    assert held.duration == 0.1
+
+
 def test_velocity_picks_the_starting_step():
     loud, soft = (np.abs(render(PulseChannel(quantize=False).note(750.0, 0.1, v), 0.1)).max() for v in (1.0, 0.4))
     assert soft / loud == pytest.approx(6 / 15, rel=0.05)
@@ -194,4 +214,11 @@ def _song(chip):
 def test_block_size_independence_and_determinism(make):
     a = render(_song(make()), 0.02, block=1)
     b = render(_song(make()), 0.02)
+    assert np.array_equal(a, b)
+
+
+@pytest.mark.parametrize("make", [ClassicChip, ModernChip])
+def test_a_whole_song_does_not_depend_on_the_block_size(make):
+    a = render(_song(make()), 0.6, block=37)
+    b = render(_song(make()), 0.6)
     assert np.array_equal(a, b)

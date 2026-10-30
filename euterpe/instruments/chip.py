@@ -43,7 +43,8 @@ class Fade:
     """The console's volume envelope: from volume start (0 to 15) the volume steps one level
     down, or up with up, every pace 64ths of a second, until it reaches 0 or 15; pace 0 holds
     start. Each step is a jump, so a fast fade has a rough, stepped decay where the spectrum of
-    each step's click shows; up to 7 the pace sets a fade of at most 15 * 7 / 64 s, 1.6 s."""
+    each step's click shows; up to 7 the pace sets a fade of at most 15 * 7 / 64 s, 1.6 s. A
+    channel stops the fade at the note's end, as the console stops a channel at note off."""
 
     start: int = 15
     pace: int = 0
@@ -52,6 +53,11 @@ class Fade:
     def __post_init__(self):
         if self.start not in range(16) or self.pace not in range(8):
             raise ValueError(f"Fade needs a whole start from 0 to 15 and pace from 0 to 7, got {self.start} and {self.pace}")
+
+    @property
+    def length(self) -> float | None:
+        """The seconds a fade from start takes to reach 0 or 15; None when it holds."""
+        return abs((15 if self.up else 0) - self.start) * self.pace / 64 if self.pace else None
 
     def of(self, velocity: float = 1.0, steps: bool = True) -> Segments:
         """The volume over time as a gain from 0 to 1, starting at velocity times start, rounded
@@ -68,6 +74,11 @@ class Fade:
         for k in range(1, len(levels)):
             points += [(k * step, levels[k - 1] / 15), (k * step, levels[k] / 15)]
         return Segments(points)
+
+
+def _gate(length: float) -> Segments:
+    """1 for length seconds, then down to 0 over 5 ms: a stepped voice stops at its note's end."""
+    return Segments([(0.0, 1.0), (length, 1.0), (length + 0.005, 0.0)])
 
 
 def _sweep(semitones: float, length: float) -> Segments:
@@ -110,7 +121,8 @@ class PulseChannel(_Channel):
     """A pulse channel: a band-limited Square at duty, the fraction of each cycle it is high.
 
     Duty 0.5 holds the odd harmonics only; 0.25 and 0.75 share one spectrum with every harmonic
-    but each 4th; 0.125 is thin and nasal, its harmonics nearly level up to the 8th. With steps
+    but each 4th; 0.125 is thin and nasal, its first four harmonics within 4 dB of each other, then
+    falling to a gap at every 8th. With steps
     the duty must be one of the console's four (else ValueError) and the volume follows
     envelope, a Fade (by default held at 15) started at the note's velocity times its start;
     without steps any duty is allowed and the volume is a smooth ADSR times the velocity.
@@ -136,7 +148,7 @@ class PulseChannel(_Channel):
 
     def voice(self, note: Note) -> Unit:
         if self.steps:
-            volume = (self.envelope or Fade()).of(note.velocity)
+            volume = (self.envelope or Fade()).of(note.velocity) * _gate(note.duration)
             return Square(self._freq(note), self.duty) * volume * self.level
         return Square(self._freq(note, self.adsr[3]), self.duty) * self._smooth(note) * self.level
 
@@ -174,7 +186,7 @@ class WaveChannel(_Channel):
         centred = [(v - 7.5) / 7.5 for v in self.table]
         gain = self.level / 2**self.shift
         if self.steps:
-            return Wavetable(centred, self._freq(note)) * gain
+            return Wavetable(centred, self._freq(note)) * _gate(note.duration) * gain
         return Wavetable(centred, self._freq(note, self.adsr[3])) * self._smooth(note) * gain
 
 
@@ -207,12 +219,13 @@ class NoiseChannel(Instrument):
         self.hat = NoiseDrum(NOISE_CLOCK / 2**3, fade=Fade(7, pace=1))
 
     def hit(self, at: float, drum: NoiseDrum, velocity: float = 0.8) -> list[Note]:
-        """One hit of drum at time at."""
-        return [Note(at, drum.rate, 0.1, velocity, resource=drum)]
+        """One hit of drum at time at, held for its fade's length (0.1 s for a fade that holds)."""
+        return [Note(at, drum.rate, drum.fade.length or 0.1, velocity, resource=drum)]
 
     def pattern(self, grid: dict[NoiseDrum, str], step: float, at: float = 0.0, repeat: int = 1) -> list[Note]:
         """Notes from a step grid, read as Kit.pattern reads one: a row of characters per drum,
-        one per step of step seconds; x a hit, X an accent, g a ghost note, a dot or a space a rest."""
+        one per step of step seconds; x a hit, X an accent, g a ghost note, o a hit as x (the hi-hat's open stroke has no meaning
+        here), a dot or a space a rest."""
         if step <= 0 or repeat < 1:
             raise ValueError(f"pattern needs a step above 0 and repeat of at least 1, got {step} and {repeat}")
         rows = {drum: _steps(row) for drum, row in grid.items()}
@@ -227,7 +240,7 @@ class NoiseChannel(Instrument):
             raise ValueError(f"note at {note.time:.2f} s names no drum; make it with NoiseChannel.hit or pattern")
         seed = 0x7FFF if self.steps else int(note.rng.integers(1, 2**15)) | 1
         noise = LFSRNoise(drum.rate, short=drum.short, seed=seed)
-        return noise * drum.fade.of(note.velocity, self.steps) * self.level
+        return noise * drum.fade.of(note.velocity, self.steps) * _gate(note.duration) * self.level
 
 
 class _Chip:
