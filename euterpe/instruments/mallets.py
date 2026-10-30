@@ -76,6 +76,7 @@ class Marimba(Barred):
     Limit: three modes per bar, and the tubes are a fixed boost, not resonators that ring on.
     """
 
+    gm_program = 12
     playable = (C2, C7)
     comfortable = (C3, C6)
 
@@ -92,6 +93,7 @@ class Xylophone(Barred):
     Limit: as Marimba's.
     """
 
+    gm_program = 13
     playable = (F4, C8)
     comfortable = (C5, F7)
 
@@ -108,6 +110,7 @@ class Glockenspiel(Barred):
     Limit: no damping between notes, so fast passages blur as on a real one played carelessly.
     """
 
+    gm_program = 9
     playable = (G5, C8)
     comfortable = (C6, C8)
 
@@ -124,6 +127,7 @@ class Celesta(Barred):
     Limit: no keyboard action or damper pedal; the hammers' felt is a fixed soft mallet.
     """
 
+    gm_program = 8
     playable = (C4, C8)
     comfortable = (C4, C7)
 

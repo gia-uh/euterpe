@@ -100,6 +100,7 @@ class Flute(Blown):
     fundamental rather than an overblown long one; no flutter tongue, no harmonics fingering.
     """
 
+    gm_program = 73
     playable = (C4, D7)
     comfortable = (D4, A6)
 
@@ -119,6 +120,7 @@ class Clarinet(Blown):
     blown at full pressure.
     """
 
+    gm_program = 71
     playable = (D3, Bb6)
     comfortable = (E3, C6)
 
@@ -139,6 +141,7 @@ class BrassSection(Blown):
     mode; the cost grows with the players, one Bore each.
     """
 
+    gm_program = 61
     polyphony = 8
     playable = (E2, D6)
     comfortable = (A2, A5)

@@ -60,6 +60,7 @@ class Lead(Patch):
     Limit: the vibrato restarts on every new note, and a slur keeps the first note's vibrato.
     """
 
+    gm_program = 81
     polyphony = 1
     glide = 0.05
     playable = (C2, C7)
@@ -86,6 +87,7 @@ class Pad(Patch):
     width.
     """
 
+    gm_program = 89
     polyphony = 8
     playable = (C1, C7)
     comfortable = (C2, C6)
@@ -106,6 +108,7 @@ class Supersaw(Patch):
     that beat, so a single note sounds like a section.
     """
 
+    gm_program = 81
     polyphony = 8
     playable = (C1, C8)
     comfortable = (C2, C6)
@@ -126,6 +129,7 @@ class SynthPluck(Patch):
     dies in about half a second, so each note is a short, ticking pluck.
     """
 
+    gm_program = 84
     polyphony = 8
     playable = (C2, C8)
     comfortable = (C3, C7)
@@ -149,6 +153,7 @@ class AcidBass(Patch):
     note that starts; a note slid into keeps the accent of the note it joined.
     """
 
+    gm_program = 38
     polyphony = 1
     glide = 0.06
     playable = (C1, C5)

@@ -29,7 +29,8 @@ dev = [
     "ipykernel>=7.4.0",
     "pytest-xdist>=3.8.0",
     "verovio>=6.3",
-]  # matplotlib: tests of euterpe.view; verovio: the MusicXML tests load the output
+    "mido>=1.3",
+]  # matplotlib: tests of euterpe.view; verovio: the MusicXML tests load the output; mido: the MIDI tests read the file back
 book = [
     "scriptorium @ git+https://github.com/apiad/scriptorium@v0.12.0",
     "matplotlib>=3.9",

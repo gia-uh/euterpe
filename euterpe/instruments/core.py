@@ -160,9 +160,11 @@ class Instrument:
     playable, comfortable: the lowest and highest pitch the instrument can play, and the
     range where it plays well; the lint rules check notes against them.
     seed: which instrument of its make this one is; character() draws its fixed flaws from it.
+    gm_program: the nearest General MIDI program, counted from 0, for a MIDI file.
     """
 
     polyphony: int = 8
+    gm_program: int = 0
     playable: tuple[Pitch, Pitch] | None = None
     comfortable: tuple[Pitch, Pitch] | None = None
     seed: int = 0

@@ -32,6 +32,7 @@ class Organ(Instrument):
     drift and leak into each other; there is no foldback at the top of the keyboard.
     """
 
+    gm_program = 16
     polyphony = 16
     playable = (C2, C7)
     comfortable = (C2, C6)
@@ -94,6 +95,7 @@ class ElectricPiano(Instrument):
     suitcase models are not modelled; wrap it in a chorus or a slow Pan for the tremolo.
     """
 
+    gm_program = 4
     polyphony = 16
     playable = (E1, E7)
     comfortable = (F2, C6)

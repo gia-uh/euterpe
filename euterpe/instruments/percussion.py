@@ -98,6 +98,8 @@ class Kick(Struck):
     synthesizer's kick more than an acoustic one.
     """
 
+    gm_program = 116
+
     def __init__(self, tune: float = 50.0, sweep: float = 3.0, drop: float = 0.04, decay: float = 0.45,
                  click: float = 0.3, level: float = 0.8, variation: float = 0.08, seed: int = 0):
         self.tune, self.sweep, self.drop, self.decay, self.click = tune, sweep, drop, decay, click
@@ -163,6 +165,8 @@ class Snare(Struck):
     Limit: the wires do not follow the head's motion, and a rimshot or a buzz roll is not modelled.
     """
 
+    gm_program = 115
+
     def __init__(self, tune: float = 185.0, decay: float = 0.18, snappy: float = 0.7, wires: float = 0.22,
                  level: float = 0.3, variation: float = 0.08, seed: int = 0):
         self.tune, self.decay, self.snappy, self.wires = tune, decay, snappy, wires
@@ -186,6 +190,8 @@ class Tom(Struck):
 
     Limit: one head and no shell, so it rings cleaner than a real tom.
     """
+
+    gm_program = 117
 
     def __init__(self, tune: float = 110.0, decay: float = 0.5, level: float = 0.4,
                  variation: float = 0.08, seed: int = 0):
@@ -211,6 +217,8 @@ class Clap(Struck):
 
     Limit: every hand has the same resonance; a crowd of hundreds needs a room as well.
     """
+
+    gm_program = 118
 
     def __init__(self, hands: int = 4, spread: float = 0.011, decay: float = 0.15, tune: float = 1200.0,
                  level: float = 0.6, variation: float = 0.08, seed: int = 0):
@@ -244,6 +252,8 @@ class HiHat(Struck):
     Limit: the metal is a fixed cluster of tones, not the modes of two real cymbals, and the
     pedal has no half-open position or foot chick.
     """
+
+    gm_program = 119
 
     def __init__(self, closed: float = 0.05, open: float = 0.45, tone: float = 7000.0, level: float = 0.35,
                  variation: float = 0.08, seed: int = 0):
@@ -299,6 +309,8 @@ class Crash(Cymbal):
     Limit: as Cymbal's; the swell of a real crash just after the hit is missing.
     """
 
+    gm_program = 119
+
     def __init__(self, decay: float = 2.0, wash: float = 0.8, bell: float = 0.0, tune: float = 340.0,
                  level: float = 0.25, variation: float = 0.08, seed: int = 0):
         super().__init__(decay, wash, bell, tune, level, variation, seed)
@@ -309,6 +321,8 @@ class Ride(Cymbal):
 
     Limit: as Cymbal's; the stick's ping does not change with where it lands.
     """
+
+    gm_program = 119
 
     def __init__(self, decay: float = 3.0, wash: float = 0.25, bell: float = 0.3, tune: float = 420.0,
                  level: float = 0.2, variation: float = 0.08, seed: int = 0):
@@ -418,6 +432,7 @@ class Timpani(Struck):
     strokes with no alternation between two mallets.
     """
 
+    gm_program = 47
     playable = (D2, C4)
     comfortable = (E2, A3)
 

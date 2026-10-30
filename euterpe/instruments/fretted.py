@@ -223,6 +223,7 @@ class Guitar(Fretted):
     and there are no fret noises, slides, bends or hammer-ons.
     """
 
+    gm_program = 24
     tuning = (E2, A2, D3, G3, B3, E4)
     frets = 19
     polyphony = 6
@@ -246,6 +247,7 @@ class BassGuitar(Fretted):
     boom than a real box.
     """
 
+    gm_program = 32
     tuning = (E1, A1, D2, G2)
     frets = 20
     polyphony = 4
@@ -326,6 +328,7 @@ class ElectricGuitar(Electric):
     it, where a real one comes from the speaker's sound driving the string.
     """
 
+    gm_program = 27
     tuning = (E2, A2, D3, G3, B3, E4)
     frets = 22
     polyphony = 6
@@ -339,6 +342,7 @@ class ElectricBass(Electric):
     Limit: the strings of BassGuitar, without their stiffness or the finger's thump.
     """
 
+    gm_program = 33
     tuning = (E1, A1, D2, G2)
     frets = 20
     polyphony = 4
