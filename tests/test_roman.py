@@ -26,6 +26,8 @@ A_MINOR = Key("A minor")
         ("V/vi", ("E", "G#", "B")),
         ("V7/IV", ("C", "E", "G", "Bb")),
         ("III+", ("E", "G#", "B#")),
+        ("III/ii", ("F", "A", "C")),
+        ("III/II", ("F#", "A#", "C#")),
     ],
 )
 def test_numerals_in_c_major(text, tones):
@@ -66,6 +68,7 @@ def test_numerals_in_a_minor(text, tones):
         ("viiø7", "m7b5"),
         ("vii°7", "dim7"),
         ("bVII7", "7"),
+        ("bIV7", "7"),
         ("iv7", "m7"),
     ],
 )
@@ -122,6 +125,7 @@ def test_the_ascii_suffixes_are_one_numeral_with_the_signs():
         ("vii°", "dominant"),
         ("V7/V", "dominant"),
         ("vii°7/ii", "dominant"),
+        ("IV/V", "dominant"),
         ("bVI", "tonic"),
         ("bII6", "predominant"),
     ],
@@ -241,7 +245,7 @@ def test_analyze_handles_a_minor_key_whose_raised_notes_cannot_be_spelled(tonic)
     assert analyze(Chord(f"{tonic}m"), key) == key.roman("i")
 
 
-def test_a_prefix_on_vii_moves_the_natural_seventh_whatever_the_case():
+def test_a_minor_triad_on_a_minor_keys_natural_seventh_has_no_numeral():
     assert analyze(Chord("Gm"), A_MINOR) is None
 
 
@@ -259,6 +263,7 @@ def chords(*symbols):
         (("G/B", "C"), C5, "IAC"),
         (("G", "C/E"), C5, "IAC"),
         (("C", "G"), None, "HC"),
+        (("C", "G7"), None, "HC"),
         (("C", "Dm", "G"), G4, "HC"),
         (("F", "C"), None, "plagal"),
         (("Fm", "C"), C5, "plagal"),
@@ -267,6 +272,7 @@ def chords(*symbols):
         (("Dm", "Em"), None, None),
         (("C", "Am"), None, None),
         (("Csus4", "C"), None, None),
+        (("G", "A"), None, None),
         (("G", "Cm"), C5, None),
         (("G", "Cm"), None, None),
         (("F", "Cm"), None, None),
