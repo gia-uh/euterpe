@@ -131,7 +131,7 @@ class Interval:
         perfect = (abs(number) - 1) % 7 in _PERFECT
         run = quality[:1] in ("A", "d") and set(quality) == {quality[0]}
         if number == 0 or not (run or (quality == "P" and perfect) or (quality in ("M", "m") and not perfect)):
-            raise ValueError(f"Interval: there is no {quality}{number}")
+            raise ValueError(f"Interval: there is no {'-' if number < 0 else ''}{quality}{abs(number)}")
         object.__setattr__(self, "quality", quality)
         object.__setattr__(self, "number", 1 if quality == "P" and abs(number) == 1 else number)
 

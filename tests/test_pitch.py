@@ -147,7 +147,7 @@ def test_semitones(text, semitones):
     assert Interval(text).semitones == semitones
 
 
-@pytest.mark.parametrize("bad", ["M5", "P3", "m4", "P2", "M1", "M0", "x3", "", "M", "3", "Pd5", "- M3"])
+@pytest.mark.parametrize("bad", ["M5", "-M5", "P3", "m4", "P2", "M1", "M0", "x3", "", "M", "3", "Pd5", "- M3"])
 def test_interval_names_what_it_cannot_read(bad):
     with pytest.raises(ValueError, match=bad or "Interval"):
         Interval(bad)
