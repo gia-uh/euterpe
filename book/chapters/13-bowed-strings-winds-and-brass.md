@@ -75,7 +75,7 @@ from euterpe.pitch import A4
 from euterpe.view import listen
 
 display(listen(Violin(vibrato=Vibrato(cents=0)).play([Note(0.0, A4, 3.0)]), 3.5, "A4, no vibrato"))
-display(listen(Violin().play([Note(0.0, A4, 3.0)]), 3.5, "A4, with vibrato"))
+display(listen(Violin().play([Note(0.0, A4, 3.0)]), 3.5, "A4, with vibrato", id="vibrato"))
 ```
 
 Without vibrato the note is a steady buzz. With it, the note sounds alive after a moment, because each harmonic k swings by k times the fundamental's swing and moves across the body's resonances.
@@ -96,20 +96,19 @@ Listen to the first F♯: it starts straight, the vibrato arrives a quarter seco
 
 ## A section
 
-An orchestra has no single violin: it has a dozen, playing the same line. No two are exactly in tune, no two start at the same instant, and each vibrato has its own rate. Their sum beats and shimmers, as chapter 12's supersaw did, but from players who differ by accident instead of by a fixed spread. `StringSection(players=4)` is that: one `Bow` per player, each detuned by up to 8 cents, starting up to 30 ms late, with its own vibrato rate and phase, and summed. One player against four, on the same note:
+An orchestra has no single violin: it has a dozen, playing the same line. No two are exactly in tune, no two start at the same instant, and each vibrato has its own rate. Their sum beats and shimmers, as chapter 12's supersaw did, but from players who differ by accident instead of by a fixed spread. `StringSection(players=4)` is that: one `Bow` per player, each detuned by up to 8 cents, starting up to 30 ms late, with its own vibrato rate and phase, and summed. The same A4 as @aud-vibrato, now on four players:
 
 ```python {run}
-from euterpe.instruments import Note, StringSection, Violin
+from euterpe.instruments import Note, StringSection
 from euterpe.pitch import A4
 from euterpe.view import listen
 
-one, four = Violin().play([Note(0.0, A4, 3.0)]).take(3.5), StringSection().play([Note(0.0, A4, 3.0)]).take(3.5)
-display(listen(one, caption="A4, one violin"), listen(four, caption="A4, a section of four"))
+listen(StringSection().play([Note(0.0, A4, 3.0)]), 3.5, "A4, a section of four")
 ```
 
-The single violin is one clear line. The section is wider and moves: four strings a few cents apart beat at a different rate in every harmonic. Below C3 the section sounds through a cello's body (`CelloBody`, an air mode near 100 Hz), so its lowest players can take a bass line.
+The single violin is one clear line. The section is wider and moves: four strings a few cents apart beat at a different rate in every harmonic. Notes below C3 sound through a cello's body (`CelloBody`, an air mode near 100 Hz), so the same section can play a bass line.
 
-The *Air* is written for strings in four parts: the melody, two inner voices that hold the harmony, and a bass that walks in octaves under it, one leap every eighth note. Two layers join the solo violin at once: the section on the inner voices and the section's low players on the bass:
+The *Air* is written for strings in four parts: the melody, two inner voices that hold the harmony, and a bass that walks in octaves under it, one leap every eighth note. Two layers join the solo violin at once, both on the section: the inner voices, and the bass below C3:
 
 ```python {run}
 from euterpe.instruments import StringSection, Violin
@@ -152,9 +151,9 @@ breath = Segments([(0.0, 0.0), (3.0, 0.7)])
 display(listen(Bore(G3.freq, pressure=breath, mouth=Reed()) * 0.5, 4.0, "A reed, the pressure rising past the threshold"))
 ```
 
-After a faint hiss at the start, which dies within half a second, the take is silent. The pressure passes 0.3 at 1.3 s (0.3 / 0.7 of three seconds), but the note only appears near 1.8 s, where the pressure is about 0.43, and is full by 2.2 s: an oscillation needs many trips through the tube to build up, and the pressure keeps rising while it does.
+The pressure passes 0.3 at 1.3 s (0.3 / 0.7 of three seconds), but the note appears noticeably later: an oscillation needs many trips through the tube to build up, and the pressure keeps rising while it does.
 
-`Clarinet` is `Bore` with a `Reed` inside an instrument, its velocity setting the pressure through a `Breath` part, with no vibrato: classical clarinettists play without it. Mozart wrote his Clarinet Concerto (K. 622) in 1791, the year he died; its Adagio opens on a slow, singing line in the instrument's middle register. Over soft chords from the section:
+`Clarinet`, `Flute` and `BrassSection` are all `Blown` instruments: a `Bore` with a mouthpiece, a `Breath` part and a `Vibrato`. `Clarinet` has a `Reed`, its velocity setting the pressure through a `Breath` part, with no vibrato: classical clarinettists play without it. Mozart wrote his Clarinet Concerto (K. 622) in 1791, the year he died; its Adagio opens on a slow, singing line in the instrument's middle register. Over soft chords from the section:
 
 ```python {run}
 from euterpe.instruments import Clarinet, StringSection
@@ -216,7 +215,7 @@ display(listen(brass.play(chords), 3.6, "A C major chord on BrassSection, veloci
 
 The first chord is soft and dark, almost a horn. The second, the same notes, rasps. On a driven instrument, loudness and tone come from the same force, and no gain can fake it.
 
-Rossini's *William Tell* Overture (1829) ends on a gallop, a trumpet call of repeated notes, three to a beat, the most famous fanfare ever written for brass:
+Rossini's *William Tell* Overture (1829) ends on a gallop, a trumpet call of repeated notes, two quick notes and a third on every beat, the most famous fanfare ever written for brass:
 
 ```python {run}
 from euterpe.instruments import BrassSection
@@ -238,16 +237,13 @@ Listen to how each short note starts: the tongue releases the air in a burst, an
 
 These instruments are recognisable and they respond to how they are played. They are also not yet real, and the ear knows why:
 
-- A violin's body has hundreds of resonances and radiates differently in every direction; here it has three modes.
-- A long note on a real violin changes bow direction, with a small break the ear expects. There is no bow change here, and no spiccato (the bow bouncing on the string), col legno (the string struck with the bow's wood) or double stops (two strings bowed at once).
-- A real player moves the bow's pressure, speed and position all through a note, by judgement. Here they follow an envelope.
-- The tubes are cylinders whose length changes as a whole: no tone holes, no key noise, no break between the clarinet's low and high registers, and no cone, so no oboe, saxophone or bassoon. In the finale the clarinet an octave down stands in for the bassoon, which Ravel wrote there.
-- A section's players start apart and drift in tune, but they do not listen to each other.
-- Every instrument here is dry until an effect adds a room.
+- The violin's body has three modes, not hundreds, and radiates the same way in every direction. No bow changes direction in a long note, and there is no spiccato (the bow bouncing), col legno (the string struck with the bow's wood) or double stops (two strings at once).
+- No player moves the bow's pressure, speed and position through a note by judgement: they follow an envelope. A section's players drift apart in tune but do not listen to each other. Every instrument is dry until an effect adds a room.
+- The tubes are cylinders whose length changes as a whole: no tone holes, no key noise, no register break, and no cone, so no oboe, saxophone or bassoon. In the finale the clarinet an octave down stands in for Ravel's bassoon.
 
 ## Putting it all together
 
-The *Boléro* is marked *Tempo di Bolero, moderato assai*: 72 beats a minute in 3/4, so a bar is 2.5 s. The snare drum plays an *ostinato*, a two-bar figure repeated unchanged from the first bar to the last: 36 steps of six to a beat, 18 a bar. It comes from chapter 14's `Kit`, where the drum is built, with its techniques: `kit.snare.roll(at, length, velocity, end)` plays strokes so fast they blur into one sound, and `hit(at, velocity)` one stroke; `kit.crash` is a crash cymbal and `kit.kick` the bass drum. `kit.pattern(grid, step, repeat=11)` turns the figure into notes, an `x` a stroke and a `.` a rest, one character every `step` seconds, repeated 11 times. A pizzicato bass (chapter 10) plucks C and G under it. The melody passes from instrument to instrument, four bars each, and every pass is louder: the velocity rises from 0.35 to 0.95 over the piece, which on these instruments raises the bow's force and the breath, so the swell brightens as it grows. The drum's level rises with a `Segments` gain.
+The *Boléro* is marked *Tempo di Bolero, moderato assai*: 72 beats a minute in 3/4, so a bar is 2.5 s. The snare drum plays an *ostinato*, a two-bar figure repeated unchanged from the first bar to the last: 36 steps of six to a beat, 18 a bar. It is played on the `Kit` and its step grid of chapters 11 and 12; chapter 14 builds the drums. Two of the drum's techniques are new: `kit.snare.roll(at, length, velocity, end)` plays strokes so fast they blur into one sound, and `hit(at, velocity)` one stroke, here on the crash cymbal and the kick. The ending holds a G7 chord (G2, B3, F4, G4), the dominant, which pulls to the last C major chord. The whole band plays through chapter 8's `FDNReverb`, a 2 s hall. A pizzicato bass (chapter 10) plucks C and G under it. The melody passes from instrument to instrument, four bars each, and every pass is louder: the velocity rises from 0.35 to 0.95 over the piece, which on these instruments raises the bow's force and the breath, so the swell brightens as it grows. The drum's level rises with a `Segments` gain.
 
 - **Pass 0**: one bar of the snare and the bass alone, very soft.
 - **Pass 1**: the flute on the melody.
@@ -329,7 +325,7 @@ Two sounds in the finale are not driven: the pizzicato bass, plucked as in chapt
 ### Answers
 
 1. Two of them swap. A slower bow needs less force to hold the string, so 0.02 now gives a clean note, and 0.5, the right force for a fast bow, is too much for a slow one and scratches like 1.0. The window of good forces moves with the speed.
-2. No: the pressure now stops below the threshold, about 0.3, so the reed never feeds the tube, and after the faint hiss at the start the take stays silent.
+2. No: the pressure now stops below the threshold, about 0.3, so the reed never feeds the tube, and the take stays silent.
 3. The beating: one player per note is a single clean tube, so the chords are steadier and thinner, and the brassy edge at velocity 1.0 sounds like one instrument instead of a section.
 
 ```python {run echo=false}
