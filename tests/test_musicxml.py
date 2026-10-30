@@ -249,6 +249,16 @@ def test_a_slur_has_both_ends():
     assert [[t.get("type") for t in n.findall("notations/slur")] for n in notes] == [["start"], [], ["stop"], []]
 
 
+def test_a_slurred_stack_writes_its_slur_on_the_first_pitch():
+    notes = _notes(_root(_score("( <c4 e4>:q <d4 f4> ) e4 f4")))
+    assert [[t.get("type") for t in n.findall("notations/slur")] for n in notes] == [["start"], [], ["stop"], [], [], []]
+
+
+def test_a_stack_in_a_tuplet_writes_its_bracket_on_the_first_pitch():
+    notes = _notes(_root(_score("3[<c4 e4>:e <d4 f4> <e4 g4>] r:q r:h")))[:6]
+    assert [[t.get("type") for t in n.findall("notations/tuplet")] for n in notes] == [["start"], [], [], [], ["stop"], []]
+
+
 def test_a_slur_on_a_split_note_ends_on_its_last_piece():
     notes = _notes(_root(_score("( c4:h. d4:h. )")))
     assert [[t.get("type") for t in n.findall("notations/slur")] for n in notes] == [["start"], [], ["stop"], []]
@@ -260,11 +270,24 @@ def test_articulations_are_written():
     assert [[a.tag for a in n.findall("notations/articulations/*")] for n in notes] == [["staccato"], ["accent"], ["tenuto"], []]
 
 
+def test_an_articulation_on_a_split_note_goes_on_its_first_piece():
+    notes = _notes(_root(_score("c4:h. d4:h.'")))
+    assert [[a.tag for a in n.findall("notations/articulations/*")] for n in notes] == [[], ["staccato"], [], []]
+    assert notes[2].findtext("pitch/step") == "D"
+
+
 def test_a_dynamic_and_a_hairpin_are_directions():
     root = _root(_score("mf c4:q < d4 e4 f! f4"))
     assert [d.tag for d in root.findall(".//direction/direction-type/dynamics/*")] == ["mf", "f"]
     assert sorted(w.get("type") for w in root.findall(".//wedge")) == ["crescendo", "stop"]
     assert [w.get("type") for w in _root(_score("c4:q > d4 e4 f4")).findall(".//wedge")] == ["diminuendo", "stop"]
+
+
+def test_a_mark_outside_the_named_dynamics_is_still_written():
+    s = _score("c4:w")
+    s.part("a").dynamic(1, 1, "sfz")
+    assert _root(s).findtext(".//dynamics/other-dynamics") == "sfz"
+    assert _root(_score("mf c4:w")).find(".//dynamics/other-dynamics") is None
 
 
 def test_a_hairpin_stops_before_the_next_starts_and_before_its_dynamic():
@@ -352,6 +375,15 @@ def test_a_ramp_writes_words_over_its_bars():
     assert [d.get("type") for d in measures[2].findall("direction/direction-type/dashes")] == ["stop"]
     assert measures[2].find(".//sound").get("tempo") == "90"
     assert measures[3].findtext(".//metronome/per-minute") == "60"
+
+
+def test_a_ramps_dashes_stop_after_the_last_note_of_its_last_bar():
+    s = _score("c4:w | d4", tempo=120)
+    s.ramp(1, 1, 60)
+    measure = list(_measures(_root(s))[0])
+    stop = next(e for e in measure if e.find("direction-type/dashes[@type='stop']") is not None)
+    assert measure.index(stop) > max(measure.index(e) for e in measure if e.tag == "note")
+    assert stop.find("offset") is None
 
 
 def test_a_rising_ramp_is_an_accelerando():
@@ -719,6 +751,15 @@ def test_bars_cuts_a_ramp_to_its_edge():
     root = _root(s, bars=(2, 3))
     assert root.findtext(".//words") == "rit."
     assert [d.get("type") for d in root.findall(".//dashes")] == ["start", "stop"]
+
+
+def test_bars_starting_inside_a_ramp_opens_with_a_metronome():
+    s = _score("c4:w | d4 | e4 | f4", tempo=120)
+    s.ramp(1, 4, 60)
+    first, second = _measures(_root(s, bars=(2, 3)))
+    assert first.findtext("direction/direction-type/metronome/per-minute") == "105"
+    assert first.find("direction/sound").get("tempo") == "105"
+    assert second.find(".//metronome") is None and second.find("sound").get("tempo") == "90"
 
 
 def test_bars_keeps_a_repeat_sign_only_inside_it():
