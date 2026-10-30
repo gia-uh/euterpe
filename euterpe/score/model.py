@@ -19,6 +19,7 @@ from euterpe.theory import Chord, EqualTemperament, Key, Meter, Roman, analyze
 if TYPE_CHECKING:
     from euterpe.instruments.core import Articulation
     from euterpe.lint.finding import Report
+    from euterpe.lint.score.profiles import Profile
     from euterpe.score.render import ScoreAudio
 
 _KINDS = ("<", ">")
@@ -541,7 +542,7 @@ class Score:
         path.write_bytes(midi_bytes(self, performed))
         return path
 
-    def lint(self, profile: Any = None) -> Report:
+    def lint(self, profile: Profile | str | None = None) -> Report:
         """The score rules' findings, under a profile, by name or as a Profile, if one is given. Nothing is rendered."""
         from euterpe.lint.score import lint_score
 

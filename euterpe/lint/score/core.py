@@ -40,9 +40,7 @@ def lint_score(score: Score, profile: Profile | str | None = None) -> Report:
         severity = profile.severities.get(rule.id, rule.severity)
         if severity is not None:
             for finding in rule.check(score, profile.params, severity):
-                styled = finding.severity == severity != rule.severity and severity in _STYLE
-                findings.append(replace(finding, message=f"{finding.message}, {_STYLE[severity]} under the "
-                                                         f"{profile.name} profile") if styled else finding)
+                findings.append(_styled(finding, rule.severity, profile))
     return Report(findings)
 
 
@@ -55,8 +53,15 @@ def lint_piece(score: Score, profile: Profile | str | None = None, seed: int = 0
         for finding in lint_audio(score.play(seed).take().samples).findings:
             severity = profile.severities.get(finding.rule, finding.severity)
             if severity is not None:
-                report.findings.append(replace(finding, severity=severity))
+                report.findings.append(_styled(replace(finding, severity=severity), finding.severity, profile))
     return report
+
+
+def _styled(finding: Finding, own: Severity | None, profile: Profile) -> Finding:
+    """The finding, saying so in its message when the profile made it a warning or an error other than its own."""
+    if finding.severity == profile.severities.get(finding.rule, own) != own and finding.severity in _STYLE:
+        return replace(finding, message=f"{finding.message}, {_STYLE[finding.severity]} under the {profile.name} profile")
+    return finding
 
 
 def _profile(profile: Profile | str | None) -> Profile:
@@ -105,7 +110,8 @@ class VoiceLine(list):
 def lines(score: Score) -> list[VoiceLine]:
     """Each voice of each part as lines, a stack of n pitches counting as n, top to bottom by mean pitch. Each line is
     (offset, end, Pitch) in order, a tied note joined to the note it holds on. A stack smaller than its voice's largest
-    leaves as a rest the lines it can reach least closely, so a line does not jump to fill the gap."""
+    leaves as a rest the lines it can reach least closely, so a line does not jump to fill the gap: before a line has
+    begun, its place is in the voice's first largest stack."""
     found_lines = []
     for name in score.parts:
         voices: dict[int, list[Placed]] = {}
@@ -117,12 +123,13 @@ def lines(score: Score) -> list[VoiceLine]:
 
 
 def _voice_lines(part: str, voice: int, placed_notes: list[Placed]) -> list[VoiceLine]:
-    split = [VoiceLine(part, voice) for _ in range(max(len(placed.event.pitches) for placed in placed_notes))]
+    widest = sorted(max((placed.event.pitches for placed in placed_notes), key=len), reverse=True)
+    split = [VoiceLine(part, voice) for _ in widest]
     tied = False
     for placed in placed_notes:
         stack = sorted(placed.event.pitches, reverse=True)
         end = placed.offset + placed.event.duration
-        for slot, pitch in zip(_slots(split, stack), stack):
+        for slot, pitch in zip(_slots(split, stack, widest), stack):
             line = split[slot]
             if tied and line and line[-1][1:] == (placed.offset, pitch):
                 line[-1] = (line[-1][0], end, pitch)
@@ -132,9 +139,9 @@ def _voice_lines(part: str, voice: int, placed_notes: list[Placed]) -> list[Voic
     return split
 
 
-def _slots(split: list[VoiceLine], stack: list) -> tuple[int, ...]:
-    """The lines a stack goes on, in order, that move least from where they last were; a line not begun costs nothing.
-    Among equals the higher lines come first."""
+def _slots(split: list[VoiceLine], stack: list, widest: list) -> tuple[int, ...]:
+    """The lines a stack goes on, in order, that move least from where they last were, or from their place in widest
+    if not begun. Among equals the higher lines come first."""
     return min(combinations(range(len(split)), len(stack)),
-               key=lambda slots: sum(abs(split[slot][-1][2] - pitch) if split[slot] else 0
+               key=lambda slots: sum(abs((split[slot][-1][2] if split[slot] else widest[slot]) - pitch)
                                      for slot, pitch in zip(slots, stack)))

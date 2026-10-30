@@ -37,8 +37,8 @@ def test_trigger_finds_the_rule_and_clean_does_not(rule, severity, part, bar, be
 
 def test_playable_names_the_pitch_and_each_pitch_of_a_stack():
     [low, high] = _found(_score("<a3 b7>:w"), "R-PLAYABLE")
-    assert "below the bottom" in high.message or "below the bottom" in low.message
-    assert "B7" in high.message + low.message and "A3" in high.message + low.message
+    assert low.message.startswith("A3 is below the bottom")
+    assert high.message.startswith("B7 is above the top")
 
 
 def test_comfort_measures_the_share_of_written_time():

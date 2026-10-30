@@ -140,6 +140,19 @@ def test_a_profile_may_turn_off_an_audio_rule():
     assert report.value("A-PEAK") is None and "A-PEAK" not in [f.rule for f in report.findings]
 
 
+def test_a_profile_raising_an_audio_rule_says_so_in_its_message():
+    report = lint_piece(_short(), Profile("my", {"A-PEAK": "error", "A-BALANCE-LOW": "warn"}))
+    peak = next(f for f in report.findings if f.rule == "A-PEAK")
+    low = next(f for f in report.findings if f.rule == "A-BALANCE-LOW")
+    assert peak.severity == "error" and peak.message.endswith(", an error under the my profile")
+    assert low.severity == "warn" and low.message.endswith(", a warning under the my profile")
+
+
+def test_a_profile_leaving_an_audio_rule_alone_or_lowering_it_names_no_profile():
+    report = lint_piece(_short(), Profile("my", {"A-TAIL": "metric", "A-PEAK": "metric"}))
+    assert not [f for f in report.findings if f.rule.startswith("A-") and "profile" in f.message]
+
+
 def test_lint_piece_skips_the_audio_of_a_score_it_cannot_play():
     s = Score()
     s.part("alto").add(melody("c4:w"))
@@ -173,6 +186,12 @@ def test_a_stack_going_from_three_to_two_leaves_the_missing_line_as_a_rest():
     assert top == [(0 * q, q, Pitch("G4")), (q, 2 * q, Pitch("G4")), (3 * q, 4 * q, Pitch("G4"))]
     assert middle == [(0 * q, q, Pitch("E4")), (q, 2 * q, Pitch("E4")), (2 * q, 3 * q, Pitch("E4")), (3 * q, 4 * q, Pitch("E4"))]
     assert bottom == [(0 * q, q, Pitch("C4")), (2 * q, 3 * q, Pitch("C4")), (3 * q, 4 * q, Pitch("C4"))]
+
+
+def test_a_note_before_a_stack_begins_on_the_line_it_leads_to():
+    s = Score()
+    s.part("alto").add(melody("c4:q <c4 e4 g4>:q g4:q"))
+    assert [_pitches(line) for line in lines(s)] == [["G4", "G4"], ["E4"], ["C4", "C4"]]
 
 
 def test_lines_order_voices_and_parts_by_mean_pitch_and_name_them():

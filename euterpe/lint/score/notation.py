@@ -40,7 +40,8 @@ def _measure(score: Score, params: dict, severity: Severity) -> list[Finding]:
 
 def _tuplet(score: Score, params: dict, severity: Severity) -> list[Finding]:
     """A run of events in one tuplet, in one bar, that is not a whole number of groups, a group being the tuplet's
-    actual count of the run's smallest written value. So two triplets in a row fill, and a duplet fills on its second."""
+    actual count of the run's finest undotted value, which is one over its largest denominator. So two triplets in a
+    row fill, a duplet fills on its second, and two dotted eighths fill a triplet of sixteenths."""
     findings = []
     for voice in _voices(score):
         keyed = groupby(voice, key=lambda placed: (placed.bar, getattr(placed.event, "tuplet", None)))
@@ -48,7 +49,7 @@ def _tuplet(score: Score, params: dict, severity: Severity) -> list[Finding]:
             if tuplet is not None:
                 placed = list(run)
                 written = [p.event.duration * tuplet.actual / tuplet.normal for p in placed]
-                group = tuplet.actual * min(written)
+                group = tuplet.actual * Fraction(1, max(w.denominator for w in written))
                 if sum(written) % group:
                     findings.append(found(
                         "N-TUPLET", severity,

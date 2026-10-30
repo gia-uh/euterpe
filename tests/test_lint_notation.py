@@ -114,6 +114,15 @@ def test_a_triplet_of_mixed_values_fills():
     assert not _found(_score("3[c4:q d:e] e4:q f:h"), "N-TUPLET")
 
 
+@pytest.mark.parametrize("text, found", [
+    ("3[c4:e. d:e.] f:q g:h", False),
+    ("3[c4:q.] f:q. g:h", False),
+    ("3[c4:e. d:e] f:q g:h", True),
+])
+def test_a_dotted_value_is_not_a_tuplets_unit(text, found):
+    assert bool(_found(_score(text), "N-TUPLET")) is found
+
+
 def test_a_rest_counts_in_a_tuplet_and_a_duplet_fills_on_two():
     assert not _found(_score("3[r:e d4 e4] f4:q g4:h"), "N-TUPLET")
     assert not _found(_score("2:3[c4:e d] e4:e f g a b"), "N-TUPLET")
