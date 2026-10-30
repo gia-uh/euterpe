@@ -207,6 +207,21 @@ def test_analyze_then_tries_applied_dominants(symbol, text):
 
 
 @pytest.mark.parametrize(
+    "symbol, key, text",
+    [
+        ("C7", "C minor", "V7/iv"),
+        ("A7", "A minor", "V7/iv"),
+        ("C#dim7", "A minor", "vii°7/iv"),
+        ("B7", "A minor", "V7/V"),
+        ("C7", "A minor", "V7/VI"),
+        ("F#", "A minor", "V/ii"),
+    ],
+)
+def test_analyze_in_minor_aims_an_applied_chord_at_the_keys_own_triad(symbol, key, text):
+    assert analyze(Chord(symbol), Key(key)) == Key(key).roman(text)
+
+
+@pytest.mark.parametrize(
     "symbol, text",
     [
         ("Ab", "bVI"),

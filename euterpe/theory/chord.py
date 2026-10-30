@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from euterpe.pitch import _LETTERS, Interval, Pitch, _signs
@@ -168,9 +168,9 @@ def _degree(numeral: str) -> int:
 def _quality(prefix: str, numeral: str, suffix: str, seventh: bool, key: Key) -> str:
     """Case gives major or minor and a suffix overrides it. A seventh on a plain uppercase numeral is the
     key's own note, so I7 in C is Cmaj7 and V7 is G7; any other seventh is minor, so bVII7 in C is Bb7."""
-    if suffix in ("°", "o"):
+    if suffix == "°":
         return "dim7" if seventh else "dim"
-    if suffix in ("ø", "%"):
+    if suffix == "ø":
         if not seventh:
             raise ValueError("a half-diminished chord needs a seventh's figure")
         return "m7b5"
@@ -266,9 +266,12 @@ def _roman_if(text: str, chord: Chord, key: Key) -> Roman | None:
     return roman if roman.chord == chord else None
 
 
-def _targets(key: Key) -> Iterator[str]:
-    """The degrees past the tonic with a major or minor triad of the key's own, which an applied chord can aim at."""
+def _targets(key: Key) -> list[str]:
+    """The degrees past the tonic with a major or minor triad in the key, which an applied chord can aim at.
+    Triads that need a minor key's raised 6th come last, so A7 in A minor is V7/iv and not V7/IV."""
     notes = _key_notes(key)
+    sixth = _name(key.degree(6))
+    own, raised = [], []
     for numeral in _NUMERALS[1:]:
         for target in (numeral, numeral.lower()):
             try:
@@ -276,7 +279,9 @@ def _targets(key: Key) -> Iterator[str]:
             except ValueError:
                 continue
             if notes.issuperset(tones):
-                yield target
+                needs_raised = any(tone[0] == sixth[0] and tone != sixth for tone in tones)
+                (raised if needs_raised else own).append(target)
+    return own + raised
 
 
 def analyze(chord: Chord, key: Key) -> Roman | None:
