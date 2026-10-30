@@ -28,6 +28,7 @@ files:
   - chapters/14-drums-and-percussion.md
   - chapters/15-chip-sounds.md
   - chapters/16-notes-octaves-and-spelling.md
+  - chapters/17-intervals.md
 
 outputs:
   site:
