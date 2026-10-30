@@ -75,10 +75,10 @@ from euterpe.pitch import C4, C5, C6, C7, C8
 
 for c in (C4, C5, C6, C7, C8):
     n = np.round(2048 - 131_072 / c.freq)
-    print(c, np.round(1200 * np.log2(131_072 / (2048 - n) / c.freq), 1) + 0.0)  # + 0.0 prints -0.0 as 0.0
+    print(c, np.round(1200 * np.log2(131_072 / (2048 - n) / c.freq), 2))
 ```
 
-C4 is exact, C7 is 10 cents flat and C8 17 cents sharp. Two notes 10 cents apart, played together, beat audibly, and these errors change sign from note to note, so a melody up high goes sour. `quantize=True`, the default, moves every note to the chip's nearest pitch.
+C4 is off by 0.03 cents, C7 is 10 cents flat and C8 17 cents sharp. Two notes 10 cents apart, played together, beat audibly, and these errors change sign from note to note, so a melody up high goes sour. `quantize=True`, the default, moves every note to the chip's nearest pitch.
 
 The tune of this chapter is in `book/tunes.py`, as chapter 13's were: `notes("korobeiniki", at, beat, up)` gives it as `Note`s from `at` seconds, `beat` seconds a beat, `up` semitones higher. Its opening, two octaves above where it belongs, as the chip plays it and in tune:
 
@@ -91,11 +91,13 @@ for quantize in (True, False):
     display(pulse.play(notes("korobeiniki", 0.0, 0.3, up=24)).take(4.8, f"Korobeiniki two octaves up, quantize={quantize}"))
 ```
 
+Up there the chip's A6 is 11.0 cents sharp and B6 9.1 cents sharp, while C7, D7 and E7 are 10.4, 6.5 and 10.3 cents flat. Listen to the runs E7, D7, C7 and B6, C7, D7 in the first take: neighbouring notes miss in opposite directions, so the steps between them come out up to 21 cents too wide or too narrow, and the line goes sour. The second take is in tune.
+
 ## The wave channel
 
-The wave channel, `WaveChannel(table, shift)`, plays chapter 6's table: 32 steps, each one of 16 levels, 0 to 15, read once a cycle. The program can write any table, so a composer picks the timbre. `TRIANGLE`, `SAW` and `SQUARE` are three tables in Euterpe; the triangle climbs 0, 1, … 15 and falls back, the saw climbs 0, 0, 1, 1, … 15, 15. The channel has no volume steps, only `shift`, which halves the level once or twice: three volumes, 100, 50 or 25 %. Its clock runs at half the pulses' rate, 65 536 / (2048 − n) Hz, so the same n sounds an octave lower; that is why it plays the bass.
+The wave channel, `WaveChannel(table, shift)`, plays chapter 6's table: 32 steps, each one of 16 levels, 0 to 15, read once a cycle. The program can write any table, so a composer picks the timbre. `TRIANGLE`, `SAW` and `SQUARE` are three tables in Euterpe; the triangle climbs 0, 1, … 15 and falls back, the saw climbs 0, 0, 1, 1, … 15, 15. The channel has no volume steps, only `shift`, which halves the level once or twice: three volumes, 100, 50 or 25 %. Its clock runs at half the pulses' rate, 65 536 / (2048 − n) Hz, so the same n sounds an octave lower: its lowest note is 65 536 / 2048 = 32 Hz, against 64 Hz for a pulse. With that reach and a soft table, it plays the bass.
 
-From here on, each section adds its channel to the first phrase of *Korobeiniki*: four bars of four beats at 144 bpm (chapter 11), in the octave where it belongs. Its chords are A minor and E major, the chord whose B and G♯ pull back to A, one every half bar, two beats. The bass plays each chord's root and its fifth, 7 semitones up, in eighths, each note a little shorter than an eighth (0.45 of a beat) so the notes do not run together: `i` counts the eighths, `i // 4` is the half bar and so the chord, and `i % 2` adds the fifth on every other one. `ClassicChip()` holds the four channels, and `play` takes each channel's notes by name and mixes them:
+From here on, each section adds its channel to the first phrase of *Korobeiniki*: four bars of four beats at 144 bpm (chapter 11), in the octave where it belongs. Its chords are A minor and E major, the chord whose B and G♯ pull back to A, one every half bar, two beats. The bass plays each chord's root and its fifth, 7 semitones up, in eighths, each note a little shorter than an eighth (0.45 of a beat) so the notes do not run together: `i` counts the eighths, `i // 4` is the half bar and so the chord, and `i % 2` adds the fifth on every other one. `ClassicChip()` holds the four channels, and starts them with `pulse1` at duty 0.5, `pulse2` at 0.25 and the wave channel on `TRIANGLE`; `play` takes each channel's notes by name and mixes them:
 
 ```python {run}
 from euterpe.instruments import SAW, TRIANGLE, ClassicChip
@@ -143,6 +145,8 @@ hats = noise.pattern({noise.snare: "..x...x.", noise.hat: ".x.x.x.x"}, beat / 2,
 (noise.play(hats) + thump.play(kicks)).take(3.4, "Two bars of the beat with a pulse kick swept from A3 down two octaves")
 ```
 
+The noise kick of the first player is a short burst of low hiss with no pitch. The pulse kick is a pitched thump that falls two octaves in a fifth of a second, closer to chapter 14's drum.
+
 ## One note at a time
 
 A channel plays one note at a time, and the chip has two pulses. A chord of three notes does not fit. The trick of the era was to play the chord's notes in turn, very fast, one per frame of the screen, 60 a second: too fast to hear as a melody, so the ear hears a buzzing chord. `arpeggio(at, pitches, length, step)` makes those notes on any tone channel; `step` is 1/60 s unless you pass one, and it decides whether the notes are a chord or a tune:
@@ -158,7 +162,7 @@ for step in (1 / 60, 1 / 8):
 
 At 1/8 s the three notes are a figure, A, C, E, A, C, E. At 1/60 s they fuse into a chord with a fast warble, the chord sound of most game music of the 1980s.
 
-`arpeggios(at, chords, each)` plays one arpeggio per chord, `each` seconds apiece, at that default step. On `pulse2`, at duty 0.125 so it stays thin under the melody, it plays the phrase's chords, and all four channels sound:
+`arpeggios(at, chords, each)` plays one arpeggio per chord, `each` seconds apiece, at that default step. On `pulse2`, thin at duty 0.125 and soft at velocity 0.6 (the melody's notes come at 0.7) so it stays under the melody, it plays the phrase's chords, and all four channels sound:
 
 ```python {run continue}
 from euterpe.pitch import A3, B3, C4, E3, E4, Gs3
@@ -182,7 +186,7 @@ for console in (ClassicChip(), ModernChip()):
 
 The classic note starts and stops like a switch, and every note holds one level. The modern note swells in, the long ones sing with vibrato, and the echo repeats each note softly 0.3 s later, which at 144 bpm is a dotted eighth, an eighth and a half (0.3125 s), so the repeats fall near the beat's grid.
 
-The modern style's other trick is `detune`: `pulse2` plays a few cents off the pitch, so when both pulses play one line they beat against each other, chapter 12's supersaw with two voices. The phrase on both pulses, in tune and 15 cents apart, with `echo`, the level of the echo, at 0, so only the beating is heard:
+The modern style's other trick is `detune`: `pulse2` plays a few cents off the pitch, 6 by default, so when both pulses play one line they beat against each other, chapter 12's supersaw with two voices. The phrase on both pulses, in tune and 15 cents apart, with `echo`, the level of the echo, at 0, so only the beating is heard:
 
 ```python {run continue}
 from euterpe.instruments import ModernChip
@@ -196,7 +200,7 @@ At 0 cents the two pulses are one louder pulse. At 15 cents A4 beats at 440 × (
 
 ## Putting it all together
 
-*Korobeiniki* is a folk melody set to Nekrasov's poem of 1861 about travelling pedlars, in A minor, in 4/4. The finale plays it twice. First on `ClassicChip`, 8 bars at 144 bpm: the melody on `pulse1` at duty 0.5, arpeggios of the chords on `pulse2` at 0.125, a bass of roots and fifths in eighths on the wave channel, and a backbeat, the snare on beats 2 and 4, on the noise channel. The chords are A minor, E major, D minor and C major, a chord every half bar; the bass and the drums are helpers, used by both passes:
+*Korobeiniki* is a folk melody set to Nekrasov's poem of 1861 about travelling pedlars, in A minor, four beats a bar. The finale plays it twice. First on `ClassicChip`, 8 bars at 144 bpm: the melody on `pulse1` at duty 0.5, arpeggios of the chords on `pulse2` at 0.125, a bass of roots and fifths in eighths on the wave channel, and a backbeat, the snare on beats 2 and 4, on the noise channel. The chords are A minor, E major, D minor and C major, a chord every half bar; the bass and the drums are helpers, used by both passes:
 
 ```python {run name=classic}
 from euterpe.instruments import ClassicChip
@@ -224,7 +228,7 @@ old = chip.play(pulse1=notes("korobeiniki", 0.0, beat), pulse2=arp, wave=bass(fi
 t0 = 32 * beat
 ```
 
-Then `ModernChip` takes over at 152 bpm, for the first theme and then the second, a calmer tune of eight bars of half notes, two beats each (`korobeiniki2` in `tunes.py`), and a last A: 17 bars. The melody moves to duty 0.25, and the second theme's half notes slide into each other in pairs. `pulse2` plays a harmony under the melody, detuned, instead of arpeggios: a third under (3 or 4 semitones), or a fourth (5 semitones) where a third would clash with the chord, as the `under` table spells out. A modern chip has reverb to fill the space between the notes. The classic chip is louder, since its notes do not swell and its mono sum is not panned, so the mix turns it down by half and the modern pass up a little, to meet in the middle:
+Then `ModernChip` takes over at 152 bpm, for the first theme and then the second, a calmer tune of eight bars of mostly half notes, two beats each (`korobeiniki2` in `tunes.py`), and a last A: 17 bars. The melody moves to duty 0.25, and the second theme's notes slide into each other in pairs: every second note is marked `Legato`. `pulse2` plays a harmony under the melody, detuned by the default 6 cents, so A4 against A4 would beat at 440 × (2^(6/1200) − 1) ≈ 1.5 Hz, instead of arpeggios: a third under (3 or 4 semitones), or a fourth (5 semitones) where a third would clash with the chord, as the `under` table spells out. A modern chip has reverb to fill the space between the notes. The classic chip is louder, since its notes do not swell and its mono sum is not panned, so the mix turns it down by half and the modern pass up a little, to meet in the middle:
 
 ```python {run continue name=modern}
 from euterpe.instruments import Legato, ModernChip, Note
@@ -269,7 +273,7 @@ Every note here was typed as a time in seconds and a pitch name, and the chords 
 ### Answers
 
 1. Every 4th: the 4th, 8th, 12th and 16th, where k × 0.25 is a whole number. The 2nd comes back, so the tone is brighter than duty 0.5 and fuller than 0.125.
-2. The register steps 4 times faster, at 32 768 Hz, so the long noise moves up and hisses like a hi-hat. The short register now repeats at 32 768 / 127 = 258 Hz, near C4, a buzzing tone instead of a growl.
+2. The register steps 4 times faster, at 32 768 Hz, so the long noise moves up and hisses like a hi-hat. The short register now repeats at 32 768 / 127 = 258 Hz, near C4: still a rough tone with a metallic edge, but high, no longer the low rumble of 64.5 Hz.
 3. Barely. At 20 notes a second each note lasts 50 ms, long enough for the ear to follow, so the chord turns into a fast trill of three notes.
 
 ```python {run echo=false}
