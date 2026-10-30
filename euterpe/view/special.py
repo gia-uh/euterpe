@@ -50,6 +50,13 @@ def _playhead(height: float) -> str:
             f'stroke-width="1.4"/></g>')
 
 
+def _rules(bars, seconds: float, top: float, bottom: float) -> str:
+    """A hairline at each bar's start, in seconds."""
+    xs = [_num(X0 + (X1 - X0) * t / seconds) for t in bars]
+    return "".join(f'<line class="eu-bar" x1="{x}" x2="{x}" y1="{_num(top)}" y2="{_num(bottom)}" stroke="{RULE}" stroke-width="0.6"/>'
+                   for x in xs)
+
+
 def special_view(x, seconds: float) -> tuple | None:
     """The special view of what a widget plays, or None."""
     from euterpe.instruments.fretted import Fretted
@@ -134,6 +141,12 @@ def tablature(notes, instrument, seconds: float) -> tuple:
     return "".join(p), W, h, X0, X1
 
 
+def drum_rows(names) -> list[str]:
+    """Drum names as a score writes them, each once, in the order drum notation stacks them, top to bottom."""
+    places = {"crash": 0, "ride": 1, "hihat": 2, "snare": 4, "kick": 5}
+    return sorted(set(names), key=lambda name: (3, int(name[3:])) if name.startswith("tom") else (places[name], 0))
+
+
 def _drum_names(kit) -> list[tuple[object, str]]:
     """The kit's drums in the order drum notation stacks them, top to bottom."""
     named = [(kit.crash, "crash"), (kit.ride, "ride"), (kit.hihat, "hi-hat")]
@@ -142,16 +155,21 @@ def _drum_names(kit) -> list[tuple[object, str]]:
     return named
 
 
-def hits(notes, kit, seconds: float) -> tuple:
-    """One row per drum that plays, a mark per hit at its time, its velocity as ink density."""
-    order = _drum_names(kit)
-    played = []
-    for drum, name in order:
-        if any(n.resource is drum for n in notes):
-            played.append((drum, name))
-    for n in notes:  # drums not among the kit's own, by their class
-        if all(n.resource is not d for d, _ in played):
-            played.append((n.resource, type(n.resource).__name__.lower()))
+def hits(notes, kit, seconds: float, bars=(), playhead: bool = True, names: dict[int, str] | None = None) -> tuple:
+    """One row per drum that plays, a mark per hit at its time, its velocity as ink density. bars are bar starts to
+    rule, in seconds. names gives each note's drum as written, by the note's id, in place of the kit's."""
+    if names is not None:
+        played = [(name, name) for name in drum_rows(names[id(n)] for n in notes)]
+        row = lambda n: names[id(n)]
+    else:
+        played = []
+        for drum, name in _drum_names(kit):
+            if any(n.resource is drum for n in notes):
+                played.append((drum, name))
+        for n in notes:  # drums not among the kit's own, by their class
+            if all(n.resource is not d for d, _ in played):
+                played.append((n.resource, type(n.resource).__name__.lower()))
+        row = lambda n: n.resource
     rh, top = 16, 6
     h = top + rh * len(played) + 18
     p = []
@@ -165,28 +183,32 @@ def hits(notes, kit, seconds: float) -> tuple:
                 x = X0 + (X1 - X0) * 4 * k * step / seconds
                 p.append(f'<line x1="{_num(x)}" x2="{_num(x)}" y1="{top}" y2="{top + rh * len(played)}" stroke="{WASH}" stroke-width="1"/>')
                 k += 1
+    p.append(_rules(bars, seconds, top, top + rh * len(played)))
     for r, (drum, name) in enumerate(played):
         y = top + r * rh
         p.append(f'<text x="{X0 - 10}" y="{y + rh / 2 + 3}" text-anchor="end" fill="#555">{html.escape(name)}</text>')
         for n in notes:
-            if n.resource is drum and n.time < seconds:
+            if row(n) == drum and n.time < seconds:
                 x = X0 + (X1 - X0) * n.time / seconds
                 p.append(f'<rect x="{_num(x - 3)}" y="{y + 2}" width="6" height="{rh - 4}" rx="1.5" fill="{PRUSSIAN}" '
                          f'fill-opacity="{0.35 + 0.65 * min(1.0, n.velocity):.2f}" data-t="{n.time:.3f}"/>')
     p.append(_ticks(seconds, top + rh * len(played) + 6))
-    p.append(_playhead(top + rh * len(played)))
+    if playhead:
+        p.append(_playhead(top + rh * len(played)))
     return "".join(p), W, h, X0, X1
 
 
-def roll(notes, seconds: float) -> tuple:
+def roll(notes, seconds: float, bars=(), numerals=(), peak: bool = False, playhead: bool = True) -> tuple:
     """A keyboard on the left over the notes' range and two semitones each side, each note a
-    bar from its time for its duration, named."""
+    bar from its time for its duration, named. bars are bar starts to rule, in seconds; numerals
+    are (seconds, text) written under the notes; peak marks the highest pitch in madder."""
     numbers = [_number(n.pitch) for n in notes]
     lo, hi = min(numbers) - 2, max(numbers) + 2
     rows = hi - lo + 1
     rh = max(3.0, min(12.0, 160 / rows))
     top = 4
-    h = top + rows * rh + 18
+    under = 12 if numerals else 0
+    h = top + rows * rh + 18 + under
     p = []
     for m in range(lo, hi + 1):
         y = top + (hi - m) * rh
@@ -197,6 +219,10 @@ def roll(notes, seconds: float) -> tuple:
             p.append(f'<rect x="{X0}" y="{_num(y)}" width="{X1 - X0}" height="{_num(rh)}" fill="#f3f5f8"/>')
         if m % 12 == 0:
             p.append(f'<text x="{X0 - 32}" y="{_num(y + rh - 1)}" text-anchor="end" font-size="7" fill="#555">{_name(m)}</text>')
+    p.append(_rules(bars, seconds, top, top + rows * rh))
+    for t, text in numerals:
+        p.append(f'<text x="{_num(X0 + (X1 - X0) * t / seconds)}" y="{_num(top + rows * rh + 10)}" font-size="9" '
+                 f'font-style="italic">{html.escape(text)}</text>')
     for n, m in zip(notes, numbers):
         if n.time >= seconds:  # the clip ends before this note starts
             continue
@@ -204,9 +230,10 @@ def roll(notes, seconds: float) -> tuple:
         w = max(2.0, (X1 - X0) * n.duration / seconds)
         y = top + (hi - m) * rh
         p.append(f'<rect x="{_num(x)}" y="{_num(y + 0.5)}" width="{_num(min(w, X1 - x))}" height="{_num(rh - 1)}" rx="1.5" '
-                 f'fill="{PRUSSIAN}" data-t="{n.time:.3f}"/>')
+                 f'fill="{MADDER if peak and m == hi - 2 else PRUSSIAN}" data-t="{n.time:.3f}"/>')
         if rh >= 5:
             p.append(f'<text x="{_num(x + 2)}" y="{_num(y - 0.5)}" font-size="6.5">{_name(m)}</text>')
-    p.append(_ticks(seconds, top + rows * rh + 6))
-    p.append(_playhead(top + rows * rh))
+    p.append(_ticks(seconds, top + rows * rh + 6 + under))
+    if playhead:
+        p.append(_playhead(top + rows * rh))
     return "".join(p), W, h, X0, X1

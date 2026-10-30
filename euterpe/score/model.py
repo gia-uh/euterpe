@@ -161,6 +161,12 @@ class Line:
                 total += self.meter.bar
         return total
 
+    def notation(self, meter: Meter | None = None) -> Any:
+        """The line engraved on one treble staff, in meter, the line's own, or else the length of its longest bar."""
+        from euterpe.view.notation import line_notation
+
+        return line_notation(self, meter)
+
     def transpose(self, interval: Interval) -> Line:
         if any(isinstance(item, Numeral) for bar in self.bars for item in bar):
             raise ValueError("Line: numerals move with the key: use s.transpose")
@@ -533,6 +539,29 @@ class Score:
         path = Path(path)
         path.write_bytes(midi_bytes(self, performed))
         return path
+
+    def notation(self, bars: tuple[int, int] | None = None, caption: str | None = None, numerals: bool = False) -> Any:
+        """The score engraved, as a view: bars=(first, last) keeps those measures, and numerals=True writes each numeral
+        of harmony() that changes under the staff. A score too long for one figure raises and asks for bars=. Needs verovio
+        (euterpe[notation])."""
+        from euterpe.view.notation import notation
+
+        return notation(self, bars, caption, numerals)
+
+    def roll(self, part: str | None = None, peak: bool = False) -> Any:
+        """A piano roll per part, or of the one part named, as a view: bars ruled, a keyboard on the edge and numerals
+        from harmony() under the bars, ? where it finds none. peak=True marks each part's highest note in madder."""
+        from euterpe.view.notation import roll
+
+        return roll(self, part, peak)
+
+    def view(self, normalize: bool = True) -> Any:
+        """What display() shows: the notation with the player under it, or the roll if verovio is missing, at -16 LUFS
+        unless normalize is false. A part with no instrument leaves out the player. A score too long for one figure raises,
+        as notation does: show a stretch of it with s.notation(bars=...)."""
+        from euterpe.view.notation import score_view
+
+        return score_view(self, normalize)
 
     def harmony(self) -> list[Harmony]:
         """For each beat, the chord of the notes sounding in it and its numeral in the key in force. A tone counts by
