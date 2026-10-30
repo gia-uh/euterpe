@@ -4,7 +4,7 @@ import pytest
 
 import euterpe
 import euterpe.score
-from euterpe import Chord, EqualTemperament, Interval, JustIntonation, Key, Meter, Pitch, Pythagorean, Score
+from euterpe import Chord, EqualTemperament, Interval, JustIntonation, Key, Meter, Performance, Pitch, Pythagorean, Score
 from euterpe.instruments import Accent, Articulation, Harp, Kit, Tenuto
 from euterpe.instruments import Note as PerformedNote
 from euterpe.score import BarRest, Harmony, Hit, Line, Measure, Note, Numeral, Part, Placed, Rest, Tuplet
@@ -686,7 +686,7 @@ def test_thin_and_uneven_parts_read_without_fuss():
 def test_score_defaults():
     s = Score()
     assert (s.key, s.meter, s.tempo, s.tuning, s.pickup, s.performance, s.title) == (
-        Key("C major"), Meter("4/4"), 120, EqualTemperament(), 0, None, None)
+        Key("C major"), Meter("4/4"), 120, EqualTemperament(), 0, Performance(), None)
 
 
 def test_score_is_exported_from_euterpe_and_the_written_note_is_not():

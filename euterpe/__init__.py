@@ -1,6 +1,6 @@
 """Euterpe: compose music by writing code."""
 
-from euterpe.score import Score, arpeggiate, chords, drums, melody
+from euterpe.score import Dynamics, Humanize, Lengths, Performance, Score, Swing, TempoMap, arpeggiate, chords, drums, melody
 from euterpe.theory import (
     Chord,
     EqualTemperament,
@@ -16,8 +16,9 @@ from euterpe.theory import (
     cadence,
 )
 
-__all__ = ["Chord", "EqualTemperament", "Interval", "JustIntonation", "Key", "Meter", "Pitch", "Pythagorean", "Roman",
-           "Scale", "Score", "analyze", "arpeggiate", "cadence", "chords", "display", "drums", "melody"]
+__all__ = ["Chord", "Dynamics", "EqualTemperament", "Humanize", "Interval", "JustIntonation", "Key", "Lengths", "Meter",
+           "Performance", "Pitch", "Pythagorean", "Roman", "Scale", "Score", "Swing", "TempoMap", "analyze", "arpeggiate",
+           "cadence", "chords", "display", "drums", "melody"]
 
 __version__ = "0.1.0.dev0"
 

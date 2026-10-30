@@ -20,6 +20,8 @@ from euterpe.score.model import (
     Tuplet,
 )
 from euterpe.score.notation import arpeggiate, chords, drums, melody
+from euterpe.score.perform import Dynamics, Humanize, Lengths, Performance, Swing, TempoMap, part_seeds
 
-__all__ = ["BarRest", "Change", "Dynamic", "Hairpin", "Harmony", "Hit", "Line", "Measure", "Note", "Numeral", "Part",
-           "Placed", "Ramp", "Rest", "Score", "Section", "Tuplet", "arpeggiate", "chords", "drums", "melody"]
+__all__ = ["BarRest", "Change", "Dynamic", "Dynamics", "Hairpin", "Harmony", "Hit", "Humanize", "Lengths", "Line", "Measure",
+           "Note", "Numeral", "Part", "Performance", "Placed", "Ramp", "Rest", "Score", "Section", "Swing", "TempoMap", "Tuplet",
+           "arpeggiate", "chords", "drums", "melody", "part_seeds"]

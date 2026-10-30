@@ -12,6 +12,7 @@ from math import floor
 from typing import TYPE_CHECKING, Any, Union
 
 from euterpe.pitch import Interval, Pitch
+from euterpe.score.perform import Performance, TempoMap
 from euterpe.theory import Chord, EqualTemperament, Key, Meter, Roman, analyze
 
 if TYPE_CHECKING:
@@ -422,7 +423,7 @@ class Score:
     meter's beat. Key and meter may be changed after a part is written, and the part follows."""
 
     def __init__(self, key: Key = Key("C major"), meter: Meter = Meter("4/4"), tempo: float = 120,
-                 tuning: Any = EqualTemperament(), pickup: Fraction = 0, performance: Any = None,
+                 tuning: Any = EqualTemperament(), pickup: Fraction = 0, performance: Performance = Performance(),
                  title: str | None = None):
         self.key = key
         self.meter = meter
@@ -502,6 +503,10 @@ class Score:
             copy._hairpins = list(part._hairpins)
             copy.measures  # a numeral that cannot be spelled in the new key raises here, not at a later read
         return moved
+
+    def tempo_map(self) -> TempoMap:
+        """Seconds and written time on the expanded timeline, as the score stands now."""
+        return TempoMap(self)
 
     def harmony(self) -> list[Harmony]:
         """For each beat, the chord of the notes sounding in it and its numeral in the key in force. A tone counts by
