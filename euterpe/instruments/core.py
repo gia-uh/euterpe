@@ -161,10 +161,12 @@ class Instrument:
     range where it plays well; the lint rules check notes against them.
     seed: which instrument of its make this one is; character() draws its fixed flaws from it.
     gm_program: the nearest General MIDI program, counted from 0, for a MIDI file.
+    articulations: the articulation types a preset declares, for the lint rule R-ARTIC; None declares nothing.
     """
 
     polyphony: int = 8
     gm_program: int = 0
+    articulations: frozenset[type] | None = None
     playable: tuple[Pitch, Pitch] | None = None
     comfortable: tuple[Pitch, Pitch] | None = None
     seed: int = 0
