@@ -27,6 +27,11 @@ def test_d_dorian_has_b_and_c_naturals():
     assert Pitch("Bb4") not in scale and Pitch("C#4") not in scale
 
 
+def test_lydian_and_locrian_spell_their_altered_fourth_and_fifth():
+    assert names(Scale("F", "lydian")) == ["F4", "G4", "A4", "B4", "C5", "D5", "E5"]
+    assert names(Scale("B", "locrian")) == ["B4", "C5", "D5", "E5", "F5", "G5", "A5"]
+
+
 @pytest.mark.parametrize(
     "mode, steps",
     [
