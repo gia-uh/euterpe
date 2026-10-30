@@ -65,13 +65,14 @@ def test_bow_loop_parameters_take_numbers_only(name):
 def test_bore_with_a_reed_sounds_the_odd_harmonics():
     x = settled(render(Bore(147.0), 0.5))
     h = {k: harmonic_db(x, 147.0, k) for k in range(1, 5)}
-    assert h[1] - h[2] >= 10 and h[3] - h[2] >= 10 and h[3] - h[4] >= 10
+    assert h[1] - h[2] >= 10 and h[3] - h[2] >= 10 and h[1] - h[4] >= 10 and h[3] - h[4] >= 10
     assert abs(cents(peak_hz(x), 147.0)) < 5
 
 
 def test_bore_below_the_threshold_is_only_breath():
-    rms = lambda p: np.sqrt(np.mean(settled(render(Bore(147.0, pressure=p), 0.5)) ** 2))  # noqa: E731
+    rms = lambda p, noise=0.02: np.sqrt(np.mean(settled(render(Bore(147.0, pressure=p, noise=noise), 0.5)) ** 2))  # noqa: E731
     assert 20 * np.log10(rms(0.1) / rms(0.5)) < -20
+    assert rms(0.1, noise=0.0) < 1e-4  # without breath, nothing starts
 
 
 @pytest.mark.parametrize("kw", [{"damping": Sine(1.0)}, {"bell": Sine(1.0)}, {"mouth": Sine(1.0)}])
