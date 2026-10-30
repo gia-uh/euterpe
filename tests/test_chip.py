@@ -230,3 +230,23 @@ def test_a_whole_song_does_not_depend_on_the_block_size(make):
     a = render(_song(make()), 0.6, block=37)
     b = render(_song(make()), 0.6)
     assert np.array_equal(a, b)
+
+
+def test_an_arpeggio_cycles_its_pitches_one_step_each():
+    notes = PulseChannel().arpeggio(1.0, [A4, C5, E4], 0.1, step=1 / 60)
+    assert len(notes) == 6
+    assert [n.pitch for n in notes] == [A4, C5, E4, A4, C5, E4]
+    assert notes[1].time == pytest.approx(1.0 + 1 / 60) and notes[0].duration == pytest.approx(1 / 60)
+
+
+def test_an_arpeggio_needs_pitches_and_a_step():
+    with pytest.raises(ValueError):
+        PulseChannel().arpeggio(0.0, [], 1.0)
+    with pytest.raises(ValueError):
+        WaveChannel().arpeggio(0.0, [A4], 1.0, step=0.0)
+
+
+def test_arpeggios_play_each_chord_for_its_time():
+    notes = PulseChannel().arpeggios(0.5, [[A4, C5], [E4, G4, B4]], 0.1, step=0.05)
+    assert [n.pitch for n in notes] == [A4, C5, E4, G4]
+    assert notes[2].time == pytest.approx(0.6)
