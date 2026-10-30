@@ -17,6 +17,7 @@ from euterpe.theory import Chord, EqualTemperament, Key, Meter, Roman, analyze
 
 if TYPE_CHECKING:
     from euterpe.instruments.core import Articulation
+    from euterpe.score.render import ScoreAudio
 
 _KINDS = ("<", ">")
 
@@ -507,6 +508,13 @@ class Score:
     def tempo_map(self) -> TempoMap:
         """Seconds and written time on the expanded timeline, as the score stands now."""
         return TempoMap(self)
+
+    def play(self, seed: int = 0, performance: Performance | None = None) -> ScoreAudio:
+        """The score as sound, one phrase per part: its own performance unless another is given. The same seed gives
+        the same samples."""
+        from euterpe.score.render import ScoreAudio
+
+        return ScoreAudio(self, seed, performance)
 
     def harmony(self) -> list[Harmony]:
         """For each beat, the chord of the notes sounding in it and its numeral in the key in force. A tone counts by

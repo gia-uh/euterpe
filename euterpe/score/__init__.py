@@ -23,5 +23,14 @@ from euterpe.score.notation import arpeggiate, chords, drums, melody
 from euterpe.score.perform import Dynamics, Humanize, Lengths, Performance, Swing, TempoMap, part_seeds
 
 __all__ = ["BarRest", "Change", "Dynamic", "Dynamics", "Hairpin", "Harmony", "Hit", "Humanize", "Lengths", "Line", "Measure",
-           "Note", "Numeral", "Part", "Performance", "Placed", "Ramp", "Rest", "Score", "Section", "Swing", "TempoMap", "Tuplet",
+           "Note", "Numeral", "Part", "Performance", "Placed", "Ramp", "Rest", "Score", "ScoreAudio", "Section", "Swing", "TempoMap", "Tuplet",
            "arpeggiate", "chords", "drums", "melody", "part_seeds"]
+
+
+def __getattr__(name: str):
+    """ScoreAudio on first use: it needs the audio layers, which importing the theory and the score must not load."""
+    if name == "ScoreAudio":
+        from euterpe.score.render import ScoreAudio
+
+        return ScoreAudio
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
