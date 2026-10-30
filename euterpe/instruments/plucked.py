@@ -233,6 +233,17 @@ class ViolinBody(Soundboard):
     dry: float = 0.4
 
 
+@dataclass(frozen=True)
+class CelloBody(Soundboard):
+    """A cello's larger body: the air mode near 100 Hz and the plate modes near 200 and 400 Hz,
+    an octave and more below a violin's."""
+
+    freqs: tuple[float, ...] = (100.0, 200.0, 400.0)
+    decays: tuple[float, ...] = (0.08, 0.06, 0.05)
+    amps: tuple[float, ...] = (1.0, 0.8, 0.6)
+    dry: float = 0.4
+
+
 class Plucked(Instrument):
     """A plucked string built from parts: an exciter sets Pluck's string moving, the body
     colours it. The string rings until it dies, a later note takes it, or polyphony steals it.
