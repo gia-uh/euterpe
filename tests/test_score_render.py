@@ -3,9 +3,10 @@ import pytest
 
 from euterpe import Humanize, Performance, Score, Swing, drums, melody
 from euterpe.instruments import ClassicChip, ElectricPiano, Harp, Kit, Note, Pad, Violin
+from euterpe.instruments.core import play
 from euterpe.pitch import C4, D4, E3, F3
 from euterpe.score import ScoreAudio, part_seeds
-from euterpe.sound import render
+from euterpe.sound import Sine, render
 from euterpe.sound.core import MAX_DEFAULT, RATE, Unit
 from euterpe.view import listen
 
@@ -16,6 +17,14 @@ def _score(instrument, text=SHORT, tempo=240, **performance) -> Score:
     s = Score(tempo=tempo, performance=Performance(**performance))
     s.part("a", instrument).add(melody(text))
     return s
+
+
+def test_the_audio_keeps_what_it_was_built_from():
+    s = _score(Harp(), swing=Swing())
+    audio = s.play(seed=5)
+    assert audio.score is s and audio.seed == 5 and audio.performance is s.performance
+    other = Performance()
+    assert s.play(performance=other).performance is other
 
 
 def test_play_gives_a_unit_with_one_phrase_per_part():
@@ -40,6 +49,16 @@ def test_one_part_plays_the_samples_of_its_notes_played_directly(make, performan
     assert np.array_equal(played, render(direct, 0.3))
 
 
+@pytest.mark.parametrize("performance", [{}, {"humanize": Humanize()}], ids=["plain", "humanized"])
+def test_a_plain_function_plays_as_an_instrument(performance):
+    voice = lambda n: Sine(n.freq)  # noqa: E731
+    s = _score(voice, **performance)
+    direct = play(voice, s.performance.notes(s, seed=5)["a"], part_seeds(5, 1)[0][1])
+    played = render(s.play(seed=5), 0.3)
+    assert np.abs(played).max() > 0.01
+    assert np.array_equal(played, render(direct, 0.3))
+
+
 def test_a_kit_part_plays_the_samples_of_its_notes_played_directly():
     s = Score(tempo=240)
     s.part("drums", Kit()).add(drums({"kick": "x...", "snare": "..x.", "hihat": "xxxx"}))
@@ -50,10 +69,13 @@ def test_a_kit_part_plays_the_samples_of_its_notes_played_directly():
 
 
 def test_the_samples_do_not_depend_on_the_block_size():
-    s = Score(tempo=240)
-    s.part("a", Harp(seed=3)).add(melody(SHORT))
-    s.part("b", Violin(seed=3)).add(melody("c5:e e5 g5 c6"))
+    s = Score(tempo=960)
+    s.part("a", Harp(seed=3)).add(melody("c4:s d4 e4 f4"))
+    s.part("b", Violin(seed=3)).add(melody("c5:t e5 g5:s c6"))
     audio = s.play()
+    frames = round(0.02 * RATE)
+    for phrase in audio.parts.values():
+        assert any(0 < start < frames for start in phrase.starts)  # a note enters inside the one large block
     assert np.array_equal(render(audio, 0.02, block=1), render(audio, 0.02, block=1024))
 
 

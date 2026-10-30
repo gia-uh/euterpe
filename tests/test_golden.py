@@ -5,11 +5,11 @@ import hashlib
 
 import numpy as np
 import pytest
+from euterpe import Humanize, Performance, Score, melody
 from euterpe.instruments import (AcidBass, BassGuitar, BrassSection, Celesta, ClassicChip, Clarinet, ElectricBass,
                                  ElectricGuitar, ElectricPiano, Flute, Glockenspiel, Guitar, Harp, Kit, Lead, Marimba,
                                  ModernChip, Organ, Pad, PizzicatoStrings, StringSection, Supersaw, SynthPluck,
                                  Timpani, Violin, Xylophone)
-from euterpe import Humanize, Performance, Score, melody
 from euterpe.pitch import Bb2, Bb3, C2, C3, C4, C5, C6, E2, Fs4, Fs5, Fs6, G3
 from euterpe.sound import render
 

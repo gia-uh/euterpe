@@ -9,6 +9,7 @@ from euterpe.score.perform import Performance, part_seeds
 from euterpe.sound.core import Mix
 
 if TYPE_CHECKING:
+    from euterpe.instruments.core import Note
     from euterpe.score.model import Score
 
 
@@ -24,14 +25,18 @@ class ScoreAudio(Mix):
         for part in score.parts.values():
             if part.instrument is None:
                 raise ValueError(f"part {part.name!r} has no instrument, so it cannot play")
-        notes = (performance or score.performance).notes(score, seed)
+        self.score = score
+        self.seed = seed
+        self.performance = performance or score.performance
+        notes = self.performance.notes(score, seed)
         seeds = part_seeds(seed, len(score.parts))
         self.parts = {name: play(part.instrument, notes[name], play_seed)
                       for (name, part), (_, play_seed) in zip(score.parts.items(), seeds)}
         super().__init__(*self.parts.values(), gains=[part.gain for part in score.parts.values()])
 
     @property
-    def notes(self) -> list:
+    def notes(self) -> list[Note]:
+        """Every part's notes, in time order."""
         return sorted((note for phrase in self.parts.values() for note in phrase.notes), key=lambda note: note.time)
 
     def take(self, seconds: float | None = None, caption: str | None = None):
