@@ -61,7 +61,7 @@ for force, name in ((0.02, "too light"), (0.5, "right"), (1.0, "too heavy")):
     display(listen(Bow(G3.freq, force=force, speed=0.8, position=0.2) * 0.5, 2.0, f"Bow force {force}, {name}"))
 ```
 
-A harmonic whose node sits under the bow cannot be driven: at position 1/8 the 8th, 16th and 24th are missing, and at the default 0.12 the harmonics near those are weak. Nearer the bridge the note is brighter and the window of good forces narrower.
+A harmonic whose *node*, a point of the string that does not move for that harmonic, sits under the bow cannot be driven: at position 1/8 the 8th, 16th and 24th are missing, and at the default 0.12 the harmonics near those are weak. Nearer the bridge the note is brighter and the window of good forces narrower.
 
 ## The violin
 
@@ -129,7 +129,7 @@ Listen for the held F♯ swelling over the walking bass, and the inner voices ch
 
 A clarinet is a tube with a reed at one end. Blown air pushes the reed against the mouthpiece and closes it; the pressure wave runs down the tube, reflects at the bell and comes back to open it again. The reed is a valve that the tube itself opens and closes, once per period. Chapter 7's bar rang once when struck; here the player's breath keeps the tube going, and the reed does for it what the bow does for a string.
 
-`Bore(freq, pressure, mouth)` is a tube in a delay line, with a mouthpiece at one end and a bell at the other. The mouthpiece is a model of its own: `Reed()` for a clarinet, `Jet()` for a flute, `Lips()` for brass. A reed closes its end of the tube. A tube closed at one end must have still air at the closed end and moving air at the open one, which only odd multiples of a quarter wavelength allow. So a clarinet sounds the odd harmonics, 1, 3, 5, and almost none of the even ones, like chapter 3's square. A trumpet is closed at the lips too, but its flaring bell and its cup mouthpiece bend the tube's resonances until they fall on every harmonic; `Lips()` models that full series directly. The same G3 from both:
+`Bore(freq, pressure, mouth)` is a tube in a delay line, with a mouthpiece at one end and a bell at the other. The mouthpiece is a model of its own: `Reed()` for a clarinet, `Jet()` for a flute, `Lips()` for brass. A reed closes its end of the tube. A tube closed at one end must have still air at the closed end and moving air at the open one, which only odd multiples of a quarter wavelength allow. So a clarinet sounds the odd harmonics, 1, 3, 5, and almost none of the even ones, like chapter 3's square. A trumpet is closed at the lips too, but its flaring bell and its cup mouthpiece bend the tube's resonances until they fall on every harmonic; `Lips()` models that full series directly: its loop is a whole period long, as an open tube's is. The same G3 from both:
 
 ```python {run}
 from euterpe.pitch import G3
@@ -141,7 +141,7 @@ spectrum(Bore(G3.freq, pressure=0.6, mouth=Reed()).take(1.5), Bore(G3.freq, pres
          caption="The same G3 from a reed and from lips")
 ```
 
-The reed's second and fourth harmonics sit far below its first and third: that hollow, woody sound is the clarinet's low register. A driven tube also needs enough pressure to start at all. Below a threshold, about 0.3 for this reed, the reed does not move far enough to feed the tube, and only the breath is heard: `Bore` adds a little white noise to the pressure, the turbulence of the player's breath (`noise`, 0.02 by default). Above it, the note *speaks*. Chapter 4's `Segments` raises the pressure from 0 to 0.7 over three seconds, one take across the threshold:
+The reed's second and fourth harmonics sit far below its first and third: that hollow, woody sound is the clarinet's low *register*, its lowest range of notes. A driven tube also needs enough pressure to start at all. Below a threshold, about 0.3 for this reed, the reed does not move far enough to feed the tube, and the take is silent: `Bore` adds a little white noise to the pressure, the turbulence of the player's breath (`noise`, 0.02 by default), but alone it is too faint to hear. Above it, the note *speaks*. Chapter 4's `Segments` raises the pressure from 0 to 0.7 over three seconds, one take across the threshold:
 
 ```python {run}
 from euterpe.pitch import G3
@@ -152,7 +152,7 @@ breath = Segments([(0.0, 0.0), (3.0, 0.7)])
 display(listen(Bore(G3.freq, pressure=breath, mouth=Reed()) * 0.5, 4.0, "A reed, the pressure rising past the threshold"))
 ```
 
-The pressure passes 0.3 at 1.3 s (0.3 / 0.7 of three seconds). The note grows out of the breath from about 1.4 s and is full by 2 s: an oscillation needs a few dozen trips through the tube to build up.
+After a faint hiss at the start, which dies within half a second, the take is silent. The pressure passes 0.3 at 1.3 s (0.3 / 0.7 of three seconds), but the note only appears near 1.8 s, where the pressure is about 0.43, and is full by 2.2 s: an oscillation needs many trips through the tube to build up, and the pressure keeps rising while it does.
 
 `Clarinet` is `Bore` with a `Reed` inside an instrument, its velocity setting the pressure through a `Breath` part, with no vibrato: classical clarinettists play without it. Mozart wrote his Clarinet Concerto (K. 622) in 1791, the year he died; its Adagio opens on a slow, singing line in the instrument's middle register. Over soft chords from the section:
 
@@ -171,7 +171,7 @@ Listen for the hollow tone on the low notes at the end of the phrase, where the 
 
 ## The flute's jet
 
-A flute has no reed. The player blows a thin jet of air across the edge of a hole; the jet flips to one side of the edge or the other, and the tube's air, swinging back and forth, decides which. `Jet()` models it with a second delay, the time the jet takes to cross to the edge, and a soft curve that splits it there. The tone is close to a sine, and the breath noise around it is part of the sound, louder than on any other instrument (`Flute` sets the breath's noise to 0.06, three times the clarinet's). `Flute` adds a vibrato of 5 Hz and 12 cents, slower and narrower than the violin's. Blow too hard and the jet arrives too early for the fundamental: the note jumps to its octave. That is *overblowing*, and a flautist uses it on purpose to reach the second register. The same C5 at pressure 0.5 and 1.0:
+A flute has no reed. The player blows a thin jet of air across the edge of a hole; the jet flips to one side of the edge or the other, and the tube's air, swinging back and forth, decides which. `Jet()` models it with a second delay, the time the jet takes to cross to the edge, and a soft curve that splits it there. The tube is open at both ends, so it allows every harmonic, but the jet drives it gently and the tone is close to a sine, and the breath noise around it is part of the sound, louder than on any other instrument (`Flute` sets the breath's noise to 0.06, three times the clarinet's). `Flute` adds a vibrato of 5 Hz and 12 cents, slower and narrower than the violin's. Blow too hard and the jet arrives too early for the fundamental: the note jumps to its octave. That is *overblowing*, and a flautist uses it on purpose to reach the second register. The same C5 at pressure 0.5 and 1.0:
 
 ```python {run}
 from euterpe.pitch import C5
@@ -184,7 +184,7 @@ for pressure in (0.5, 1.0):
 
 The second take is the same tube an octave higher, at C6.
 
-Grieg's *Morning Mood* (from *Peer Gynt*, published in 1888) is a sunrise: the flute plays a phrase that rocks around a chord of E major, and it is answered an octave lower. The second time down here is the same flute, over a held chord from the section:
+Grieg's *Morning Mood* (from *Peer Gynt*, published in 1888) is a sunrise: the flute plays a phrase that rocks around a chord of E major, and the oboe answers it an octave lower. Here the same flute plays the answer an octave down, over a held chord from the section:
 
 ```python {run}
 from euterpe.instruments import Flute, Note, StringSection
@@ -210,8 +210,8 @@ from euterpe.pitch import C3, C4, E3, G3
 from euterpe.view import listen
 
 brass = BrassSection()
-swell = [Note(1.8 * k, p, 1.5, v) for k, v in enumerate((0.1, 1.0)) for p in (C3, E3, G3, C4)]
-display(listen(brass.play(swell), 3.6, "A C major chord on BrassSection, velocity 0.1, then 1.0"))
+chords = [Note(1.8 * k, p, 1.5, v) for k, v in enumerate((0.1, 1.0)) for p in (C3, E3, G3, C4)]
+display(listen(brass.play(chords), 3.6, "A C major chord on BrassSection, velocity 0.1, then 1.0"))
 ```
 
 The first chord is soft and dark, almost a horn. The second, the same notes, rasps. On a driven instrument, loudness and tone come from the same force, and no gain can fake it.
@@ -232,14 +232,14 @@ low = notes("tell bass", 0.0, GALLOP, velocity=0.6)
 display(listen(brass.play(call + low) * 0.7, 10.0, "Rossini, William Tell Overture, the gallop on BrassSection"))
 ```
 
-Listen to how each short note starts: the tongue releases the air in a burst, and the lips need a few periods to lock onto the note, so the fast repeated notes each begin with a small chiff of breath before the tone.
+Listen to how each short note starts: the tongue releases the air in a burst, and the lips need a few periods to lock onto the note, so the fast repeated notes each begin with a short puff of breath noise before the tone: `Blown` raises the breath noise to 0.3 for each note's attack, the tongue letting the air go.
 
 ## Where synthesis stops
 
 These instruments are recognisable and they respond to how they are played. They are also not yet real, and the ear knows why:
 
 - A violin's body has hundreds of resonances and radiates differently in every direction; here it has three modes.
-- A long note on a real violin changes bow direction, with a small break the ear expects. There is no bow change here, and no spiccato, col legno or double stops.
+- A long note on a real violin changes bow direction, with a small break the ear expects. There is no bow change here, and no spiccato (the bow bouncing on the string), col legno (the string struck with the bow's wood) or double stops (two strings bowed at once).
 - A real player moves the bow's pressure, speed and position all through a note, by judgement. Here they follow an envelope.
 - The tubes are cylinders whose length changes as a whole: no tone holes, no key noise, no break between the clarinet's low and high registers, and no cone, so no oboe, saxophone or bassoon. In the finale the clarinet an octave down stands in for the bassoon, which Ravel wrote there.
 - A section's players start apart and drift in tune, but they do not listen to each other.
@@ -247,7 +247,7 @@ These instruments are recognisable and they respond to how they are played. They
 
 ## Putting it all together
 
-The *Boléro* is marked *Tempo di Bolero, moderato assai*: 72 beats a minute in 3/4, so a bar is 2.5 s. The snare drum plays an *ostinato*, a two-bar figure repeated unchanged from the first bar to the last: 36 steps of six to a beat, 18 a bar. It comes from chapter 14's `Kit`, where the drum is built, with its techniques: `kit.snare.roll(at, length, velocity, end)` plays strokes so fast they blur into one sound, and `hit(at, velocity)` one stroke. A pizzicato bass (chapter 10) plucks C and G under it. The melody passes from instrument to instrument, four bars each, and every pass is louder: the velocity rises from 0.35 to 0.95 over the piece, which on these instruments raises the bow's force and the breath, so the swell brightens as it grows. The drum's level rises with a `Segments` gain.
+The *Boléro* is marked *Tempo di Bolero, moderato assai*: 72 beats a minute in 3/4, so a bar is 2.5 s. The snare drum plays an *ostinato*, a two-bar figure repeated unchanged from the first bar to the last: 36 steps of six to a beat, 18 a bar. It comes from chapter 14's `Kit`, where the drum is built, with its techniques: `kit.snare.roll(at, length, velocity, end)` plays strokes so fast they blur into one sound, and `hit(at, velocity)` one stroke; `kit.crash` is a crash cymbal and `kit.kick` the bass drum. `kit.pattern(grid, step, repeat=11)` turns the figure into notes, an `x` a stroke and a `.` a rest, one character every `step` seconds, repeated 11 times. A pizzicato bass (chapter 10) plucks C and G under it. The melody passes from instrument to instrument, four bars each, and every pass is louder: the velocity rises from 0.35 to 0.95 over the piece, which on these instruments raises the bow's force and the breath, so the swell brightens as it grows. The drum's level rises with a `Segments` gain.
 
 - **Pass 0**: one bar of the snare and the bass alone, very soft.
 - **Pass 1**: the flute on the melody.
@@ -329,7 +329,7 @@ Two sounds in the finale are not driven: the pizzicato bass, plucked as in chapt
 ### Answers
 
 1. Two of them swap. A slower bow needs less force to hold the string, so 0.02 now gives a clean note, and 0.5, the right force for a fast bow, is too much for a slow one and scratches like 1.0. The window of good forces moves with the speed.
-2. No: the pressure now stops below the threshold, about 0.3, so the reed never feeds the tube and only the breath noise is heard, growing louder.
+2. No: the pressure now stops below the threshold, about 0.3, so the reed never feeds the tube, and after the faint hiss at the start the take stays silent.
 3. The beating: one player per note is a single clean tube, so the chords are steadier and thinner, and the brassy edge at velocity 1.0 sounds like one instrument instead of a section.
 
 ```python {run echo=false}
