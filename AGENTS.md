@@ -17,6 +17,7 @@ Euterpe is a Python library for composing music by writing code. It has four lay
 ## Constraints
 
 - Python 3.12 or later. Runtime dependencies: numpy, scipy, soundfile, pyloudnorm. Nothing else at runtime.
+- Every file format Euterpe writes or reads (audio, MusicXML, MIDI, any later one) is written and read by Euterpe's own code on the standard library (`struct`, `xml.etree`, `zipfile`), with no third-party library, in the tests too: a test reads a file back with Euterpe's own reader, never with mido, music21 or the like. Drawing (matplotlib) and staff engraving (verovio) are optional extras the book uses; the library never imports them at runtime.
 - Internal sample rate 48 000 Hz, float32. Mono is shape `(n,)`, stereo `(n, 2)`.
 - Default block size 1024 frames. Rendering in any block size gives the same samples, to the bit.
 - Every random source takes an explicit seed. The same unit graph and seed render the same samples.

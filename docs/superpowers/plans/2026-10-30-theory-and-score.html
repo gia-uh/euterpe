@@ -188,13 +188,13 @@ details.task[data-state=done]>summary .s{color:var(--ok)} details.task[data-stat
 <p class="lede">Builds spelled pitches and the theory objects, the score model and its one-line notation, performance and the renderer, MusicXML, MIDI and engraving, 33 new lint rules with three profiles, inspect and the CLI, in sixteen code pull requests; then chapters 16 to 25, one pull request each; then the release v0.3.0.</p>
 <p><strong>Goal:</strong> a reader can write a piece as bars in a key, hear it on Part II's instruments, export it, lint it against a style and inspect it without ears.</p>
 <p><strong>Architecture:</strong> <code>euterpe/pitch.py</code> stays below the instruments; <code>euterpe/theory/</code> is pure values; <code>euterpe/score/</code> holds written time in <code>Fraction</code>s and turns it into layer 2 <code>Note</code>s in seconds; export, lint and inspect read the score sideways. Layers 1 and 2 change only by <code>Pitch</code>, <code>Tenuto</code> and two class attributes, and golden hashes prove no sample moves.</p>
-<p><strong>Tech stack:</strong> Python 3.12, numpy, scipy, <code>fractions</code>, <code>xml.etree</code>, <code>struct</code>; verovio in an extra, mido in the dev group.</p>
+<p><strong>Tech stack:</strong> Python 3.12, numpy, scipy, <code>fractions</code>, <code>xml.etree</code>, <code>struct</code>; verovio in an extra, euterpe.score.midi.read in the dev group.</p>
 <p><strong>Spec:</strong> <code>docs/superpowers/specs/2026-10-30-theory-and-score-design.html</code> (sections cited as §n). Read §02 and the sections a task cites before starting it. Execution: a workflow, one agent per pull request, a fresh reviewer on each branch before merge. Every PR has its own issue under milestone issue #4.</p>
 <div class="bar"><i id="prog" style="width:0"></i></div><p class="meta" id="progt"></p>
 
 <h2><span class="n">·</span>Global constraints</h2>
 <ul>
-<li>Python 3.12; runtime deps numpy, scipy, soundfile, pyloudnorm only. verovio only in the extra <code>notation = ["verovio&gt;=6.3"]</code> and the dev and book groups; mido only in the dev group. No compiled extension.</li>
+<li>Python 3.12; runtime deps numpy, scipy, soundfile, pyloudnorm only. verovio only in the extra <code>notation = ["verovio&gt;=6.3"]</code> and the dev and book groups; euterpe.score.midi.read only in the dev group. No compiled extension.</li>
 <li>Rate 48 000 Hz, float32; same samples in any block size; every random source seeded. No rendered sample of Part II changes: <code>tests/test_golden.py</code> stays green with its hashes unedited from slice 1 on.</li>
 <li>Written time is <code>fractions.Fraction</code> of a whole note; seconds appear only after the tempo map. Never compare written time as floats.</li>
 <li>Theory objects are frozen, hashable values with no audio, and raise <code>ValueError</code> naming the text they cannot parse.</li>
@@ -385,11 +385,11 @@ Produces: musicxml_bytes(score, bars=None, numerals=False) -> bytes; s.to_musicx
 <div class="verify">Verify: <code>uv run pytest -q tests/test_musicxml.py</code> passes, including <code>verovio.toolkit().loadData(...)</code> returning true on a score with every feature; CI green.</div></details>
 
 <details class="task" id="slice-midi" data-state="pending"><summary>9 · midi · the Standard MIDI writer and gm_program<span class="s"></span><span class="f">euterpe/score/midi.py (new), euterpe/score/model.py, euterpe/instruments/core.py and each preset file, pyproject.toml, uv.lock, tests/test_midi.py (new)</span></summary>
-<p>§07; §13's MIDI row. Adds mido to the dev group.</p>
+<p>§07; §13's MIDI row. Adds euterpe.score.midi.read to the dev group.</p>
 <pre>Consumes: s.events(), performance.notes, TempoMap, Key.signature.
 Produces: s.to_midi(path, performed=False) -> Path; Instrument.gm_program: int = 0</pre>
 <ol>
-<li>Write the failing tests: §13's row, read back with mido. Also: 6/8 at 60 writes the quarter's tempo of 666 667 µs (a dotted quarter is one second); <code>Key("D# major")</code> writes key signature −3, since SMF holds only −7 to 7 and nine sharps sound as three flats; a part's note repeated at one tick writes its note-off before the note-on; both passes of a <code>repeat=2</code> section are written (review focus 3); <code>performed=True</code> has one tempo of 120 bpm and notes at their seconds, and swing moves them.</li>
+<li>Write the failing tests: §13's row, read back with euterpe.score.midi.read. Also: 6/8 at 60 writes the quarter's tempo of 666 667 µs (a dotted quarter is one second); <code>Key("D# major")</code> writes key signature −3, since SMF holds only −7 to 7 and nine sharps sound as three flats; a part's note repeated at one tick writes its note-off before the note-on; both passes of a <code>repeat=2</code> section are written (review focus 3); <code>performed=True</code> has one tempo of 120 bpm and notes at their seconds, and swing moves them.</li>
 <li>Write format 1, 480 ticks per quarter, with <code>struct</code>: variable-length quantities and a small event list, no class hierarchy. Track 0 has tempo, time and key signature; a ramp writes one tempo event per sixteenth. Each part has a track and a channel, skipping channel 10; past fifteen pitched parts the channels are shared in turn. Kit parts use channel 10 and §07's GM notes (<code>Hit.accent == "o"</code> on the hi-hat is 46).</li>
 <li>The notated file uses the sounding length of <code>Lengths</code> and the dynamics, with no swing or humanization. Velocity is rounded times 127, at least 1.</li>
 <li>Add <code>gm_program</code> as a class attribute on <code>Instrument</code>, default 0, and set it on each preset (§14). A test covers the presets §10's arrangements play.</li>
