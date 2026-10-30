@@ -9,6 +9,7 @@ from euterpe.instruments.core import (
     Note,
     PalmMute,
     Staccato,
+    Tenuto,
     Vibrato,
     play,
 )
@@ -140,6 +141,7 @@ __all__ = [
     "Steel",
     "String",
     "Struck",
+    "Tenuto",
     "Tolerance",
     "Vibrato",
     "ViolinBody",
