@@ -56,7 +56,7 @@ def test_a_placed_pickup_note_counts_from_the_end_of_the_short_bar():
     first, second = s.events()
     assert first == Placed("a", 0, 1, Fraction(7, 8), Fraction(0), note("E5", E))
     assert second == Placed("a", 0, 2, Fraction(0), E, note("A4", 1))
-    assert Meter("4/4").strength(first.in_bar) == Meter("4/4").strength(Fraction(7, 8))
+    assert Meter("4/4").strength(first.in_bar) > Meter("4/4").strength(Fraction(3, 4))
 
 
 def test_placed_offset_counts_from_the_start_of_bar_one():
@@ -151,10 +151,21 @@ def test_a_ramp_moves_the_tempo_linearly_in_written_time_and_stays_at_its_end():
     assert s.tempo_at(6) == 100
 
 
-@pytest.mark.parametrize("to", [0, -10])
-def test_a_ramp_to_no_tempo_raises(to):
+def test_a_ramp_is_linear_in_written_time_across_a_meter_change():
+    s = Score(tempo=120)
+    s.change(2, meter=Meter("2/4"))
+    s.ramp(1, 2, 60)
+    assert s.tempo_at(2) == 80
+
+
+@pytest.mark.parametrize("tempo", [0, -10])
+def test_no_tempo_at_or_below_zero_is_accepted(tempo):
     with pytest.raises(ValueError, match="above 0"):
-        Score().ramp(1, 2, to)
+        Score().ramp(1, 2, tempo)
+    with pytest.raises(ValueError, match="above 0"):
+        Score(tempo=tempo)
+    with pytest.raises(ValueError, match="above 0"):
+        Score().change(2, tempo=tempo)
 
 
 def test_a_ramp_cannot_overlap_a_ramp_or_a_tempo_change():
@@ -277,6 +288,12 @@ def test_part_hairpin_places_both_ends():
         part.hairpin((2, 1), (1, 1), ">")
 
 
+def test_hairpins_read_in_order_of_their_start():
+    part = Score().part("a").hairpin((2, 1), (2, 3), ">").hairpin((1, 1), (1, 3), "<")
+    assert [pin.kind for pin in part.hairpins] == ["<", ">"]
+    assert [pin.start for pin in part.hairpins] == [0, 1]
+
+
 # Numerals and whole-bar rests
 
 
@@ -373,6 +390,14 @@ def test_line_transpose_moves_notes_spelled_by_the_interval_and_not_hits():
 def test_line_transpose_names_a_note_past_a_double_accidental_and_its_bar():
     with pytest.raises(ValueError, match=r"bar 2.*F##4"):
         line([note("C4")], [note("F##4")]).transpose(Interval("A1"))
+
+
+def test_line_joining_two_meters_knows_no_single_bar():
+    three, four = Line(((BarRest(),),), Meter("3/4")), Line(((BarRest(),),), Meter("4/4"))
+    assert (three + four).meter is None
+    with pytest.raises(ValueError, match="meter"):
+        (three + four).duration
+    assert (three + three).meter == Meter("3/4")
 
 
 # Hits
@@ -574,6 +599,20 @@ def test_harmony_counts_a_doubled_tone_once():
     s.part("low").add(line([stack("C3 E3 G3")]))
     s.part("high").add(line([stack("C4 E4 G4 Bb4")]))
     assert s.harmony()[0].chord == Chord("C7")
+
+
+def test_harmony_counts_a_tone_by_its_longest_note_in_the_beat():
+    s = Score(meter=Meter("1/4"))
+    s.part("low").add(line([stack("C4 E4 G4", E), Rest(E)]))
+    s.part("top").add(line([note("Bb4", E), note("Bb4", Fraction(1, 16)), Rest(Fraction(1, 16))]))
+    assert s.harmony()[0].chord == Chord("C7")
+
+
+def test_harmony_takes_the_lowest_copy_of_a_doubled_tone_as_bass():
+    s = Score(meter=Meter("1/4"))
+    s.part("low").add(line([note("E3")]))
+    s.part("high").add(line([stack("C4 E5 G4")]))
+    assert s.harmony()[0].chord == Chord("C/E")
 
 
 def test_harmony_takes_the_bass_from_any_part():

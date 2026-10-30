@@ -27,6 +27,12 @@ def _time(value: int | Fraction, what: str) -> Fraction:
     return Fraction(value)
 
 
+def _tempo(value: float, what: str) -> float:
+    if value <= 0:
+        raise ValueError(f"{what}: a tempo must be above 0, not {value}")
+    return value
+
+
 def _length(value: int | Fraction, what: str) -> Fraction:
     length = _time(value, what)
     if length <= 0:
@@ -157,7 +163,9 @@ class Line:
         return Line(bars, self.meter)
 
     def __add__(self, other: Line) -> Line:
-        return Line(self.bars + other.bars, self.meter or other.meter)
+        """The bars of both. A meter one line knows carries over; two that differ measure no single bar, so neither does."""
+        meters = {meter for meter in (self.meter, other.meter) if meter is not None}
+        return Line(self.bars + other.bars, meters.pop() if len(meters) == 1 else None)
 
     def __mul__(self, times: int) -> Line:
         return Line(self.bars * times, self.meter)
@@ -374,7 +382,7 @@ class Score:
                  title: str | None = None):
         self.key = key
         self.meter = meter
-        self.tempo = tempo
+        self.tempo = _tempo(tempo, "Score")
         self.tuning = tuning
         self.pickup = _time(pickup, "Score pickup")
         if not 0 <= self.pickup < meter.bar:
@@ -387,7 +395,8 @@ class Score:
         self.sections: list[Section] = []
 
     def part(self, name: str, instrument: Any = None, gain: float = 1.0, clef: str | None = None) -> Part:
-        """Creates the part, or returns the one of that name. Asking for it with other settings raises."""
+        """Creates the part, or returns the one of that name. A setting other than the default that differs from
+        the part's raises."""
         part = self.parts.get(name)
         if part is None:
             part = self.parts[name] = Part(self, name, instrument, gain, clef)
@@ -399,6 +408,8 @@ class Score:
     def change(self, bar: int, key: Key | None = None, meter: Meter | None = None, tempo: float | None = None) -> None:
         """A key, meter or tempo from that bar on. Two changes on one bar add up."""
         self._check_bar(bar)
+        if tempo is not None:
+            _tempo(tempo, "change")
         if tempo is not None and any(ramp.bar < bar < ramp.bar + ramp.bars for ramp in self.ramps):
             raise ValueError(f"change: bar {bar} is inside a ramp, so its tempo is already moving")
         if bar == 1 and meter is not None and self.pickup >= meter.bar:
@@ -410,8 +421,7 @@ class Score:
     def ramp(self, bar: int, bars: int, to: float) -> None:
         """A ritardando or accelerando over bars bars, linear in written time, to a tempo in bpm that then holds."""
         self._check_bar(bar)
-        if to <= 0:
-            raise ValueError(f"ramp: a tempo must be above 0, not {to}")
+        _tempo(to, "ramp")
         if bars < 1:
             raise ValueError(f"ramp: bar {bar} needs at least one bar, not {bars}")
         if any(bar < other.bar + other.bars and other.bar < bar + bars for other in self.ramps):
