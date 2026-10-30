@@ -187,12 +187,14 @@ def test_swing_moves_ends_with_positions():
 
 def test_swing_moves_a_position_piecewise_linearly_inside_a_pair():
     swing = Swing(Fraction(3, 4))
-    assert swing.moved(Fraction(0)) == 0
-    assert swing.moved(E / 2) == Fraction(3, 32)
-    assert swing.moved(E) == Fraction(3, 16)
-    assert swing.moved(E + E / 2) == Fraction(7, 32)
-    assert swing.moved(Q) == Q
-    assert swing.moved(Q + E) == Q + Fraction(3, 16)
+    meter = Meter("4/4")
+    assert swing.moved(Fraction(0), meter) == 0
+    assert swing.moved(E / 2, meter) == Fraction(3, 32)
+    assert swing.moved(E, meter) == Fraction(3, 16)
+    assert swing.moved(E + E / 2, meter) == Fraction(7, 32)
+    assert swing.moved(Q, meter) == Q
+    assert swing.moved(Q + E, meter) == Q + Fraction(3, 16)
+    assert swing.moved(Fraction(1) + E, meter) == Fraction(1) + Fraction(3, 16)  # past the bar, as past a score's end
 
 
 def test_swing_needs_a_ratio_inside_the_pair():
@@ -220,6 +222,69 @@ def test_a_note_ending_on_a_bar_line_ends_at_the_downbeat_in_a_bar_that_cuts_a_p
     s = score("c4:e d e | f4:e", Performance(swing=Swing(), lengths=Lengths(normal=1.0)), meter=Meter("3/8"))
     notes = s.performance.notes(s)["a"]
     assert notes[2].time + notes[2].duration == pytest.approx(notes[3].time)
+
+
+@pytest.mark.parametrize("meter, swing, text", [
+    ("3/8", Swing(), "c4:e d e:s. f:t | g4:e d e"),
+    ("3/4", Swing(unit=Q), "c4:q d e:e. f:s | g4:q a b"),
+    ("3/4", Swing(.75, Q), "c4:q d e:e. f:s | g4:q a b"),
+])
+def test_a_pair_the_bar_cuts_stays_straight(meter, swing, text):
+    s = score(text, Performance(swing=swing), meter=Meter(meter), tempo=60)
+    notes = s.performance.notes(s)["a"]
+    written = [placed.event.pitches[0] for placed in s.events("a")]
+    assert [note.pitch for note in notes] == written
+    assert all(note.duration > 0 for note in notes)
+    assert all(a.time < b.time for a, b in zip(notes, notes[1:]))
+    tempo = s.tempo_map()
+    cut = [placed for placed in s.events("a") if placed.bar == 1][2:]  # the third count of the bar on
+    assert [note.time for note in notes[2:2 + len(cut)]] == pytest.approx([tempo.seconds(p.offset) for p in cut])
+    assert len(Harp().play(notes).voices) == len(notes)
+
+
+@pytest.mark.parametrize("meter", ["6/8", "12/8"])
+def test_swing_leaves_a_compound_beat_alone_and_moves_the_second_eighth_of_each(meter):
+    meter = Meter(meter)
+    text = " ".join(["c4:e d e"] * meter.beats)
+    s = score(text, Performance(swing=Swing()), meter=meter, tempo=60)
+    notes = s.performance.notes(s)["a"]
+    tempo = s.tempo_map()
+    for beat in range(meter.beats):
+        first, second, third = notes[3 * beat:3 * beat + 3]
+        assert first.time == pytest.approx(tempo.seconds(beat * meter.beat))
+        assert second.time == pytest.approx(tempo.seconds(beat * meter.beat + Q * Fraction(2, 3)))
+        assert second.time != pytest.approx(tempo.seconds(beat * meter.beat + E))
+        assert third.time == pytest.approx(tempo.seconds(beat * meter.beat + Q))
+
+
+def test_a_beat_no_longer_than_the_pair_lets_the_unit_ask_for_it():
+    s = score("c4:e d e f g a b", Performance(swing=Swing()), meter=Meter("7/8"), tempo=60)
+    assert s.performance.notes(s)["a"][1].time == pytest.approx(s.tempo_map().seconds(Q * Fraction(2, 3)))
+    s = score("c4:q d e f", Performance(swing=Swing(unit=Q)))
+    assert times(s.performance.notes(s)["a"]) == pytest.approx([0, 2 / 3, 1, 5 / 3])
+
+
+def test_swing_keeps_the_start_of_each_uneven_group():
+    s = score("c4:e d e f g a b", Performance(swing=Swing()), meter=Meter("7/8", groups=(3, 2, 2)), tempo=60)
+    tempo = s.tempo_map()
+    starts = times(s.performance.notes(s)["a"])
+    assert starts[3] == pytest.approx(tempo.seconds(3 * E))
+    assert starts[5] == pytest.approx(tempo.seconds(5 * E))
+    assert starts[1] == pytest.approx(tempo.seconds(Q * Fraction(2, 3)))
+
+
+def test_a_triplet_keeps_its_exact_place_and_swings_by_position():
+    straight = played("3[c4:e d e] f4:q")
+    assert times(straight) == pytest.approx([0, 1 / 6, 1 / 3, 1 / 2])
+    assert [n.duration for n in straight[:3]] == pytest.approx([0.9 / 6] * 3)
+    swung = played("3[c4:e d e] f4:q", Performance(swing=Swing()))
+    assert times(swung) == pytest.approx([0, 2 / 9, 7 / 18, 1 / 2])
+
+
+def test_a_tie_inside_a_triplet_merges():
+    notes = played("3[c4:e~ c d] e4:q")
+    assert [n.pitch for n in notes] == [Pitch("C4"), Pitch("D4"), Pitch("E4")]
+    assert notes[0].duration == pytest.approx(0.9 / 3)
 
 
 def test_swing_goes_first_and_the_tempo_map_after_it():
@@ -391,6 +456,12 @@ def test_a_mark_inside_a_hairpin_ends_it_there():
     assert velocities[4:] == pytest.approx([.76] * 4)
 
 
+def test_mf_is_only_read_for_a_note_before_any_mark():
+    assert played("p c4:q", Performance(dynamics=Dynamics(levels={"p": .3}, stress=0)))[0].velocity == pytest.approx(.3)
+    with pytest.raises(ValueError, match="mf"):
+        played("c4:q p d", Performance(dynamics=Dynamics(levels={"p": .3})))
+
+
 def test_a_mark_the_levels_do_not_hold_raises_naming_it():
     s = Score()
     s.part("a").add(melody("c4:q")).dynamic(1, 1, "fff")
@@ -559,6 +630,14 @@ def test_a_legato_note_may_start_before_the_previous_ends():
     assert any(a.time + a.duration > b.time + 1e-9
                for seed in range(20)
                for a, b in zip(*[iter(s.performance.notes(s, seed=seed)["a"][:4])] * 2))
+
+
+def test_a_stack_on_one_voice_starts_together_as_it_does_without_humanize():
+    s = score("<c5 e5>:q d5", Performance(humanize=Humanize(timing=0.01)), instrument=Violin())
+    first, second, third = s.performance.notes(s)["a"]
+    assert first.time == second.time
+    assert first.duration == pytest.approx(0.45) and second.duration == pytest.approx(0.45)
+    assert len(Violin().play([first, second, third]).voices) == 2
 
 
 def test_a_full_length_one_voice_line_does_not_slur_without_humanize():

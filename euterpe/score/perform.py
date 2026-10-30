@@ -27,8 +27,10 @@ _CLIP = 3.0  # a humanizing draw stops here, in standard deviations
 
 @dataclass(frozen=True)
 class Swing:
-    """Pairs of units from each downbeat, the first of each pair taking ratio of the pair. A pickup keeps its place in
-    the bar it borrows from. It changes only when notes start and end, so the spectrum of a note is untouched."""
+    """Pairs of units, the first of each pair taking ratio of the pair. Pairs count from the downbeat, or from each of
+    the meter's groups when one is longer than a pair, so a compound beat stays where it is. A pair the bar or the group
+    cuts short stays straight. A pickup keeps its place in the bar it borrows from. It changes only when notes start
+    and end, so the spectrum of a note is untouched."""
 
     ratio: float = 2 / 3
     unit: Fraction = Fraction(1, 8)
@@ -40,15 +42,33 @@ class Swing:
         if not 0 < self.ratio < 1:
             raise ValueError(f"Swing: the first unit takes a share of the pair between 0 and 1, not {self.ratio}")
 
-    def moved(self, position: Fraction) -> Fraction:
+    def moved(self, position: Fraction, meter: Meter) -> Fraction:
         """Where a position from the downbeat goes: piecewise linear inside its pair, and the pair's ends stay."""
         pair = 2 * self.unit
         ratio = Fraction(self.ratio).limit_denominator(10**6)
-        whole = position // pair * pair
-        inside = position - whole
+        place = position % meter.bar
+        start, end = _window(place, meter, pair)
+        first = start + (place - start) // pair * pair
+        if first + pair > end:
+            return position
+        inside = place - first
         if inside <= self.unit:
-            return whole + inside * 2 * ratio
-        return whole + pair * ratio + (inside - self.unit) * 2 * (1 - ratio)
+            return position - inside + inside * 2 * ratio
+        return position - inside + pair * ratio + (inside - self.unit) * 2 * (1 - ratio)
+
+
+def _window(place: Fraction, meter: Meter, pair: Fraction) -> tuple[Fraction, Fraction]:
+    """The stretch of a bar whose pairs count from its start: the group holding place when a group is longer than a
+    pair, else the whole bar."""
+    groups = [Fraction(size, meter.denominator) for size in meter.groups]
+    if max(groups) <= pair:
+        return Fraction(0), meter.bar
+    start = Fraction(0)
+    for group in groups:
+        if place < start + group:
+            break
+        start += group
+    return start, start + group
 
 
 @dataclass(frozen=True)
@@ -94,11 +114,13 @@ class Humanize:
 
 
 class _Curve:
-    """A part's level along written time: a mark holds, and a hairpin moves linearly from the level where it starts."""
+    """A part's level along written time: mf before any mark, a mark holds, and a hairpin moves linearly from the level
+    where it starts."""
 
     def __init__(self, dynamics: Dynamics, part: Part):
-        self.starts = [Fraction(0)]
-        self.stretches = [(Fraction(0), dynamics._level("mf"), dynamics._level("mf"))]
+        self.dynamics = dynamics
+        self.starts: list[Fraction] = []
+        self.stretches: list[tuple[Fraction, float, float]] = []
         marks = part.dynamics
         pins = part.hairpins
         for offset, is_pin, item in sorted([(m.offset, 0, m) for m in marks] + [(p.start, 1, p) for p in pins],
@@ -120,6 +142,8 @@ class _Curve:
 
     def at(self, offset: Fraction) -> float:
         index = bisect_right(self.starts, offset) - 1
+        if index < 0:
+            return self.dynamics._level("mf")
         end, first, last = self.stretches[index]
         if offset >= end:
             return last
@@ -136,7 +160,7 @@ def _one_level_on(dynamics: Dynamics, level: float, kind: str) -> float:
 @dataclass(frozen=True)
 class _Bar:
     """One played bar on the expanded timeline: where it starts and how long it is, in whole notes; the part of a full
-    bar it leaves out; the tempo at its two ends; and the beat that tempo counts."""
+    bar it leaves out; the tempo at its two ends; and the meter, whose beat that tempo counts."""
 
     bar: int
     start: Fraction
@@ -144,7 +168,11 @@ class _Bar:
     lead: Fraction
     first: float
     last: float
-    beat: Fraction
+    meter: Meter
+
+    @property
+    def beat(self) -> Fraction:
+        return self.meter.beat
 
     def elapsed(self, written: Fraction) -> float:
         """Seconds to play written whole notes from the bar's start: over n beats from a to b bpm, 60 n ln(a/b) / (a - b)."""
@@ -167,7 +195,8 @@ class _Bar:
 class TempoMap:
     """Whole notes on the expanded timeline, section repeats played out, to seconds and back. Constant stretches and
     linear ramps, read bar by bar in written time, so a ramp in a repeated section plays on both passes. A number tempo
-    counts the meter's beat. Past the last bar the score names, the last tempo holds."""
+    counts the meter's beat. Past the last bar the score names, the last tempo holds. It does nothing to a note's
+    spectrum: a faster tempo fits more notes, and each decays less before the next."""
 
     def __init__(self, score: Score):
         self.played: list[_Bar] = []
@@ -175,10 +204,10 @@ class TempoMap:
         for bar in _played_bars(score):
             first, last = _tempos(score, bar)
             length = score._bar_length(bar)
-            self.played.append(_Bar(bar, start, length, score._lead(bar), first, last, score.meter_at(bar).beat))
+            self.played.append(_Bar(bar, start, length, score._lead(bar), first, last, score.meter_at(bar)))
             start += length
         end = self.played[-1]
-        self._bars = [*self.played, _Bar(end.bar, start, end.beat, Fraction(0), end.last, end.last, end.beat)]
+        self._bars = [*self.played, _Bar(end.bar, start, end.beat, Fraction(0), end.last, end.last, end.meter)]
         self._starts = [bar.start for bar in self._bars]
         self._times = [0.0]
         for bar in self._bars[:-1]:
@@ -204,7 +233,7 @@ class TempoMap:
             return offset
         bar = self._bars[bisect_right(self._starts, offset) - 1]
         in_bar = bar.lead + offset - bar.start
-        return max(Fraction(0), offset + swing.moved(in_bar) - in_bar)
+        return max(Fraction(0), offset + swing.moved(in_bar, bar.meter) - in_bar)
 
 
 def _played_bars(score: Score) -> list[int]:
@@ -304,9 +333,10 @@ class Performance:
         curve = _Curve(self.dynamics, part)
         events = _sounds(score, part.name, tempo)
         drums = _drums(part) if any(sound.pitch is None for sounds in events for sound in sounds) else {}
+        one_voice = getattr(part.instrument, "polyphony", None) == 1 and getattr(part.instrument, "slurs", True)
         notes = []
         for sounds in events:
-            moves, jolts = self._draws(rng, len(sounds))
+            moves, jolts = self._draws(rng, len(sounds), not one_voice)
             for sound, move, jolt in zip(sounds, moves, jolts):
                 placed = sound.placed
                 event = placed.event
@@ -325,15 +355,16 @@ class Performance:
                 velocity = _unit(self._accented(event, level) + float(jolt))
                 notes.append(Performed(time, pitch, (end - start) * self._fraction(event, sent), velocity, sent))
         notes.sort(key=lambda note: note.time)
-        if getattr(part.instrument, "polyphony", None) == 1 and getattr(part.instrument, "slurs", True):
+        if one_voice:
             _detach(notes)
         return notes
 
-    def _draws(self, rng: np.random.Generator, count: int) -> tuple[np.ndarray, np.ndarray]:
-        """How far each of a written event's notes moves, in seconds and in velocity. They share most of the start."""
+    def _draws(self, rng: np.random.Generator, count: int, spread: bool) -> tuple[np.ndarray, np.ndarray]:
+        """How far each of a written event's notes moves, in seconds and in velocity. They share most of the start, or
+        all of it without spread, as on one voice, where a stack must start together to slur as it does unhumanized."""
         if self.humanize is None:
             return np.zeros(count), np.zeros(count)
-        shared = rng.standard_normal() + (_SPREAD * rng.standard_normal(count) if count > 1 else 0.0)
+        shared = rng.standard_normal() + (_SPREAD * rng.standard_normal(count) if spread and count > 1 else 0.0)
         return (self.humanize.timing * np.clip(shared * np.ones(count), -_CLIP, _CLIP),
                 self.humanize.velocity * np.clip(rng.standard_normal(count), -_CLIP, _CLIP))
 
