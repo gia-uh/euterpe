@@ -9,6 +9,7 @@ from dataclasses import dataclass, replace
 from fractions import Fraction
 from itertools import accumulate, zip_longest
 from math import floor
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
 from euterpe.pitch import Interval, Pitch
@@ -515,6 +516,14 @@ class Score:
         from euterpe.score.render import ScoreAudio
 
         return ScoreAudio(self, seed, performance)
+
+    def to_musicxml(self, path: str | Path) -> Path:
+        """Writes the score as MusicXML 4.0 and returns the path."""
+        from euterpe.score.musicxml import musicxml_bytes
+
+        path = Path(path)
+        path.write_bytes(musicxml_bytes(self))
+        return path
 
     def harmony(self) -> list[Harmony]:
         """For each beat, the chord of the notes sounding in it and its numeral in the key in force. A tone counts by

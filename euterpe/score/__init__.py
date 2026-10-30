@@ -19,12 +19,13 @@ from euterpe.score.model import (
     Section,
     Tuplet,
 )
+from euterpe.score.musicxml import musicxml_bytes
 from euterpe.score.notation import arpeggiate, chords, drums, melody
 from euterpe.score.perform import Dynamics, Humanize, Lengths, Performance, Swing, TempoMap, part_seeds
 
 __all__ = ["BarRest", "Change", "Dynamic", "Dynamics", "Hairpin", "Harmony", "Hit", "Humanize", "Lengths", "Line", "Measure",
            "Note", "Numeral", "Part", "Performance", "Placed", "Ramp", "Rest", "Score", "ScoreAudio", "Section", "Swing", "TempoMap", "Tuplet",
-           "arpeggiate", "chords", "drums", "melody", "part_seeds"]
+           "arpeggiate", "chords", "drums", "melody", "musicxml_bytes", "part_seeds"]
 
 
 def __getattr__(name: str):

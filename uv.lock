@@ -258,6 +258,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+notation = [
+    { name = "verovio" },
+]
 view = [
     { name = "matplotlib" },
 ]
@@ -266,6 +269,7 @@ view = [
 book = [
     { name = "matplotlib" },
     { name = "scriptorium" },
+    { name = "verovio" },
 ]
 dev = [
     { name = "ipykernel" },
@@ -274,6 +278,7 @@ dev = [
     { name = "nbformat" },
     { name = "pytest" },
     { name = "pytest-xdist" },
+    { name = "verovio" },
 ]
 
 [package.metadata]
@@ -283,13 +288,15 @@ requires-dist = [
     { name = "pyloudnorm", specifier = ">=0.1.1" },
     { name = "scipy", specifier = ">=1.13" },
     { name = "soundfile", specifier = ">=0.13" },
+    { name = "verovio", marker = "extra == 'notation'", specifier = ">=6.3" },
 ]
-provides-extras = ["view"]
+provides-extras = ["view", "notation"]
 
 [package.metadata.requires-dev]
 book = [
     { name = "matplotlib", specifier = ">=3.9" },
     { name = "scriptorium", git = "https://github.com/apiad/scriptorium?rev=v0.12.0" },
+    { name = "verovio", specifier = ">=6.3" },
 ]
 dev = [
     { name = "ipykernel", specifier = ">=7.4.0" },
@@ -298,6 +305,7 @@ dev = [
     { name = "nbformat", specifier = ">=5.11.1" },
     { name = "pytest", specifier = ">=8" },
     { name = "pytest-xdist", specifier = ">=3.8.0" },
+    { name = "verovio", specifier = ">=6.3" },
 ]
 
 [[package]]
@@ -1553,6 +1561,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d9/68/f1b440335057bfce71b6e50a9d09445aa2ecbd08359a337976627b8409e7/tzdata-2026.5.tar.gz", hash = "sha256:8cc73c0a0bfca7dbfa59235d60b2eff82231dee33f53d206db1acd9173cfc0a7", size = 200404, upload-time = "2026-10-03T09:23:14.143Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/94/21/1e5995a1c920cce14e4bffae20c665ec10e7ed03ab25e006cd741092b718/tzdata-2026.5-py2.py3-none-any.whl", hash = "sha256:b683bd1b6659ddcd810ff02ad09ba821d4bf1065072805063eb35c49617905ac", size = 347996, upload-time = "2026-10-03T09:23:12.535Z" },
+]
+
+[[package]]
+name = "verovio"
+version = "6.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/42/e4/0e52bfdfa97a8743141fe9a6d304aa017eca684664663bb38def7daf4101/verovio-6.4.0.tar.gz", hash = "sha256:d3492e0b99cd3d1581f0fa8bc37c4c869bc1b0a9494d4b2bf73cc3917f3354a9", size = 6237991, upload-time = "2026-10-30T11:28:24.874Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/02/e0/1e1428a851b3f6304c2ca9ae47a92553f9b3bd60d1c9d8010dfb6cbac47c/verovio-6.4.0-cp310-abi3-macosx_13_0_arm64.whl", hash = "sha256:ed2aa5b696dca772b49da7393f3c74115410a2152eada7f88689ed631d73eaac", size = 7419822, upload-time = "2026-10-30T11:28:12.607Z" },
+    { url = "https://files.pythonhosted.org/packages/92/e0/882946d6333222c2994c340fbdaa21909df4ba2958f8bd2a633ed2c08e96/verovio-6.4.0-cp310-abi3-macosx_13_0_x86_64.whl", hash = "sha256:bd2a38bc47349e06a5b92078fcc8c50eca4bf49cfa899234d613e2be62bdd9e8", size = 7700023, upload-time = "2026-10-30T11:28:14.906Z" },
+    { url = "https://files.pythonhosted.org/packages/6c/9a/fb33a1872b58aa38cb2bbc20319a07494c43d56310a59bdb3ce34d6071be/verovio-6.4.0-cp310-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:250b01736f4a73583e722b6c5226afa7664065d34ca81d5f731444381e62b987", size = 8215065, upload-time = "2026-10-30T11:28:16.849Z" },
+    { url = "https://files.pythonhosted.org/packages/06/5a/88d9750147156dcd353c705097e57d6d23201b08b292ef4f29f20d24a20d/verovio-6.4.0-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:6b254295f8542d6c625cd00f788675cf39455ec309ba191a64124cbd16d83db0", size = 8614328, upload-time = "2026-10-30T11:28:18.719Z" },
+    { url = "https://files.pythonhosted.org/packages/39/6e/ea5ba9c6eb8a12bce44b0ebabbe7e472d9b6549e50f86c8f471887b0b556/verovio-6.4.0-cp310-abi3-win32.whl", hash = "sha256:2bb9666f491877c6a88627f282b6e07146737db33335ed7a0977af8265ef1e52", size = 5467044, upload-time = "2026-10-30T11:28:20.967Z" },
+    { url = "https://files.pythonhosted.org/packages/e9/a3/fe81ca815c9d84834d155450dc4d70618c7ea78a04bb9d28ecdbbdb5a5f2/verovio-6.4.0-cp310-abi3-win_amd64.whl", hash = "sha256:d81bee29b83978a48a065710cb16ebba0914c9c2212305e8c154a6f05d864424", size = 5862891, upload-time = "2026-10-30T11:28:22.897Z" },
 ]
 
 [[package]]
