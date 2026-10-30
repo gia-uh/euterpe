@@ -12,6 +12,18 @@ from euterpe.instruments.core import (
     Vibrato,
     play,
 )
+from euterpe.instruments.chip import (
+    SAW,
+    SQUARE,
+    TRIANGLE,
+    ClassicChip,
+    Fade,
+    ModernChip,
+    NoiseChannel,
+    NoiseDrum,
+    PulseChannel,
+    WaveChannel,
+)
 from euterpe.instruments.bowed import Bowed, Bowing, StringSection, Violin
 from euterpe.instruments.fretted import BassGuitar, Electric, ElectricBass, ElectricGuitar, Fretted, Guitar, Shape
 from euterpe.instruments.keys import ElectricPiano, Organ
@@ -45,6 +57,16 @@ from euterpe.instruments.plucked import (
 )
 
 __all__ = [
+    "SAW",
+    "SQUARE",
+    "TRIANGLE",
+    "ClassicChip",
+    "Fade",
+    "ModernChip",
+    "NoiseChannel",
+    "NoiseDrum",
+    "PulseChannel",
+    "WaveChannel",
     "Blown",
     "Bowed",
     "BrassSection",
