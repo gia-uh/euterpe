@@ -93,9 +93,9 @@ for quantize in (True, False):
 
 ## The wave channel
 
-The wave channel plays chapter 6's table: 32 steps, each one of 16 levels, 0 to 15, read once a cycle. The program can write any table, so a composer picks the timbre. `TRIANGLE`, `SAW` and `SQUARE` are three tables in Euterpe; the triangle climbs 0, 1, … 15 and falls back, the saw climbs 0, 0, 1, 1, … 15, 15. The channel has no volume steps, only `shift`, which halves the level once or twice: three volumes, 100, 50 or 25 %. Its clock runs at half the pulses' rate, 65 536 / (2048 − n) Hz, so the same n sounds an octave lower; that is why it plays the bass.
+The wave channel, `WaveChannel(table, shift)`, plays chapter 6's table: 32 steps, each one of 16 levels, 0 to 15, read once a cycle. The program can write any table, so a composer picks the timbre. `TRIANGLE`, `SAW` and `SQUARE` are three tables in Euterpe; the triangle climbs 0, 1, … 15 and falls back, the saw climbs 0, 0, 1, 1, … 15, 15. The channel has no volume steps, only `shift`, which halves the level once or twice: three volumes, 100, 50 or 25 %. Its clock runs at half the pulses' rate, 65 536 / (2048 − n) Hz, so the same n sounds an octave lower; that is why it plays the bass.
 
-From here on, each section adds its channel to the first phrase of *Korobeiniki*: four bars of four beats at 144 bpm (chapter 11), in the octave where it belongs. Its chords are A minor and E major, the chord whose B and G♯ pull back to A, one every half bar, two beats. The bass plays each chord's root and its fifth, 7 semitones up, in eighths: `i` counts the eighths, `i // 4` is the half bar and so the chord, and `i % 2` adds the fifth on every other one. `ClassicChip()` holds the four channels, and `play` takes each channel's notes by name and mixes them:
+From here on, each section adds its channel to the first phrase of *Korobeiniki*: four bars of four beats at 144 bpm (chapter 11), in the octave where it belongs. Its chords are A minor and E major, the chord whose B and G♯ pull back to A, one every half bar, two beats. The bass plays each chord's root and its fifth, 7 semitones up, in eighths, each note a little shorter than an eighth (0.45 of a beat) so the notes do not run together: `i` counts the eighths, `i // 4` is the half bar and so the chord, and `i % 2` adds the fifth on every other one. `ClassicChip()` holds the four channels, and `play` takes each channel's notes by name and mixes them:
 
 ```python {run}
 from euterpe.instruments import SAW, TRIANGLE, ClassicChip
@@ -115,7 +115,7 @@ The saw has every harmonic and growls under the melody. The triangle is soft, wi
 
 ## Noise drums
 
-The noise channel is chapter 6's linear-feedback shift register: 15 bits, which repeat every 32 767 steps and hiss, or 7 bits with `short`, which repeat every 127 and buzz at a pitch. A `NoiseDrum(rate, short, fade)` sets how fast the register steps, which register, and a `Fade`. The chip's rates come from a formula too, 262 144 / (r · 2^s) Hz, where the program writes r, a divisor from 1 to 7, and s, a shift from 0 to 13. The drum below has r = 1 and s = 5, so it steps at 262 144 / 2^5 = 8192 Hz, with each register:
+The noise channel is chapter 6's linear-feedback shift register: 15 bits, which repeat every 32 767 steps and hiss, or 7 bits with `short`, which repeat every 127 and buzz at a pitch. A `NoiseDrum(rate, short, fade)` sets how fast the register steps, which register, and a `Fade`, and `hit(at, drum)` strikes it once. The chip's rates come from a formula too, 262 144 / (r · 2^s) Hz, where the program writes r, a divisor from 1 to 7, and s, a shift from 0 to 13. The drum below has r = 1 and s = 5, so it steps at 262 144 / 2^5 = 8192 Hz, with each register:
 
 ```python {run continue}
 from euterpe.instruments import Fade, NoiseChannel, NoiseDrum
@@ -182,7 +182,7 @@ for console in (ClassicChip(), ModernChip()):
 
 The classic note starts and stops like a switch, and every note holds one level. The modern note swells in, the long ones sing with vibrato, and the echo repeats each note softly 0.3 s later, which at 144 bpm is a dotted eighth, an eighth and a half (0.3125 s), so the repeats fall near the beat's grid.
 
-The modern style's other trick is `detune`: `pulse2` plays a few cents off the pitch, so when both pulses play one line they beat against each other, chapter 12's supersaw with two voices. The phrase on both pulses, in tune and 15 cents apart, with the echo off, so only the beating is heard:
+The modern style's other trick is `detune`: `pulse2` plays a few cents off the pitch, so when both pulses play one line they beat against each other, chapter 12's supersaw with two voices. The phrase on both pulses, in tune and 15 cents apart, with `echo`, the level of the echo, at 0, so only the beating is heard:
 
 ```python {run continue}
 from euterpe.instruments import ModernChip
@@ -196,7 +196,7 @@ At 0 cents the two pulses are one louder pulse. At 15 cents A4 beats at 440 × (
 
 ## Putting it all together
 
-*Korobeiniki* is a folk melody set to Nekrasov's poem of 1861 about travelling pedlars, in A minor, in 4/4. The finale plays it twice. First on `ClassicChip`, 8 bars at 144 bpm: the melody on `pulse1` at duty 0.5, arpeggios of the chords on `pulse2` at 0.125, a bass of roots and fifths in eighths on the wave channel, and a backbeat on the noise channel. The chords are A minor, E major, D minor and C major, a chord every half bar; the bass and the drums are helpers, used by both passes:
+*Korobeiniki* is a folk melody set to Nekrasov's poem of 1861 about travelling pedlars, in A minor, in 4/4. The finale plays it twice. First on `ClassicChip`, 8 bars at 144 bpm: the melody on `pulse1` at duty 0.5, arpeggios of the chords on `pulse2` at 0.125, a bass of roots and fifths in eighths on the wave channel, and a backbeat, the snare on beats 2 and 4, on the noise channel. The chords are A minor, E major, D minor and C major, a chord every half bar; the bass and the drums are helpers, used by both passes:
 
 ```python {run name=classic}
 from euterpe.instruments import ClassicChip
@@ -209,7 +209,7 @@ first = "Am E Am Am E E Am Am Dm Dm C C E E Am Am".split()
 
 
 def bass(chords, at, beat):
-    """Root, fifth, root, fifth in eighths: four notes a chord, two beats."""
+    """Root, fifth, root, fifth in eighths, each a little shorter than an eighth: four notes a chord, two beats."""
     return [(at + 2 * beat * h + e * beat / 2, roots[c] + 7 * (e % 2), 0.45 * beat) for h, c in enumerate(chords) for e in range(4)]
 
 
@@ -224,7 +224,7 @@ old = chip.play(pulse1=notes("korobeiniki", 0.0, beat), pulse2=arp, wave=bass(fi
 t0 = 32 * beat
 ```
 
-Then `ModernChip` takes over at 152 bpm, for the first theme and then the second, a calmer tune of eight bars of half notes, two beats each (`korobeiniki2` in `tunes.py`), and a last A: 17 bars. The melody moves to duty 0.25, and the second theme's half notes slide into each other in pairs. `pulse2` plays a harmony under the melody, detuned, instead of arpeggios: a third under, or a fourth where a third would clash with the chord, as the `under` table spells out. A modern chip has reverb to fill the space between the notes. The classic chip is louder, since its notes do not swell and its mono sum is not panned, so the mix turns it down by half and the modern pass up a little, to meet in the middle:
+Then `ModernChip` takes over at 152 bpm, for the first theme and then the second, a calmer tune of eight bars of half notes, two beats each (`korobeiniki2` in `tunes.py`), and a last A: 17 bars. The melody moves to duty 0.25, and the second theme's half notes slide into each other in pairs. `pulse2` plays a harmony under the melody, detuned, instead of arpeggios: a third under (3 or 4 semitones), or a fourth (5 semitones) where a third would clash with the chord, as the `under` table spells out. A modern chip has reverb to fill the space between the notes. The classic chip is louder, since its notes do not swell and its mono sum is not panned, so the mix turns it down by half and the modern pass up a little, to meet in the middle:
 
 ```python {run continue name=modern}
 from euterpe.instruments import Legato, ModernChip, Note
@@ -253,7 +253,7 @@ Every note here was typed as a time in seconds and a pitch name, and the chords 
 ## Summary
 
 - A sound chip has few channels because each costs transistors and power; each plays one note at a time.
-- `PulseChannel(duty)`: a pulse at duty 0.125, 0.25, 0.5 or 0.75, which loses every 8th, 4th or 2nd harmonic. `Fade(start, pace)` steps its volume through 16 levels; `sweep` bends its pitch, for kicks and effects.
+- `PulseChannel(duty)`: a pulse at duty 0.125, 0.25, 0.5 or 0.75 (0.75 as 0.25), which loses every 8th, 4th or 2nd harmonic. `Fade(start, pace)` steps its volume through 16 levels; `sweep` bends its pitch, for kicks and effects.
 - Every pitch is a clock divided by a whole number, 131 072 / (2048 − n) Hz, so high notes land up to tens of cents off; `quantize` turns that on.
 - `WaveChannel(table, shift)`: a cycle of 32 steps of 16 levels at three volumes, an octave lower, for the bass.
 - `NoiseChannel` plays `NoiseDrum`s on a 15- or 7-bit shift register, by `hit` or `pattern`.
