@@ -198,7 +198,7 @@ def test_rests_and_empty_parts_have_no_notation_findings():
     s = Score()
     s.part("alto").add(Line([[Rest(1)]]))
     s.part("empty")
-    assert lint_score(s).findings == []
+    assert not [f for f in lint_score(s).findings if f.rule.startswith("N-")]
 
 
 def test_a_bar_far_over_its_meter_is_one_finding_and_leaves_the_next_bar_alone():
