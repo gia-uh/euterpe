@@ -26,7 +26,7 @@ Bach's Invention No. 1 in C, BWV 772, written in 1723 to teach a student to play
 
 An interval has a number and a quality. The number counts letters, with both ends included: C up to E is C, D, E, so a third. C up to C is a unison, a first, and C up to the next C is the octave of chapter 16, an eighth. The quality then says how many semitones that number holds, because the same three letters can hold several. `Interval("M3")` is a major third, and `C4 + Interval("M3")` is the pitch that far up, spelled by its letters, and `Interval.between(p, q)` measures one.
 
-Unisons, fourths, fifths and octaves take the word *perfect* (`P`), and the others take major (`M`) and minor (`m`), one semitone less. *Augmented* (`A`) is a semitone wider than perfect or major, and *diminished* (`d`) a semitone narrower than perfect or minor. A minus sign goes down, as `-P8` did in chapter 16. Mind the letter A: `Interval("A4")` is an augmented fourth and `Pitch("A4")` is the note at 440 Hz, and each class reads the text its own way. All four thirds of C:
+Unisons, fourths, fifths and octaves take the word *perfect* (`P`), and the others take major (`M`) and minor (`m`), one semitone less. *Augmented* (`A`) is a semitone wider than perfect or major, and *diminished* (`d`) a semitone narrower than perfect or minor. A minus sign goes down, as `-P8` did in chapter 16. Mind the letter A: `Interval("A4")` is an augmented fourth and `Pitch("A4")` is the note at 440 Hz, and each class reads the text its own way. `semitones` gives an interval's size and `pretty` its name in words. All four thirds of C:
 
 ```python {run output=code}
 from euterpe import Interval, Pitch
@@ -84,11 +84,11 @@ violin = Violin().play([(2.0 * i, C4, 1.8) for i in range(12)])
 (flute + violin * 0.8).take(24.5, "Each interval from C4: m2, M2, m3, M3, P4, A4, P5, m6, M6, m7, M7, P8")
 ```
 
-Listen to how much each pair rubs. The m2 at the start grinds, and so does the M7 near the end, one semitone short of closing the octave. The thirds and sixths are sweet. The P5 and the P8 are so plain that they are almost one note. The A4, the middle of the octave and called the *tritone*, is restless and wants to move. `consonance` is the name for this, and `Interval` gives it three grades: `Interval("P5").consonance` is `perfect`, `Interval("M3").consonance` is `imperfect` and `Interval("m2").consonance` is `dissonant`. The *perfect* consonances are the open ones, the *imperfect* ones the sweet ones, and the rest *dissonant*: they want to go somewhere. The fourth depends on context. `consonance` calls P4 perfect, as its partials do, but when four lines are written together a fourth above the lowest line counts as a dissonance, and chapter 23 follows that rule.
+Listen to how much each pair rubs. The m2 at the start grinds, and so does the M7 near the end, one semitone short of closing the octave. The thirds and sixths are sweet. The P5 and the P8 are so plain that they are almost one note. The A4, the middle of the octave and called the *tritone*, is restless and wants to move. `consonance` is the name for this, and `Interval` gives it three grades: `Interval("P5").consonance` is `perfect`, `Interval("M3").consonance` is `imperfect` and `Interval("m2").consonance` is `dissonant`. The *perfect* consonances are the open ones, the *imperfect* ones the sweet ones, and the rest *dissonant*: they want to go somewhere. The fourth depends on context. `consonance` calls P4 perfect, as its partials will show below, but when four lines are written together a fourth above the lowest line counts as a dissonance, and chapter 23 follows that rule.
 
 ## Transposing
 
-Every interval is also a move. A *subject*, the short tune a piece is built from, can be moved whole by `Line.transpose`, and it keeps its shape because every note moves by the same interval. The Invention's subject is seven notes after a sixteenth's rest, and bar 1 of its upper line finishes it with four eighths. `then` carries a line on inside the same bar, where `+` would start a new one. The figure, followed by itself up a step, and then by itself up a fifth, the distance Bach goes to next:
+Every interval is also a move. A *subject*, the short tune a piece is built from, can be moved whole by `Line.transpose`, and it keeps its shape because every note moves by the same interval. The Invention's subject is seven notes after a sixteenth's rest, and bar 1 of its upper line finishes it with four eighths. Call that whole bar the *figure*. `then` carries a line on inside the same bar, where `+` would start a new one. The figure, followed by itself up a step, and then by itself up a fifth, the distance Bach goes to next:
 
 ```python {run}
 from euterpe import Interval, Key, Score, display, melody
@@ -169,7 +169,7 @@ for name in "P8 P5 P4 M6 M3 m3 m6 m7 M2 M7 m2 A4".split():
 
 Low partials are the loud ones, so the smaller these two numbers, the more of the sound lines up: 2 and 1 for the octave, 3 and 2 for the fifth, 5 and 4 for the major third. The dissonances wait until the 9th or the 15th partial, where a saw has little level left. The order follows the grades, with one exception, and it shows what this measure leaves out. The tritone meets at 7 and 5, yet it sounds rough: well below that, its lower note's 3rd partial and its upper note's 2nd miss by 1200 log2(3 / (2 × 2^(6/12))) = 102 cents, about a semitone. Partials that meet make an interval smooth, and partials that nearly meet make it rough.
 
-The Invention's third bar opens on a pair this table can read: C4 under E5, the major tenth. E5's 2nd partial meets C4's 5th, the same 5 and 4 as the major third, an octave higher, and they miss by the same 13.7 cents. Under the fast upper line the strings walk in eighths through more of these distances:
+The Invention's third bar opens on a pair this table can read: C4 under E5, the major tenth. E5's 2nd partial is E4's 4th, so this is the major third's pair, 5 and 4, and they miss by the same 13.7 cents. Under the fast upper line the strings walk in eighths through more of these distances:
 
 ```python {run}
 from euterpe import Key, Score, display, melody
@@ -180,6 +180,8 @@ s.part("flute", Flute()).add(melody("e5:s a g f e g f a g f e d c e d f"))
 s.part("section", StringSection(players=2)).add(melody("c4:e b3 c4 d e g3 a b"))
 display(s, caption="Bar 3 of the Invention, which opens with C4 under E5")
 ```
+
+On the first note the strings' C4 sits under the flute's E5, and then the strings step up while the flute runs down.
 
 ## Just and equal
 
@@ -195,7 +197,7 @@ for tuning, name in ((EqualTemperament(), "equal"), (JustIntonation(C4), "just")
     print(f"{name:6} {tuning.freq(E4):.2f} {partial5:.1f} {partial4:.1f} {beats:.1f}")
 ```
 
-Moving E4 down by 2.6 Hz puts its 4th partial right onto C4's 5th. Now `Score` takes the tuning, and one sustained third plays in each, written `<c4 e4>:w`: angle brackets sound notes together. An organ is the instrument for this: chapter 12's organ builds a note from sines at exact multiples and holds them at one level, so nothing moves but the beat. `"008888800"` pulls out the first five. Under each player is the sound through chapter 5's `BandPass`, centred between the two partials so that nothing else gets through:
+Moving E4 down by 2.6 Hz puts its 4th partial right onto C4's 5th. Now `Score` takes the tuning, and one sustained third plays in each, written `<c4 e4>:w`: angle brackets sound notes together. An organ is the instrument for this: chapter 12's organ builds a note from sines at exact multiples and holds them at one level, so nothing moves but the beat. `"008888800"` pulls out the first five. Under each player is a drawing of the sound through chapter 5's `BandPass`, centred between the two partials so that nothing else gets through, because the beat is hard to pick out inside the full sound:
 
 ```python {run}
 from euterpe import EqualTemperament, JustIntonation, Key, Score, display, melody
@@ -214,25 +216,26 @@ for tuning, name in ((EqualTemperament(), "equal"), (JustIntonation(C4), "just")
 
 Listen high up: the equal third shimmers, and its band swells 10 times in that second. The just third is still, and its band is flat.
 
-So why does every piano use the other one? Because just tuning fits one key. `JustIntonation(C4)` sets D at 9/8 and A at 5/3, so the fifth from D up to A is (5/3) / (9/8) = 40/27, which is 680 cents instead of a pure fifth's 702. The Invention has that pair at the end of bar 5, D3 under A4, a fifth with an octave added. D3's 3rd partial should land on A4. In equal tuning it is 440.5 Hz against 440.0 Hz, 0.5 Hz apart, and in just tuning 441.5 Hz against 436.0 Hz, 5.5 Hz apart:
+So why does every piano use the other one? Because just tuning fits one key. `JustIntonation(C4)` sets D at 9/8 and A at 5/3, so the fifth from D up to A is (5/3) / (9/8) = 40/27, which is 680 cents instead of a pure fifth's 702. The Invention has that pair at the end of bar 5, D3 under A4, a fifth with an octave added. D3's 3rd partial should land on A4. In equal tuning it is 440.5 Hz against 440.0 Hz, 0.5 Hz apart, and in just tuning 441.5 Hz against 436.0 Hz, 5.5 Hz apart, as the captions compute:
 
 ```python {run}
 from euterpe import EqualTemperament, JustIntonation, Key, Score, display, melody
 from euterpe.instruments import Organ
-from euterpe.pitch import C4
+from euterpe.pitch import A4, C4, D3
 from euterpe.view import listen
 
 for tuning, name in ((EqualTemperament(), "equal"), (JustIntonation(C4), "just")):
     s = Score(key=Key("C major"), tempo=60, tuning=tuning)
     s.part("organ", Organ(drawbars="008888800")).add(melody("<d3 a4>:w"))
-    display(listen(s.play(), 4.0, f"D3 and A4 on an organ, in {name} tuning"))
+    hz = f"{3 * tuning.freq(D3):.1f} Hz against {tuning.freq(A4):.1f} Hz"
+    display(listen(s.play(), 4.0, f"D3 and A4 on an organ, in {name} tuning: {hz}"))
 ```
 
 Here the two tunings swap places: the equal pair is almost still, and the just one wavers about five times a second. In this tuning G♯ and A♭ are even two frequencies, so a keyboard would need more keys. Equal temperament spreads the error evenly: each fifth is 2 cents narrow, each major third 13.7 cents wide, and every key is equally usable and equally a little out of tune. Chapter 18 needs that freedom. The rest of this book plays in equal temperament.
 
 ## Putting it all together
 
-The closing piece is the first seven bars of Invention No. 1, from the Bach-Gesellschaft edition of the 19th century, and a held G to close, which is not in Bach: bar 8 goes on, and this excerpt stops on the note bar 7 has been working towards. The notation has no sign for the trills and mordents, so they are left out. The upper line starts with the figure. Its bar 7 enters with the subject a fifth up, and the bars between are spelled out, because they are the kind of move `transpose` cannot make: even bar 2, the figure a fifth up, replaces the sixteenth's rest with a D and keeps F where `transpose` gave F♯:
+The closing piece is the first seven bars of Invention No. 1, from the Bach-Gesellschaft edition of the 19th century, and a held G to close, which is not in Bach: bar 8 goes on, and this excerpt stops on the note bar 7 has been working towards. The notation has no sign for the trills and mordents, so they are left out. The upper line starts with the figure. Its bar 7 enters with the subject a fifth up, and the bars between are spelled out, because they are the kind of move `transpose` cannot make: even bar 2, the figure a fifth up, replaces the sixteenth's rest with a D and keeps F where `transpose` gave F♯. A `t` in bar 6 is a thirty-second, half a sixteenth:
 
 ```python {run name=lines}
 from euterpe import Interval, melody
@@ -249,7 +252,7 @@ right += melody("g4:e r r:q").then(subject.transpose(Interval("P5")))
 right += melody("g4:w")
 ```
 
-A `t` is a thirty-second, half a sixteenth. The lower line is built the same way. It enters after a two-beat rest with the subject an octave down, and again a fourth down in bar 2. Bar 7 takes the whole figure down a perfect eleventh, an octave and a fourth, and that one transposition, F♯3 included, is exactly what Bach wrote:
+The lower line is built the same way. It enters after a two-beat rest with the subject an octave down, and again a fourth down in bar 2. Bar 7 takes the whole figure down a perfect eleventh, an octave and a fourth, and that one transposition, F♯3 included, is exactly what Bach wrote. The `~` in bar 4 is a *tie*: it joins a note to the next one of the same pitch, so that C4 holds into bar 5:
 
 ```python {run continue name=duo}
 from euterpe import Key, Score, display
@@ -272,7 +275,7 @@ display(s.notation(bars=(1, 4), caption="Bars 1 to 4 of the two lines"))
 listen(song, caption="Bach, Invention No. 1, BWV 772, bars 1 to 7, flute over strings")
 ```
 
-The `~` is a *tie*: it joins a note to the next one of the same pitch, so the C4 at the end of bar 4 holds into bar 5. At 72 quarters a minute a bar takes 3.33 s. Listen in bar 1, from 1.67 s, for the strings entering with the tune the flute just played, the octave you already know, and in bar 2 for the fifth above that tune and the fourth below it. Listen for the long downward runs of bars 3 and 4, each one a third under the last, while the strings climb under them in eighths. Then try hearing it vertically: the third bar starts on the major tenth from the first section of this chapter, C4 under E5, and through the seven bars the two lines keep landing on thirds, sixths and tenths and passing through seconds on the way to them. Every pair of notes here is an interval you can now name.
+At 72 quarters a minute a bar takes 3.33 s. Listen in bar 1, from 1.67 s, for the strings entering with the tune the flute just played, the octave you already know, and in bar 2 for the fifth above that tune and the fourth below it. Listen for the long downward runs of bars 3 and 4, each one a third under the last, while the strings climb under them in eighths. Then try hearing it vertically: the third bar starts on the major tenth from the first section of this chapter, C4 under E5, and through the seven bars the two lines keep landing on thirds, sixths and tenths and passing through seconds on the way to them. Every pair of notes here is an interval you can now name.
 
 There is something this chapter cannot explain. For three bars the Invention uses only seven of the twelve notes, the white keys. The first black key, F♯, comes in bar 4. From there on the music leans on it, and bar 7 sounds as if it has arrived somewhere new. Why those seven, and what does one new note change? Chapter 18.
 
