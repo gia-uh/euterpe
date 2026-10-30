@@ -98,6 +98,11 @@ class Legato(Articulation):
 
 
 @dataclass
+class Tenuto(Articulation):
+    """Held for its full written length. The score's performance reads it, and it changes nothing here."""
+
+
+@dataclass
 class Control:
     """An event that is not a note, such as a pedal or a bend; the instrument whose model has
     that control reads it in perform()."""
