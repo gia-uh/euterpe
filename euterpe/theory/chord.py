@@ -155,8 +155,9 @@ def _above(root: Pitch, tone: Pitch) -> Interval:
 
 
 def _root(prefix: str, numeral: str, key: Key) -> Pitch:
-    """The note a numeral stands on: its degree moved by its prefix, and the raised 7th for vii in minor."""
-    pitch = key.leading_tone if numeral == "vii" and key.mode == "minor" else key.degree(_degree(numeral))
+    """The note a numeral stands on: its degree moved by its prefix, and the raised 7th for a plain vii in minor."""
+    raised = numeral == "vii" and not prefix and key.mode == "minor"
+    pitch = key.leading_tone if raised else key.degree(_degree(numeral))
     return Pitch(pitch.letter, pitch.alter + {"": 0, "b": -1, "#": 1}[prefix], pitch.octave)
 
 
@@ -245,10 +246,14 @@ class Roman:
 
 
 def _key_notes(key: Key) -> set[str]:
-    """The names counted as in the key: its scale, and the raised 6th and 7th in minor."""
+    """The names counted as in the key: its scale, and the raised 6th and 7th in minor where a Pitch can spell them."""
     notes = [*key.scale.pitches()]
     if key.mode == "minor":
-        notes += [key.degree(1) + Interval("M6"), key.degree(1) + Interval("M7")]
+        for name in ("M6", "M7"):
+            try:
+                notes.append(key.degree(1) + Interval(name))
+            except ValueError:
+                pass
     return {_name(p) for p in notes}
 
 
@@ -302,10 +307,16 @@ def _on(chord: Chord, key: Key, degree: int, qualities: tuple[str, ...]) -> bool
     return chord.root == _name(key.degree(degree)) and chord.quality in qualities
 
 
+def _third(key: Key, degree: int) -> str:
+    """The triad quality the key's own third gives a degree: "m" or "" for major."""
+    return "m" if Interval.between(key.degree(degree), key.degree(degree + 2)).quality == "m" else ""
+
+
 def cadence(chords: Sequence[Chord], key: Key, soprano: Pitch | None = None) -> str | None:
     """The cadence the last chords make, or None. Root-position V or V7 to root-position I with the tonic in
     the soprano is a PAC; V to I otherwise an IAC; ending on V an HC; IV to I plagal; V to vi deceptive.
-    I takes either third, so a minor key's major ending counts, and IV does too."""
+    In a key with a minor tonic triad I takes either third, so a major ending counts; in a major key Cm is
+    not I. IV takes either third in any key, so iv to I is plagal."""
     if not chords:
         return None
     last = chords[-1]
@@ -315,14 +326,13 @@ def cadence(chords: Sequence[Chord], key: Key, soprano: Pitch | None = None) -> 
         return None
     before = chords[-2]
     dominant = _on(before, key, 5, ("", "7"))
-    tonic = _on(last, key, 1, ("", "m"))
+    tonic = _on(last, key, 1, ("", "m") if _third(key, 1) == "m" else ("",))
     if dominant and tonic:
         rooted = before.inversion == 0 and last.inversion == 0
         on_top = soprano is not None and _name(soprano) == _name(key.degree(1))
         return "PAC" if rooted and on_top else "IAC"
     if tonic and _on(before, key, 4, ("", "m")):
         return "plagal"
-    sixth = "m" if Interval.between(key.degree(6), key.degree(8)).quality == "m" else ""
-    if dominant and _on(last, key, 6, (sixth,)):
+    if dominant and _on(last, key, 6, (_third(key, 6),)):
         return "deceptive"
     return None

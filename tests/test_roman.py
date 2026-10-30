@@ -46,6 +46,9 @@ def test_numerals_in_c_major(text, tones):
         ("ii°", ("B", "D", "F")),
         ("V7", ("E", "G#", "B", "D")),
         ("bII6", ("Bb", "D", "F")),
+        ("bVII", ("Gb", "Bb", "Db")),
+        ("bvii", ("Gb", "Bbb", "Db")),
+        ("#vii", ("G#", "B", "D#")),
     ],
 )
 def test_numerals_in_a_minor(text, tones):
@@ -231,6 +234,17 @@ def test_analyze_handles_keys_with_many_accidentals():
     assert analyze(Chord("C"), Key("Fb major")) == Key("Fb major").roman("#V")
 
 
+@pytest.mark.parametrize("tonic", ["D##", "G##", "A##"])
+def test_analyze_handles_a_minor_key_whose_raised_notes_cannot_be_spelled(tonic):
+    key = Key(f"{tonic} minor")
+    assert analyze(Chord("C"), key) is None
+    assert analyze(Chord(f"{tonic}m"), key) == key.roman("i")
+
+
+def test_a_prefix_on_vii_moves_the_natural_seventh_whatever_the_case():
+    assert analyze(Chord("Gm"), A_MINOR) is None
+
+
 def chords(*symbols):
     return [Chord(symbol) for symbol in symbols]
 
@@ -253,6 +267,9 @@ def chords(*symbols):
         (("Dm", "Em"), None, None),
         (("C", "Am"), None, None),
         (("Csus4", "C"), None, None),
+        (("G", "Cm"), C5, None),
+        (("G", "Cm"), None, None),
+        (("F", "Cm"), None, None),
     ],
 )
 def test_cadences_in_c_major(symbols, soprano, name):
