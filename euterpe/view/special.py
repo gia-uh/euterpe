@@ -76,10 +76,10 @@ def special_view(x, seconds: float) -> tuple | None:
 
 
 def _chord_name(shape, tuning) -> str | None:
-    """The shape's chord symbol, or None when no chord fits. A fret has no spelling, so sharps are tried and then flats:
-    C minor's third only reads as a chord as E♭."""
+    """The shape's chord symbol, or None when no chord fits. A fret has no spelling, so sharps are tried, then flats, then
+    flats with C♭: C minor's third only reads as a chord as E♭, and D♭7's seventh only as C♭."""
     numbers = [_number(t) + f for t, f in zip(tuning, shape.frets) if f is not None]
-    for spell in (Pitch, Key("F major").spell):
+    for spell in (Pitch, Key("F major").spell, Key("Gb major").spell):
         found = Chord.from_pitches(spell(n) for n in numbers)
         if found is not None:
             return signs(found.name)

@@ -364,6 +364,9 @@ def _label(shape: Shape) -> str:
     ((2, 4, 4, 2, 2, 2), "F♯m"),
     ((None, 3, 5, 5, 4, 3), "Cm"),  # its third needs a flat: D♯ would read as no chord
     ((None, 1, 3, 3, 3, 1), "B♭"),
+    ((None, 4, 6, 4, 6, 4), "D♭7"),  # these three need C♭ to read as a chord
+    ((1, 2, 3, 1, None, None), "Fdim"),
+    ((1, None, 1, 1, 0, None), "Fm7♭5"),
 ])
 def test_a_shape_is_labelled_with_its_chord_name(frets, name):
     assert f">{name}<" in _label(Shape(*frets))
