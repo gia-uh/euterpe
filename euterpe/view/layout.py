@@ -7,7 +7,7 @@ from collections.abc import Callable
 
 from euterpe.view.base import View
 
-_SIZE = re.compile(r'<svg[^>]*?width="([\d.]+)(?:pt)?"[^>]*?height="([\d.]+)(?:pt)?"', re.S)
+_SIZE = re.compile(r'<svg[^>]*?width="([\d.]+)pt"[^>]*?height="([\d.]+)pt"', re.S)
 
 
 class Row(View):

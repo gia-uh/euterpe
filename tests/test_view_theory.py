@@ -1,10 +1,11 @@
 import re
 from fractions import Fraction
+from xml.dom.minidom import parseString
 
 import numpy as np
 import pytest
 
-from euterpe import Chord, Key, Scale, Score, melody
+from euterpe import Chord, Key, Pitch, Scale, Score, melody
 from euterpe.instruments import Guitar
 from euterpe.instruments.fretted import Shape
 from euterpe.pitch import A4, C4, E4, G4
@@ -88,6 +89,21 @@ def test_a_stereo_clip_keeps_a_note_panned_or_out_of_phase():
     assert chromagram(Clip(np.stack([mono, -mono], axis=1)))[9, 2:9] == pytest.approx(1.0, abs=0.01)
 
 
+@pytest.mark.parametrize("name, reads", [("A1", 10), ("B1", 0), ("D2", 3)])
+def test_a_pure_low_tone_with_no_bin_of_its_own_reads_a_semitone_off(name, reads):
+    tone = Pitch(name)
+    chroma = chromagram(_sines(tone, seconds=1.0))[:, 2:15]
+    assert (chroma.argmax(axis=0) == reads).all()
+    assert chroma[tone.number % 12].max() < 0.01
+
+
+def test_a_pure_tone_above_98_hz_reads_its_own_class():
+    for name in ("A2", "C3", "F#3"):
+        tone = Pitch(name)
+        chroma = chromagram(_sines(tone, seconds=1.0))[:, 2:15]
+        assert (chroma.argmax(axis=0) == tone.number % 12).all()
+
+
 def test_the_rate_sets_the_folding():
     assert chromagram(_sines(A4, rate=44100))[:, 2].argmax() == 9
 
@@ -101,7 +117,7 @@ def test_clip_chroma_is_a_view_with_twelve_named_rows():
     fig = view.figure()
     assert [t.get_text() for t in fig.axes[0].get_yticklabels()][0] == "C" and len(fig.axes[0].get_yticks()) == 12
     data, _ = view._repr_mimebundle_()
-    assert data["image/svg+xml"].startswith("<?xml") or "<svg" in data["image/svg+xml"]
+    assert "<svg" in data["image/svg+xml"]
 
 
 def test_clip_chroma_draws_a_silent_and_an_empty_clip():
@@ -149,6 +165,17 @@ def test_score_chroma_marks_a_beat_with_no_chord_with_a_question_mark():
     s = Score()
     s.part("a").add(melody("c4:w"))
     assert [t.get_text() for t in s.chroma().figure().axes[0].texts] == ["?"]
+
+
+def test_score_chroma_leaves_out_a_numeral_that_would_touch_the_last():
+    s = Score()
+    s.part("keys").add(melody(" | ".join(["<c4 e4 g4>:h <f4 a4 c5>", "<g4 b4 d5>:h <a4 c5 e5>"] * 16)))
+    written = s.chroma()
+    fig = written.figure()
+    drawn = fig.axes[0].texts
+    assert 1 < len(drawn) < len(written.numerals)
+    boxes = sorted((t.get_window_extent() for t in drawn), key=lambda b: b.x0)
+    assert all(a.x1 <= b.x0 for a, b in zip(boxes, boxes[1:]))
 
 
 def test_score_chroma_keeps_a_pickup_in_its_bar():
@@ -282,6 +309,22 @@ def test_the_keyboard_shows_every_note_of_a_wide_chord():
     assert _pressed(view) == ["C2", "C6"]
 
 
+def test_the_keyboard_bundle_carries_the_svg():
+    data, meta = Chord("Cmaj7").keyboard(caption="a seventh")._repr_mimebundle_()
+    assert ">G4<" in data["image/svg+xml"] and ">G4<" in data["text/html"] and "a seventh" in data["text/html"]
+    assert meta["caption"] == "a seventh"
+
+
+def test_the_keyboard_is_sized_in_points_as_a_matplotlib_view_is():
+    assert re.search(r'<svg[^>]*width="504pt"', Chord("C").keyboard().svg().decode())
+
+
+def test_a_keyboard_label_is_escaped():
+    svg = keyboard([C4], label="A & B").svg()
+    parseString(svg)
+    assert b"A &amp; B" in svg
+
+
 def test_two_keyboards_are_equal():
     assert Chord("Cmaj7").keyboard().svg() == Chord("Cmaj7").keyboard().svg()
     assert Scale("C", "major").keyboard().svg() == Scale("C", "major").keyboard().svg()
@@ -299,9 +342,10 @@ def test_keyboards_go_in_a_row():
     assert float(re.search(r'width="([\d.]+)pt"', svg).group(1)) <= 7 * 72 + 12
 
 
-def test_the_circle_draws_every_church_mode():
-    for mode in ("lydian", "mixolydian", "phrygian", "locrian", "aeolian", "ionian"):
-        assert b"<svg" in Key("A", mode).circle().svg()
+@pytest.mark.parametrize("mode, marked", [("ionian", "A"), ("lydian", "E"), ("mixolydian", "D"), ("dorian", "G"),
+                                          ("aeolian", "C"), ("phrygian", "F"), ("locrian", "B♭")])
+def test_the_circle_marks_each_church_mode_with_its_signature(mode, marked):
+    assert _wedges(Key("A", mode))[0] == [marked]
 
 
 # Shape's label

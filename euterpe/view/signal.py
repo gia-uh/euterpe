@@ -290,14 +290,19 @@ class Spectrogram(_Many):
 
 
 _WINDOW, _HOP = 8192, 2048  # the chromagram's STFT, in samples
-_BAND = (55.0, 5000.0)  # Hz: below it a bin is wider than a semitone's share, above it partials say little of the note
+_BAND = (55.0, 5000.0)  # Hz
 _SILENT = 1e-10  # a frame's power at or under -100 dBFS has no pitch to name
 
 
 def chromagram(clip: Unit | Clip) -> np.ndarray:
     """Pitch classes over time, shape (12, frames), row 0 being C: an 8192-point STFT with a 2048 hop, energy from 55 to
     5000 Hz folded into pitch classes. Each frame sums to 1, or is all zeros where the clip is silent. Frame k is
-    centred on the kth hop of the clip, so it stands for the time from k * 2048 to (k + 1) * 2048 samples."""
+    centred on the kth hop of the clip, so it stands for the time from k * 2048 to (k + 1) * 2048 samples.
+
+    Limit: a bin is 5.86 Hz wide at 48 kHz, wider than a semitone below about 98 Hz, so a pure low tone can read a
+    semitone off. A1, B1 and D2 as sines put nothing on their own class, since no bin rounds to it, and read as A♯, C and
+    D♯; most other notes from C2 to B2 put about 0.6 on theirs. Harmonics, which most instruments have, land where bins
+    are fine enough."""
     c = sources(clip)[0]
     freqs = np.fft.rfftfreq(_WINDOW, 1 / c.rate)
     band = (freqs >= _BAND[0]) & (freqs <= _BAND[1])

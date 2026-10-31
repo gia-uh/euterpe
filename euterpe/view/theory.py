@@ -3,6 +3,7 @@ The first two are drawn by hand as SVG with text, so they need no matplotlib and
 
 from __future__ import annotations
 
+import html
 import math
 from bisect import bisect_right
 from collections.abc import Iterable
@@ -38,8 +39,8 @@ class _Drawing(View):
         if self._svg is None:
             body, w, h = self.body()
             points = self.width * 72
-            self._svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {_num(w)} {_num(h)}" width="{_num(points)}" '
-                         f'height="{_num(points * h / w)}" {FONT} fill="{INK}">{body}</svg>').encode()
+            self._svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {_num(w)} {_num(h)}" width="{_num(points)}pt" '
+                         f'height="{_num(points * h / w)}pt" {FONT} fill="{INK}">{body}</svg>').encode()
         return self._svg
 
     def _repr_mimebundle_(self, include=None, exclude=None):
@@ -142,7 +143,7 @@ class Keyboard(_Drawing):
         w, h = x + 1, _WHITE_H + 4
         if self.label:
             keys += (f'<text x="{_num(x + 12)}" y="{_num(h / 2 + 5)}" font-size="14" font-style="italic" fill="{MADDER}">'
-                     f"{self.label}</text>")
+                     f"{html.escape(self.label)}</text>")
             w += 20 + 8 * len(self.label)
         return keys, w, h
 
@@ -150,6 +151,9 @@ class Keyboard(_Drawing):
 def keyboard(pitches: Iterable[Pitch], *, label: str | None = None, caption: str | None = None, id: str | None = None) -> Keyboard:
     """These pitches pressed on a keyboard, as a view."""
     return Keyboard(pitches, label=label, caption=caption, id=id)
+
+
+_NUMERAL_GAP = 3  # points between two numerals above the bars
 
 
 class WrittenChroma(View):
@@ -189,8 +193,14 @@ class WrittenChroma(View):
         shown = self.bars[::every]
         ax.set_xticks([x for _, x in shown], [str(bar) for bar, _ in shown])
         ax.set_xlabel("bar", fontstyle="italic")
-        for x, text in self.numerals:
-            ax.text(x, 1.02, text, transform=ax.get_xaxis_transform(), va="bottom", fontsize=9.5, fontstyle="italic")
+        right = None
+        for x, text in self.numerals:  # a numeral that would touch the one before it is left out
+            label = ax.text(x, 1.02, text, transform=ax.get_xaxis_transform(), va="bottom", fontsize=9.5, fontstyle="italic")
+            box = label.get_window_extent()
+            if right is not None and box.x0 < right + _NUMERAL_GAP * fig.dpi / 72:
+                label.remove()
+            else:
+                right = box.x1
         return fig
 
 
