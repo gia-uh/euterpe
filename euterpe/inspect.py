@@ -31,15 +31,15 @@ _TONICS = (("C", "C"), ("Db", "C#"), ("D", "D"), ("Eb", "Eb"), ("E", "E"), ("F",
 # Chord qualities the audio can name, as pitch classes over the root. Chroma has no octave, so no inversion.
 _QUALITIES = {"": (0, 4, 7), "m": (0, 3, 7), "dim": (0, 3, 6), "7": (0, 4, 7, 10), "maj7": (0, 4, 7, 11),
               "m7": (0, 3, 7, 10)}
-_CHORD_DECAY, _KEY_DECAY = 0.4, 0.6  # each harmonic's weight over the last's, the values measured to read best
+_CHORD_DECAY, _KEY_DECAY = 0.4, 0.6  # each harmonic's weight over the last's, as measured to read best
 _FITS = 0.75  # cosine to a template. Measured: a chord under a melody on harp and strings 0.80, one rich note 0.64
-_SEVENTH = 0.05  # a seventh must beat its triad by this. Measured: a melody's harmonic fakes 0.04, a real one gains 0.07
+_SEVENTH = 0.05  # a seventh must beat its triad by this. Measured: a melody's harmonic fakes 0.04, a real one adds 0.07
 _PRESENT = 0.05  # each chord tone's least share of the unit chroma, so a bare fifth or third names no chord
 
 
 def _heard(tones: np.ndarray, decay: float) -> np.ndarray:
     """Weights on the 12 pitch classes as a chroma hears them: each with its first six harmonics, which fall on the
-    tone itself, its fifth and its major third, at decay to the power of the harmonic's number."""
+    tone itself, its fifth and its major third, at decay to the power of the harmonic's number less one."""
     return sum(decay ** n * np.roll(tones, over) for n, over in enumerate((0, 0, 7, 0, 4, 7)))
 
 
@@ -63,7 +63,8 @@ def estimate_key(chroma: np.ndarray) -> tuple[Key, float]:
     if not x.size or x.std() == 0:
         return Key("C major"), 0.0
     found = [(float(np.corrcoef(x, np.roll(profile, tonic))[0, 1]), tonic, mode)
-             for mode, profile in ((0, _heard(_MAJOR, _KEY_DECAY)), (1, _heard(_MINOR, _KEY_DECAY))) for tonic in range(12)]
+             for mode, profile in enumerate((_heard(_MAJOR, _KEY_DECAY), _heard(_MINOR, _KEY_DECAY)))
+             for tonic in range(12)]
     r, tonic, mode = max(found)
     return Key(f"{_TONICS[tonic][mode]} {('major', 'minor')[mode]}"), r
 

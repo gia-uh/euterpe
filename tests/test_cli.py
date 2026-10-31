@@ -1,5 +1,6 @@
 import json
 import sys
+from runpy import run_path
 
 import numpy as np
 import pytest
@@ -163,7 +164,7 @@ def _file(tmp_path, text):
 def test_render_a_piece_lasts_its_duration(written, tmp_path, capsys):
     out = tmp_path / "piece.wav"
     assert main(["render", str(written), "-o", str(out), "--seed", "7"]) == 0
-    assert len(read(out)[0]) > 48_000 * 0.75    # three beats at 240 bpm, and the tails
+    assert len(read(out)[0]) == round(run_path(str(written))["score"]().play(7).duration * 48_000)
     assert capsys.readouterr().out.startswith(f"{out}: ")
 
 
@@ -299,15 +300,12 @@ def score(seed):
 '''
 
 
-def test_score_seed_receives_seed_and_the_same_seed_reaches_the_performance(tmp_path, monkeypatch, capsys):
+def test_score_seed_receives_seed_and_the_same_seed_reaches_the_performance(tmp_path, played, capsys):
     path = _file(tmp_path, SEEDED)
     assert main(["render", str(path), "-o", str(tmp_path / "x.musicxml"), "--seed", "1"]) == 0
     assert b"seed1" in (tmp_path / "x.musicxml").read_bytes()
-    seeds = []
-    real = Score.play
-    monkeypatch.setattr(Score, "play", lambda self, seed=0, performance=None: seeds.append(seed) or real(self, seed, performance))
     assert main(["render", str(path), "-o", str(tmp_path / "x.wav"), "--seed", "4"]) == 0
-    assert seeds == [4]
+    assert played == [4]
     assert main(["render", str(path), "-o", str(tmp_path / "y.mid")]) == 2
     assert "--seed" in capsys.readouterr().err
 
