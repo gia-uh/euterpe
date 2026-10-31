@@ -31,20 +31,22 @@ _TONICS = (("C", "C"), ("Db", "C#"), ("D", "D"), ("Eb", "Eb"), ("E", "E"), ("F",
 # Chord qualities the audio can name, as pitch classes over the root. Chroma has no octave, so no inversion.
 _QUALITIES = {"": (0, 4, 7), "m": (0, 3, 7), "dim": (0, 3, 6), "7": (0, 4, 7, 10), "maj7": (0, 4, 7, 11),
               "m7": (0, 3, 7, 10)}
-# A tone's first six harmonics as (pitch class over the tone, weight), losing 0.6 of the weight at each.
-_PARTIALS = ((0, 1.0), (0, 0.4), (7, 0.16), (0, 0.064), (4, 0.0256), (7, 0.01))
+_CHORD_DECAY, _KEY_DECAY = 0.4, 0.6  # each harmonic's weight over the last's, the values measured to read best
 _FITS = 0.75  # cosine to a template. Measured: a chord under a melody on harp and strings 0.80, one rich note 0.64
 _SEVENTH = 0.05  # a seventh must beat its triad by this. Measured: a melody's harmonic fakes 0.04, a real one gains 0.07
 _PRESENT = 0.05  # each chord tone's least share of the unit chroma, so a bare fifth or third names no chord
 
 
+def _heard(tones: np.ndarray, decay: float) -> np.ndarray:
+    """Weights on the 12 pitch classes as a chroma hears them: each with its first six harmonics, which fall on the
+    tone itself, its fifth and its major third, at decay to the power of the harmonic's number."""
+    return sum(decay ** n * np.roll(tones, over) for n, over in enumerate((0, 0, 7, 0, 4, 7)))
+
+
 def _template(tones: tuple[int, ...]) -> np.ndarray:
     """A chord's chroma with each tone's harmonics, so an organ's F does not read as Fmaj7 through the E of its A's
     third harmonic."""
-    template = np.zeros(12)
-    for tone in tones:
-        for over, weight in _PARTIALS:
-            template[(tone + over) % 12] += weight
+    template = _heard(np.isin(np.arange(12), tones).astype(float), _CHORD_DECAY)
     return template / np.linalg.norm(template)
 
 
@@ -52,14 +54,16 @@ _TEMPLATES = {quality: (tones, _template(tones)) for quality, tones in _QUALITIE
 
 
 def estimate_key(chroma: np.ndarray) -> tuple[Key, float]:
-    """The key whose Krumhansl-Kessler profile correlates best with the chroma, shape (12,) or (12, frames), and that
-    correlation. A chroma with no differences to read, such as silence, gives C major at 0."""
+    """The key whose Krumhansl-Kessler profile, heard with its tones' harmonics, correlates best with the chroma, shape
+    (12,) or (12, frames), and that correlation. Bare profiles read a rich instrument's major key as its dominant, since
+    every tone's third harmonic sounds a fifth up. A chroma with no differences to read, such as silence, gives C major
+    at 0."""
     x = np.asarray(chroma, float)
     x = x.mean(axis=1) if x.ndim == 2 and x.size else x
     if not x.size or x.std() == 0:
         return Key("C major"), 0.0
     found = [(float(np.corrcoef(x, np.roll(profile, tonic))[0, 1]), tonic, mode)
-             for mode, profile in ((0, _MAJOR), (1, _MINOR)) for tonic in range(12)]
+             for mode, profile in ((0, _heard(_MAJOR, _KEY_DECAY)), (1, _heard(_MINOR, _KEY_DECAY))) for tonic in range(12)]
     r, tonic, mode = max(found)
     return Key(f"{_TONICS[tonic][mode]} {('major', 'minor')[mode]}"), r
 
@@ -180,6 +184,10 @@ def _part_facts(score: Score, part: str) -> str:
     events = [placed.event for placed in score.events(part)]
     pitches = [pitch for event in events if isinstance(event, Note) for pitch in event.pitches]
     hits = sum(isinstance(event, Hit) for event in events)
-    facts = [f"{len(pitches)} notes, {min(pitches)} to {max(pitches)}"] if pitches else []
-    facts += [f"{hits} hits"] if hits else []
+    facts = [f"{_count(len(pitches), 'note')}, {min(pitches)} to {max(pitches)}"] if pitches else []
+    facts += [_count(hits, "hit")] if hits else []
     return ", ".join(facts) or "no notes"
+
+
+def _count(n: int, name: str) -> str:
+    return f"{n} {name}" if n == 1 else f"{n} {name}s"

@@ -35,6 +35,21 @@ def test_the_key_of_an_a_minor_scale():
     assert key == Key("A minor") and 0.5 < r <= 1
 
 
+@pytest.mark.parametrize("instrument", [Organ, Harp])
+@pytest.mark.parametrize("key", ["C major", "D major"])
+def test_a_rich_instrument_does_not_read_as_the_dominant(instrument, key):
+    s = Score(key=Key(key), tempo=240)
+    s.part("c", instrument()).add(chords(" | ".join(f"{n}:w" for n in "I vi ii V I IV V I I IV I V vi IV V I".split()),
+                                         voicing="close"))
+    assert estimate_key(chromagram(s.play(0).take()))[0] == Key(key)
+
+
+def test_a_minor_key_on_a_rich_instrument():
+    s = Score(key=Key("A minor"), tempo=240)
+    s.part("c", Organ()).add(chords(" | ".join(f"{n}:w" for n in "i iv i V i VI iv V".split()), voicing="close"))
+    assert estimate_key(chromagram(s.play(0).take()))[0] == Key("A minor")
+
+
 def test_estimate_key_takes_one_chroma_or_many_frames():
     frames = chromagram(_sines(["C4", "E4", "G4"]))
     assert estimate_key(frames) == estimate_key(frames.mean(axis=1))
@@ -112,7 +127,7 @@ def undrawn(monkeypatch):
 
 def test_inspect_writes_the_five_kinds_of_file_with_summary_last(tmp_path):
     s = Score(tempo=240)
-    s.part("only", Harp()).add(melody("c4:q e"))
+    s.part("only", Harp()).add(melody("c4:q"))
     paths = inspect(s, tmp_path / "new" / "dir", seed=3)
     assert [p.name for p in paths] == ["roll-only.png", "spectrogram.png", "chroma.png", "loudness.png", "summary.txt"]
     assert all(plt.imread(p).shape[0] > 100 for p in paths[:-1])
@@ -147,6 +162,14 @@ def test_a_part_of_hits_counts_hits(tmp_path, undrawn):
     s = Score(tempo=240)
     s.part("drums", Kit()).add(drums({"kick": "x.x.", "snare": ".x.x"}, "q"))
     assert "part drums: 4 hits" in inspect(s, tmp_path)[-1].read_text()
+
+
+def test_one_note_and_one_hit_are_singular(tmp_path, undrawn):
+    s = Score(tempo=240)
+    s.part("alone", Harp()).add(melody("c4:q"))
+    s.part("drums", Kit()).add(drums({"kick": "x"}, "q"))
+    text = inspect(s, tmp_path)[-1].read_text()
+    assert "part alone: 1 note, C4 to C4\n" in text and "part drums: 1 hit\n" in text
 
 
 def test_two_parts_never_share_a_file(tmp_path, undrawn):
