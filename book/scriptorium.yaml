@@ -31,6 +31,7 @@ files:
   - chapters/17-intervals.md
   - chapters/18-scales-and-keys.md
   - chapters/19-rhythm-and-meter.md
+  - chapters/21-chords.md
 
 outputs:
   site:
