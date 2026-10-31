@@ -78,6 +78,7 @@ def test_v_parallel_is_a_metric_under_pop_naming_no_profile():
     ("c6:h d6:h", "c4:h d4:h", "octaves"),
     ("c4:h d4:h", "c4:h d4:h", "unisons"),
     ("a4:h g4:h", "d4:h c4:h", "fifths"),
+    ("c5:h d5:h", "c4:h d5:h", "unisons"),  # an octave going to a unison the same way
 ])
 def test_v_parallel_reads_each_perfect_interval_both_ways(top, low, kind):
     [f] = _found(_score(top, low), "V-PARALLEL")
@@ -92,6 +93,7 @@ def test_v_parallel_reads_each_perfect_interval_both_ways(top, low, kind):
     ("c5:h a4:h", "c4:h d4:h"),  # an octave to a fifth
     ("ab4:h bb4:h", "c#4:h d#4:h"),  # sounds like fifths, spelled as sixths
     ("g4:q a4:q b4:h", "c4:h d4:h"),  # the voices do not move together
+    ("c5:h d5:h", "g4:h a4:h"),  # fourths
 ])
 def test_v_parallel_leaves_other_motion_alone(top, low):
     assert not _found(_score(top, low), "V-PARALLEL")
@@ -115,6 +117,15 @@ def test_a_stack_going_from_three_pitches_to_two_leaves_the_missing_line_as_a_re
     s.part("choir").add(melody("<c4 g4 c5>:h <d4 a4>:h"))
     [f] = _found(s, "V-PARALLEL")
     assert f.part == "choir" and "with another line (C4–G4 to D4–A4)" in f.message
+
+
+def test_each_voice_of_a_part_is_a_line_and_a_finding_names_its_voice():
+    s = Score()
+    s.part("p").add(melody("g4:h a4:h"))
+    s.part("p").add(melody("c4:h d4:h"), voice=1)
+    [f] = _found(s, "V-PARALLEL")
+    assert f.part == "p"
+    assert f.message.startswith("voice 1: parallel fifths with another line (C4–G4 to D4–A4)")
 
 
 def test_thin_and_uneven_scores_do_not_crash_the_v_rules():
@@ -148,6 +159,7 @@ def test_v_direct_reaches_a_fifth_or_an_octave_and_leaves_the_rest():
     assert not _found(_score("g4:h c5:h", "a3:h b3:h"), "V-DIRECT")  # a minor ninth
     assert not _found(_score("g4:h c5:h", "d4:h c4:h"), "V-DIRECT")  # contrary
     assert not _found(_score("g4:h c5:h", "c4:h f4:h"), "V-DIRECT")  # parallel fifths are V-PARALLEL's
+    assert not _found(_score("c4:h g4:h", "b3:h d4:h"), "V-DIRECT")  # a fourth
 
 
 def test_v_direct_needs_two_lines():

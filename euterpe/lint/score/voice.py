@@ -1,6 +1,6 @@
 """V rules: how the lines of a score move against each other, in the common-practice style of four-part writing. Each
 is off with no profile. The chorale profile makes V-PARALLEL an error and the rest warnings, and pop keeps V-PARALLEL as
-a metric. Two lines are compared only where both sound, so a line with a rest or a missing voice has nothing to break."""
+a metric. Two lines are compared only where both sound, so a line in a rest or a missing voice has nothing to break."""
 
 from __future__ import annotations
 
@@ -53,17 +53,11 @@ def _runs(moments: list, holds: Callable[[tuple], bool]) -> Iterator[tuple[Fract
         held = now
 
 
-def _place(score: Score, at: Fraction) -> tuple[int, Fraction]:
-    """The bar of a moment and how far it is from the bar's downbeat."""
-    starts = score._starts(score.bars)
+def _found(rule: str, severity: Severity, score: Score, starts: list[Fraction], line: VoiceLine, at: Fraction,
+           message: str, value: float) -> Finding:
+    """A finding on a line at a moment, with the bar and beat it falls on among the bars' starts."""
     bar = bisect_right(starts, at)
-    return bar, at - starts[bar - 1] + score._lead(bar)
-
-
-def _found(rule: str, severity: Severity, score: Score, line: VoiceLine, at: Fraction, message: str,
-           value: float) -> Finding:
-    """A finding on a line at a moment, with the bar and beat it falls on."""
-    bar, in_bar = _place(score, at)
+    in_bar = at - starts[bar - 1] + score._lead(bar)
     return Finding(rule, severity, named(line.voice, message), value, part=line.part, bar=bar,
                    beat=beat_at(score.meter_at(bar), in_bar))
 
@@ -92,6 +86,7 @@ def _class(kind: str | None) -> str | None:
 def _parallel(score: Score, params: dict, severity: Severity) -> list[Finding]:
     """Each pair of lines moving the same way from one perfect fifth, octave or unison to another of its kind, on the
     lower line at the moment they arrive, with the semitones between them as the value."""
+    starts = score._starts(score.bars)
     findings = []
     for upper, lower in combinations(lines(score), 2):
         for at, upper_from, lower_from, upper_to, lower_to in _moves(upper, lower):
@@ -100,17 +95,19 @@ def _parallel(score: Score, params: dict, severity: Severity) -> list[Finding]:
                     and _class(_perfect(upper_from, lower_from)) == _class(kind)):
                 message = (f"parallel {kind}s with {_other(lower, upper)} "
                            f"({lower_from!r}–{upper_from!r} to {lower_to!r}–{upper_to!r})")
-                findings.append(_found("V-PARALLEL", severity, score, lower, at, message, float(upper_to - lower_to)))
+                findings.append(_found("V-PARALLEL", severity, score, starts, lower, at, message,
+                                           float(upper_to - lower_to)))
     return findings
 
 
 def _direct(score: Score, params: dict, severity: Severity) -> list[Finding]:
-    """The outer lines reaching a fifth or an octave the same way, the top one by a leap, on the top line, with the
+    """The outer lines reaching a fifth, octave or unison the same way, the top one by a leap, on the top line, with the
     semitones of the leap as the value. Arriving from the same perfect interval is V-PARALLEL's."""
     read = lines(score)
     if len(read) < 2:
         return []
     top, bottom = read[0], read[-1]
+    starts = score._starts(score.bars)
     findings = []
     for at, top_from, bottom_from, top_to, bottom_to in _moves(top, bottom):
         kind = _perfect(top_to, bottom_to)
@@ -119,25 +116,27 @@ def _direct(score: Score, params: dict, severity: Severity) -> list[Finding]:
                 and _class(_perfect(top_from, bottom_from)) != _class(kind)):
             message = (f"direct {kind} with {_other(top, bottom)} ({bottom_from!r}–{top_from!r} to "
                        f"{bottom_to!r}–{top_to!r}), the top line leaping")
-            findings.append(_found("V-DIRECT", severity, score, top, at, message, float(top_to - top_from)))
+            findings.append(_found("V-DIRECT", severity, score, starts, top, at, message, float(top_to - top_from)))
     return findings
 
 
 def _crossing(score: Score, params: dict, severity: Severity) -> list[Finding]:
     """Each stretch in which a lower line sounds above a higher one, where it begins, on the lower line, with the
     semitones it is above by as the value."""
+    starts = score._starts(score.bars)
     findings = []
     for upper, lower in combinations(lines(score), 2):
         moments = _moments((upper, lower))
         for at, (high, low) in _runs(moments, lambda pair: None not in pair and pair[1].number > pair[0].number):
             message = f"{low!r} is above {high!r} in {_other(lower, upper)}"
-            findings.append(_found("V-CROSSING", severity, score, lower, at, message, float(low - high)))
+            findings.append(_found("V-CROSSING", severity, score, starts, lower, at, message, float(low - high)))
     return findings
 
 
 def _overlap(score: Score, params: dict, severity: Severity) -> list[Finding]:
     """A line moving past where its neighbour was just before, when the neighbour has moved too: with the neighbour
     still there, that is V-CROSSING. On the line that moves past, with the semitones past as the value."""
+    starts = score._starts(score.bars)
     findings = []
     read = lines(score)
     for upper, lower in pairwise(read):
@@ -146,10 +145,12 @@ def _overlap(score: Score, params: dict, severity: Severity) -> list[Finding]:
                 continue
             if lower_to.number > upper_from.number:
                 message = f"moves to {lower_to!r}, above {upper_from!r}, where {_other(lower, upper)} just was"
-                findings.append(_found("V-OVERLAP", severity, score, lower, at, message, float(lower_to - upper_from)))
+                findings.append(_found("V-OVERLAP", severity, score, starts, lower, at, message,
+                                           float(lower_to - upper_from)))
             if upper_to.number < lower_from.number:
                 message = f"moves to {upper_to!r}, below {lower_from!r}, where {_other(upper, lower)} just was"
-                findings.append(_found("V-OVERLAP", severity, score, upper, at, message, float(upper_to - lower_from)))
+                findings.append(_found("V-OVERLAP", severity, score, starts, upper, at, message,
+                                           float(upper_to - lower_from)))
     return findings
 
 
@@ -165,12 +166,13 @@ def _spacing(score: Score, params: dict, severity: Severity) -> list[Finding]:
     read = lines(score)
     if len(read) != len(_RANGES):
         return _not_four("V-SPACING", read)
+    starts = score._starts(score.bars)
     findings = []
     for upper, lower in pairwise(read[:3]):
         moments = _moments((upper, lower))
         for at, (high, low) in _runs(moments, lambda pair: None not in pair and pair[0] - pair[1] > _OCTAVE):
             message = f"{low!r} is {high - low} semitones below {high!r} in {_other(lower, upper)}, more than an octave"
-            findings.append(_found("V-SPACING", severity, score, lower, at, message, float(high - low)))
+            findings.append(_found("V-SPACING", severity, score, starts, lower, at, message, float(high - low)))
     return findings
 
 
@@ -180,6 +182,7 @@ def _range(score: Score, params: dict, severity: Severity) -> list[Finding]:
     read = lines(score)
     if len(read) != len(_RANGES):
         return _not_four("V-RANGE", read)
+    starts = score._starts(score.bars)
     findings = []
     for line, (lowest, highest) in zip(read, _RANGES):
         low, high = Pitch(lowest), Pitch(highest)
@@ -187,7 +190,7 @@ def _range(score: Score, params: dict, severity: Severity) -> list[Finding]:
             outside = pitch - high if pitch.number > high.number else pitch - low if pitch.number < low.number else 0
             if outside:
                 message = f"{pitch!r} is outside the voice's range, {lowest} to {highest}"
-                findings.append(_found("V-RANGE", severity, score, line, at, message, float(outside)))
+                findings.append(_found("V-RANGE", severity, score, starts, line, at, message, float(outside)))
     return findings
 
 
@@ -205,7 +208,8 @@ def _doubling(score: Score, params: dict, severity: Severity) -> list[Finding]:
         doubled = leading if len(holding) > 1 else None
         if doubled and doubled != last:
             message = f"the leading tone {leading} is in {len(holding)} lines"
-            findings.append(_found("V-DOUBLING", severity, score, read[holding[1]], at, message, float(len(holding))))
+            findings.append(_found("V-DOUBLING", severity, score, starts, read[holding[1]], at, message,
+                                       float(len(holding))))
         last = doubled
     return findings
 
