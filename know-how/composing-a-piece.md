@@ -28,17 +28,22 @@ Render when the summary holds up: `euterpe render piece.py -o piece.mp3 --seed 7
 
 ## Reading summary.txt
 
+The piece above, trimmed:
+
 ```text
-length: 12.34 s
-loudness: -18.2 LUFS
-true peak: -3.1 dBTP
-key: D major (audio 0.86), written D major
+length: 6.78 s
+loudness: -18.9 LUFS
+true peak: -6.1 dBTP
+key: D major (audio 0.85), written D major
 chord 1.1: audio D, written D
-part melody: 7 notes, F#4 to D5
-metric A-PEAK: sample peak -3.4 dBFS
+chord 2.1: audio A, written A/C#
+part melody: 6 notes, F#4 to D5
+part chords: 9 notes, C#4 to A4
+metric H-KEY: part melody: 0% of the note time is outside the key
+metric A-PEAK: sample peak -6.2 dBFS
 ```
 
-- `key`: the audio's estimate and its correlation, beside the written key. A disagreement on a short excerpt says little: a piece of a few bars may not state its tonic often enough, and its dominant can win. On a whole piece, read it as the notes not stating the key you wrote.
+- `key`: the audio's estimate and its correlation, beside the written key. It can be wrong when your notes are right, so never change notes on this line alone. Over 61 progressions and lines on Organ, Harp, ElectricPiano, Violin, Flute and Clarinet it named the written key 57 times. All four misses were chords in a major key read as its dominant, at 0.66 to 0.89 (B major for E major). An estimate a fifth above the written key therefore says little. Any other disagreement is worth checking against `metric H-KEY`, which reads the written notes and says how much of their time is outside the key. On a piece of drums alone the estimate means nothing: it is reading noise.
 - `chord <bar>.<beat>`: what the audio holds beside what the score says, one line per beat as played, so a repeat appears once per pass. `?` means nothing fits: the audio side names only major, minor and diminished triads and the dominant, major and minor sevenths, in root position, since chroma has no octave. `written A/C#` beside `audio A` is agreement. A difference where you expected agreement is a finding worth reading: a balance that buries a chord tone, or a wrong note.
 - `part`: how many notes each part writes and its lowest and highest pitch, so you can check a part's range.
 - `metric`: every lint metric, with no profile. The rules that a profile turns on or into warnings come from step 2.
