@@ -16,7 +16,7 @@ for name in ("strain", "hands", "rag"):
     code = re.search(rf"```python \{{[^}}\n]*name={name}\b[^}}\n]*\}}\n(.*?)\n```", text, re.S).group(1)
     exec("\n".join(line for line in code.split("\n") if "listen(" not in line and "display(" not in line), scope)
 bar = 2 * 60 / 76
-samples = render(scope["song"], 8 * bar)[int(3.75 * bar * 48000):]
+samples = render(scope["song"], 8 * bar)[int(3.74 * bar * 48000):]
 display(Clip(samples, caption="The Entertainer: the first phrase of its tune"))
 ```
 
@@ -136,7 +136,7 @@ for how, figure in (("holding across nothing", "e4:e c5 e4 c5 | c5:h"),
 
 In 2/4 the sixteenths rank 0 3 2 3 1 3 2 3. The first high C starts on rank 3 and holds across rank 2, for 1. The tied one starts on rank 3 and holds across the bar line, rank 0, for 3.
 
-The first take is a child's tune. The second is the start of The Entertainer. A rag comes in sections called *strains*, each 16 bars, and here is the right hand of its first strain on chapter 12's electric piano, spelled from Joplin's edition. `hook`, `fall` and `top` are the figures that come back, and `strain` strings them together with the bars that come once. Notes in angle brackets strike together, and most of these have the tune on top with an octave under it. Its first two notes come before the first full bar, and that is a *pickup*: `pickup=Fraction(1, 8)` tells the score that bar 1 holds only that eighth:
+The first take is a child's tune. The second is the start of The Entertainer. A rag comes in sections called *strains*, each 16 bars, and here is the right hand of its first strain on chapter 12's electric piano, spelled from Joplin's edition. `hook`, `fall` and `top` are the figures that come back, and `strain` strings them together with the bars that come once. `turn` is a four-bar phrase that comes once, `lead` is the two pickup sixteenths, and `close` is the last chord, kept apart because the closing piece adds it after the strain. Notes in angle brackets strike together, and most of these have the tune on top with an octave under it. Its first two notes come before the first full bar, and that is a *pickup*: `pickup=Fraction(1, 8)` tells the score that bar 1 holds only those two sixteenths, one eighth together:
 
 ```python {run name=strain}
 from fractions import Fraction
@@ -212,7 +212,7 @@ The two agree, and the last line is the same bars with no ramp: the slowing adds
 
 ## Swing
 
-A written time goes through three steps on its way to seconds, in this order: swing, tempo, humanization. *Swing* comes first because it changes where a beat's inside falls. `Swing(ratio, unit)` takes pairs of units and gives the first one `ratio` of the pair. At the default, 2/3 on eighths, the second eighth of each beat moves late, to 2/3 of the way through the beat, and beats themselves stay where they are. `Performance` holds how a score is played, as against how it is written: `Score(performance=...)` sets it, and `s.play(performance=...)` overrides it for one take. So here is a groove of the book's own, a ride cymbal and a hi-hat on beats 2 and 4 over a walking bass, chapter 10's bass guitar in quarters. The ride's pattern is the jazz drummer's, with its third and last strokes on the off-beat eighths:
+A written time goes through three steps on its way to seconds, in this order: swing, tempo, humanization. *Swing* comes first because it moves notes in written time, as shares of a beat, before any seconds exist. `Swing(ratio, unit)` takes pairs of units and gives the first one `ratio` of the pair. At the default, 2/3 on eighths, the second eighth of each beat moves late, to 2/3 of the way through the beat, and beats themselves stay where they are. `Performance` holds how a score is played, as against how it is written: `Score(performance=...)` sets it, and `s.play(performance=...)` overrides it for one take. So here is a groove of the book's own, a ride cymbal and a hi-hat on beats 2 and 4 over a walking bass, chapter 10's bass guitar in quarters. The ride's pattern is the jazz drummer's, with its third and last strokes on the off-beat eighths:
 
 ```python {run continue}
 from fractions import Fraction
@@ -234,7 +234,7 @@ The staffs are the same and the two sound like two styles: the first is stiff an
 
 ## Humanize
 
-Everything so far starts on its exact time, and no player does. `Humanize(timing, velocity)` adds a seeded Gaussian draw to each note's start and velocity. The defaults have standard deviations of 8 ms and 0.04, each clipped at 3 of them. The strain's first three bars with it off and on. Then the block reads what was played: `play` returns the audio, its `parts` hold each part's sound by name, their `notes` are in time order, and a note's `time` is its start in seconds. It prints the starts of the right hand's second to fifth notes, exact and then under two seeds:
+Everything so far starts on its exact time, and no player does. `Humanize(timing, velocity)` adds a seeded Gaussian draw to each note's start and velocity, and the notes of a chord share most of the draw on their start. The defaults have standard deviations of 8 ms and 0.04, each clipped at 3 of them. The strain's first three bars with it off and on. Then the block reads what was played: `play` returns the audio, its `parts` hold each part's sound by name, their `notes` are in time order, and a note's `time` is its start in seconds. It prints the starts of the right hand's second to fifth notes, exact and then under two seeds:
 
 ```python {run continue}
 from euterpe import Humanize, Key, Meter, Performance, Score, display, melody
@@ -252,7 +252,7 @@ for performance, seed in ((off, 0), (on, 1), (on, 2)):
     print([round(note.time, 3) for note in take.parts["right"].notes[1:5]])
 ```
 
-The first line is on an exact grid, and with `humanize` left at None no random draw is made at all. The other two give each note its own small error, which is different under each seed and the same every time under one, so a piece renders to the same samples every time. Listen for the difference in the attacks of the chords, where notes that started as one now spread by a few milliseconds.
+The first line is on an exact grid, and with `humanize` left at None no random draw is made at all. The other two give each note its own small error, which is different under each seed and the same every time under one, so a piece renders to the same samples every time. Listen for what that moves: whole chords and single notes land up to 3 × 8 = 24 ms off the grid against the other hand, and strokes come out unevenly loud. Inside one chord the notes differ by far less, a standard deviation of a quarter of that 8 ms, or 2 ms.
 
 ## Putting it all together
 
@@ -296,7 +296,7 @@ The rhythm is now written down: every length in that score is a fraction, each n
 ## Exercises
 
 1. In the block with `s.ramp(3, 2, to=to)`, change `46` to `120`. How long do the two bars take now, and what is this ramp called?
-2. In the swing block, change `Swing()` to `Swing(3 / 4)`. Where does the second eighth start now, and what does the groove sound like?
+2. In the swing block, change both `Swing()` to `Swing(3 / 4)`. Where does the second eighth start now, and what does the groove sound like?
 3. In the closing piece, add `swing=Swing(unit=Fraction(1, 16))` to the `Performance`, importing `Swing` from `euterpe` and `Fraction` from `fractions`. What happens to the rag's sixteenths, and which notes stay where they were?
 
 ### Answers
