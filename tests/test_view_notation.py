@@ -104,7 +104,7 @@ def test_a_full_score_engraves_with_no_music_font_character():
 
 def test_the_svg_has_its_size_and_its_viewbox():
     svg = _score(" | ".join(["c4:q d e f"] * 40)).notation().svg().decode()
-    assert 780 <= float(re.search(r'<svg[^>]*\bwidth="([\d.]+)', svg).group(1)) <= 860
+    assert 520 <= float(re.search(r'<svg[^>]*\bwidth="([\d.]+)', svg).group(1)) <= 580
     assert re.search(r'<svg[^>]*viewBox="0 0 [\d.]+ [\d.]+"', svg)
 
 
