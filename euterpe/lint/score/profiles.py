@@ -26,6 +26,8 @@ _AUDIO = {"A-PEAK": "metric", "A-TRUEPEAK": "warn", "A-CLIP": "error", "A-LUFS":
 _EVERY_STYLE = {**_NOTATION, **_INSTRUMENT, **_AUDIO}
 _RHYTHM = dict.fromkeys(("T-STRONG", "T-SYNCOPATION", "T-DENSITY", "T-PHRASE", "T-BACKBEAT", "T-FOURFLOOR", "T-TEMPO"), "metric")
 _MELODY = ("M-RANGE", "M-LEAP", "M-CLIMAX", "M-REPEAT", "M-AUGMENTED", "M-CONTOUR")
+_HARMONY = ("H-KEY", "H-ROMAN", "H-CADENCE", "H-LEADING", "H-SEVENTH")
+_FORM = dict.fromkeys(("F-MOTIF", "F-REPEAT"), "metric")
 
 THRESHOLDS = {"min_backbeat": 0.5, "min_floor": 0.9, "tempo": (118, 150), "max_range": 19, "max_repeat": 4}  # a rule's own
 
@@ -35,12 +37,20 @@ PROFILES = {
         **_RHYTHM,
         **dict.fromkeys(_MELODY, "warn"),
         "M-CONTOUR": "metric",
-    }, {"max_range": THRESHOLDS["max_range"], "max_repeat": THRESHOLDS["max_repeat"]}),
+        "H-KEY": "metric",
+        "H-ROMAN": "metric",
+        "H-CADENCE": "warn",
+        "H-LEADING": "warn",
+        "H-SEVENTH": "warn",
+        **_FORM,
+    }, {"max_range": THRESHOLDS["max_range"], "max_repeat": THRESHOLDS["max_repeat"], "final_cadences": ("PAC", "plagal")}),
     "pop": Profile("pop", {
         **_EVERY_STYLE,
         **_RHYTHM,
         "T-BACKBEAT": "warn",
         **dict.fromkeys(_MELODY, "metric"),
+        **dict.fromkeys(_HARMONY, "metric"),
+        **_FORM,
     }, {"min_backbeat": THRESHOLDS["min_backbeat"]}),
     "techno": Profile("techno", {
         **_EVERY_STYLE,
@@ -49,5 +59,8 @@ PROFILES = {
         "T-TEMPO": "warn",
         **dict.fromkeys(_MELODY, None),
         "M-RANGE": "metric",
+        **dict.fromkeys(_HARMONY, None),
+        "H-KEY": "metric",
+        **_FORM,
     }, {"min_floor": THRESHOLDS["min_floor"], "tempo": THRESHOLDS["tempo"]}),
 }
