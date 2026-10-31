@@ -36,7 +36,7 @@ _METRONOME = str.maketrans({"\ueca2": "\U0001d15d", "\ueca3": "\U0001d15e", "\ue
 
 
 _MADDER_RULES = (f".euterpe-score .eu-on,.euterpe-score .eu-on *{{fill:{MADDER};stroke:{MADDER}}}"
-                 ".euterpe-score g.note,.euterpe-score rect[id]{cursor:pointer}"
+                 ".eu-score g.note,.eu-score rect[id]{cursor:pointer}.eu-score text{pointer-events:none}"
                  f".eu-cursor{{stroke:{MADDER};stroke-width:1.5;vector-effect:non-scaling-stroke;pointer-events:none}}")
 _PANEL_RULES = "@media (max-width:640px){.eu-score>svg{min-width:600px}}"
 
@@ -80,7 +80,7 @@ class ScoreWidget(Widget):
     the cursor and light the notes. In print the panel stands where a widget's special view does."""
 
     classes = "euterpe-widget euterpe-score"
-    points = 120  # the score above carries the detail, and the figure has a budget
+    points = 110  # the score above carries the detail, and the figure has a budget
 
     def __init__(self, audio: Clip, panel: View, events: list, *, caption: str | None = None, id: str | None = None,
                  normalize: bool = True):
@@ -162,6 +162,9 @@ def _engrave(data: bytes) -> tuple[bytes, list[tuple[str, Fraction, Fraction]]]:
         raise ValueError("notation: the score is too long for one figure; choose its measures with bars=(first, last)")
     svg = toolkit.renderToSVG(1)
     svg = re.sub(r'<svg viewBox="0 0 (\d+) (\d+)"', r'<svg width="\1" height="\2" viewBox="0 0 \1 \2"', svg, count=1)
+    width, height = re.search(r'<svg width="(\d+)" height="(\d+)"', svg).groups()
+    # The inner svg's size: a browser defaults it to the root's, but WeasyPrint draws it at nothing, so the PDF has no staff.
+    svg = svg.replace('<svg class="definition-scale"', f'<svg class="definition-scale" x="0" y="0" width="{width}" height="{height}"', 1)
     svg = svg.replace('color="black"', f'color="{INK}" fill="{INK}"').replace('font-family="Times, serif"', FONT)
     return svg.replace(' font-family="Leipzig"', "").translate(_METRONOME).encode(), _written(toolkit.renderToTimemap({"includeRests": False}))
 

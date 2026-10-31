@@ -7,7 +7,7 @@
       var panel = fig.querySelector(".eu-score"), json = fig.querySelector(".eu-map");
       if (!panel || !json) return null;
       var map = JSON.parse(json.textContent), svg = panel.querySelector("svg"), w = svg.viewBox.baseVal.width;
-      var els = null, i = -1, lit = {}, line = null, places = [], row = null;
+      var els = null, i = -1, lit = {}, line = null, places = [], row = null, begun = false;
       function el(id) {
         if (!els) {
           els = {};
@@ -39,12 +39,13 @@
       }
       function follow(x, sys) {
         var s = svg.getBoundingClientRect(), p = panel.getBoundingClientRect(), k = s.width / w, top = sys.euBox.y0 * k + s.top - p.top;
+        var cx = x * k + s.left - p.left;
+        // Sideways first: setting scrollLeft cancels a smooth scroll already under way.
+        if (cx < 0 || cx > panel.clientWidth * 0.9) panel.scrollLeft += cx - panel.clientWidth / 4;
         if (sys !== row) {
           row = sys;
           if (top < 0 || sys.euBox.y1 * k + s.top - p.top > panel.clientHeight) panel.scrollTo({ top: panel.scrollTop + top - panel.clientHeight / 4, behavior: "smooth" });
         }
-        var cx = x * k + s.left - p.left;
-        if (cx < 0 || cx > panel.clientWidth * 0.9) panel.scrollLeft += cx - panel.clientWidth / 4;
       }
       panel.addEventListener("click", function (e) {
         for (var t = e.target; t && t !== panel; t = t.parentNode) {
@@ -52,11 +53,13 @@
           map.forEach(function (ev) {
             if (ev[1].indexOf(t.id) >= 0 && (best === null || Math.abs(ev[0] - au.currentTime) < Math.abs(best - au.currentTime))) best = ev[0];
           });
-          if (best !== null) { au.currentTime = best; return; }
+          if (best !== null) { begun = true; au.currentTime = best; return; }
         }
       });
       return function () {
-        var now = au.currentTime, a = null, idle = au.ended || (au.paused && !now);
+        var now = au.currentTime, a = null;
+        begun = begun || now > 0 || !au.paused;
+        var idle = au.ended || !begun;
         if (idle || (i >= 0 && now < map[i][0])) {
           Object.keys(lit).forEach(function (id) { light(id, false); });
           i = -1;

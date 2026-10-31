@@ -60,6 +60,14 @@ def test_the_panel_scrolls_sideways_on_a_phone_and_inside_itself():
     assert re.search(r"@media \(max-width:640px\)\{[^}]*\.eu-score>svg\{min-width:600px\}", html)
 
 
+def test_the_inner_svg_has_its_size_for_print():
+    svg = _score().notation().svg().decode()
+    width, height = re.search(r'<svg width="(\d+)" height="(\d+)"', svg).groups()
+    inner = re.search(r'<svg[^>]*class="definition-scale"[^>]*>', svg).group(0)
+    for name, value in (("x", "0"), ("y", "0"), ("width", width), ("height", height)):
+        assert f' {name}="{value}"' in inner
+
+
 def test_a_score_wraps_to_systems_at_that_width():
     svg = _score(" | ".join(["c4:q d e f"] * 40)).notation().svg()
     assert svg.count(b'class="system"') > 1
