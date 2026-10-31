@@ -227,6 +227,18 @@ def test_v_doubling_follows_the_key_in_force():
     assert [(f.bar, f.value) for f in _found(s, "V-DOUBLING")] == [(1, 2.0), (2, 2.0)]
 
 
+def test_v_doubling_reads_a_key_change_under_notes_tied_across_it():
+    s = _score("c#5:w~ | c#5:w", "c#4:w~ | c#4:w")
+    s.change(2, key=Key("D major"))
+    [f] = _found(s, "V-DOUBLING")
+    assert (f.part, f.bar, f.beat, f.value) == ("alto", 2, 1.0, 2.0)
+
+
+def test_v_doubling_counts_once_when_tied_over_a_bar_in_one_key():
+    [f] = _found(_score("b4:w~ | b4:w", "b3:w~ | b3:w"), "V-DOUBLING")
+    assert (f.bar, f.beat) == (1, 1.0)
+
+
 def test_v_doubling_reads_the_raised_seventh_of_minor_and_its_spelling():
     assert _found(_score("g#4:w", "g#3:w", key=Key("A minor")), "V-DOUBLING")
     assert not _found(_score("g4:w", "g3:w", key=Key("A minor")), "V-DOUBLING")

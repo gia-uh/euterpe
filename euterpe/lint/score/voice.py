@@ -5,7 +5,7 @@ a metric. Two lines are compared only where both sound, so a line with a rest or
 from __future__ import annotations
 
 from bisect import bisect_right
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from fractions import Fraction
 from itertools import combinations, pairwise
 
@@ -27,9 +27,11 @@ def _sounding(line: VoiceLine, at: Fraction) -> Pitch | None:
     return line[index][2] if index >= 0 and at < line[index][1] else None
 
 
-def _moments(read: tuple[VoiceLine, ...]) -> list[tuple[Fraction, tuple[Pitch | None, ...]]]:
-    """Each moment any of the lines starts or ends a note, with the pitch each sounds from then on."""
-    times = sorted({time for line in read for offset, end, _ in line for time in (offset, end)})
+def _moments(read: tuple[VoiceLine, ...],
+             also: Iterable[Fraction] = ()) -> list[tuple[Fraction, tuple[Pitch | None, ...]]]:
+    """Each moment any of the lines starts or ends a note, and the moments also asked for, with the pitch each line
+    sounds from then on."""
+    times = sorted({*also, *(time for line in read for offset, end, _ in line for time in (offset, end))})
     return [(at, tuple(_sounding(line, at) for line in read)) for at in times]
 
 
@@ -191,12 +193,14 @@ def _range(score: Score, params: dict, severity: Severity) -> list[Finding]:
 
 def _doubling(score: Score, params: dict, severity: Severity) -> list[Finding]:
     """Each stretch with the leading tone of the key in force in two or more lines, where it begins, on the second line
-    down, with how many lines hold it as the value. A key change that moves the leading tone begins a new stretch."""
+    down, with how many lines hold it as the value. A key change that moves the leading tone begins a new stretch, even
+    under notes tied across it, so each bar start is read too."""
     read = tuple(lines(score))
     findings = []
     last = None
-    for at, pitches in _moments(read):
-        leading = _name(score.key_at(_place(score, at)[0]).leading_tone)
+    starts = score._starts(score.bars)
+    for at, pitches in _moments(read, starts):
+        leading = _name(score.key_at(bisect_right(starts, at)).leading_tone)
         holding = [index for index, pitch in enumerate(pitches) if pitch is not None and _name(pitch) == leading]
         doubled = leading if len(holding) > 1 else None
         if doubled and doubled != last:
