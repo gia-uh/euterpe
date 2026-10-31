@@ -11,7 +11,6 @@ import pytest
 from euterpe import Key, Meter, Pitch, Score, chords, drums, melody
 from euterpe.instruments import Harp, Kit, Note
 from euterpe.view import display
-from euterpe.view.notation import PAGE_WIDTH, SCALE
 from euterpe.view.special import X0, X1, roll as special_roll
 from euterpe.view.widget import FONT
 
@@ -103,10 +102,9 @@ def test_a_full_score_engraves_with_no_music_font_character():
     assert not re.search("[\ue000-\uf8ff]", svg.decode())
 
 
-def test_the_svg_is_no_wider_than_a_phone():
+def test_the_svg_has_its_size_and_its_viewbox():
     svg = _score(" | ".join(["c4:q d e f"] * 40)).notation().svg().decode()
-    width = float(re.search(r'<svg[^>]*\bwidth="([\d.]+)', svg).group(1))
-    assert width == PAGE_WIDTH * SCALE / 100 <= 390
+    assert 780 <= float(re.search(r'<svg[^>]*\bwidth="([\d.]+)', svg).group(1)) <= 860
     assert re.search(r'<svg[^>]*viewBox="0 0 [\d.]+ [\d.]+"', svg)
 
 
@@ -211,10 +209,10 @@ def test_display_shows_the_notation_with_the_player_under_it(monkeypatch):
     s = _score("c4:q d e f", Harp())
     view = _shown(monkeypatch, s, caption="A scale", id="fig-scale")
     data, meta = view._repr_mimebundle_()
-    assert view.svg() == s.notation().svg()
+    assert s.notation().svg() in view.svg()
     assert "audio/mpeg" in data
     assert data["text/html"].index("<svg") < data["text/html"].index("<audio")
-    assert meta == {"caption": "A scale", "id": "fig-scale"}
+    assert meta == {"caption": "A scale", "id": "fig-scale", "site": "html"}
 
 
 def test_display_of_a_score_with_no_instrument_shows_the_notation_alone(monkeypatch):

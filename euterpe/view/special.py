@@ -155,9 +155,15 @@ def _drum_names(kit) -> list[tuple[object, str]]:
     return named
 
 
-def hits(notes, kit, seconds: float, bars=(), playhead: bool = True, names: dict[int, str] | None = None) -> tuple:
+def _ref(ids: dict[int, str] | None, note) -> str:
+    return f' id="{ids[id(note)]}"' if ids else ""
+
+
+def hits(notes, kit, seconds: float, bars=(), playhead: bool = True, names: dict[int, str] | None = None,
+         ids: dict[int, str] | None = None) -> tuple:
     """One row per drum that plays, a mark per hit at its time, its velocity as ink density. bars are bar starts to
-    rule, in seconds. names gives each note's drum as written, by the note's id, in place of the kit's."""
+    rule, in seconds. names gives each note's drum as written, by the note's id, in place of the kit's; ids an element
+    id for each mark, the same way."""
     if names is not None:
         played = [(name, name) for name in drum_rows(names[id(n)] for n in notes)]
         row = lambda n: names[id(n)]
@@ -191,17 +197,19 @@ def hits(notes, kit, seconds: float, bars=(), playhead: bool = True, names: dict
             if row(n) == drum and n.time < seconds:
                 x = X0 + (X1 - X0) * n.time / seconds
                 p.append(f'<rect x="{_num(x - 3)}" y="{y + 2}" width="6" height="{rh - 4}" rx="1.5" fill="{PRUSSIAN}" '
-                         f'fill-opacity="{0.35 + 0.65 * min(1.0, n.velocity):.2f}" data-t="{n.time:.3f}"/>')
+                         f'fill-opacity="{0.35 + 0.65 * min(1.0, n.velocity):.2f}" data-t="{n.time:.3f}"{_ref(ids, n)}/>')
     p.append(_ticks(seconds, top + rh * len(played) + 6))
     if playhead:
         p.append(_playhead(top + rh * len(played)))
     return "".join(p), W, h, X0, X1
 
 
-def roll(notes, seconds: float, bars=(), numerals=(), peak: bool = False, playhead: bool = True) -> tuple:
+def roll(notes, seconds: float, bars=(), numerals=(), peak: bool = False, playhead: bool = True,
+         ids: dict[int, str] | None = None) -> tuple:
     """A keyboard on the left over the notes' range and two semitones each side, each note a
     bar from its time for its duration, named as its Pitch is spelled. bars are bar starts to rule, in seconds; numerals
-    are (seconds, text) written under the notes; peak marks the highest pitch in madder."""
+    are (seconds, text) written under the notes; peak marks the highest pitch in madder; ids gives an element id for
+    each note's bar, by the note's id."""
     numbers = [_number(n.pitch) for n in notes]
     lo, hi = min(numbers) - 2, max(numbers) + 2
     rows = hi - lo + 1
@@ -230,7 +238,7 @@ def roll(notes, seconds: float, bars=(), numerals=(), peak: bool = False, playhe
         w = max(2.0, (X1 - X0) * n.duration / seconds)
         y = top + (hi - m) * rh
         p.append(f'<rect x="{_num(x)}" y="{_num(y + 0.5)}" width="{_num(min(w, X1 - x))}" height="{_num(rh - 1)}" rx="1.5" '
-                 f'fill="{MADDER if peak and m == hi - 2 else PRUSSIAN}" data-t="{n.time:.3f}"/>')
+                 f'fill="{MADDER if peak and m == hi - 2 else PRUSSIAN}" data-t="{n.time:.3f}"{_ref(ids, n)}/>')
         if rh >= 5:
             p.append(f'<text x="{_num(x + 2)}" y="{_num(y - 0.5)}" font-size="6.5">{n.pitch.pretty if isinstance(n.pitch, Pitch) else _name(m)}</text>')
     p.append(_ticks(seconds, top + rows * rh + 6 + under))

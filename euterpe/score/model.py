@@ -569,9 +569,10 @@ class Score:
         return roll(self, part, peak)
 
     def view(self, normalize: bool = True) -> Any:
-        """What display() shows: the notation with the player under it, or the roll if verovio is missing, at -16 LUFS
-        unless normalize is false. A part with no instrument leaves out the player. A score too long for one figure raises,
-        as notation does: show a stretch of it with s.notation(bars=...)."""
+        """What display() shows: the notation with the sound widget under it and a cursor that walks the staves as it
+        plays, or the same on the roll if verovio is missing, at -16 LUFS unless normalize is false. A part with no
+        instrument leaves out the sound. A score too long for one figure raises, as notation does: show a stretch of it
+        with s.notation(bars=...)."""
         from euterpe.view.notation import score_view
 
         return score_view(self, normalize)

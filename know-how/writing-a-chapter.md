@@ -24,6 +24,7 @@ Utility code runs hidden, in `{run echo=false}` blocks: hand-made drawings, form
 - A drawing that plots a function rather than a sound goes through `figure(draw, caption=...)`, where `draw` returns the matplotlib figure; it is drawn in the house style too. If a sound needs hand-made matplotlib, the view API is missing something: propose the view instead.
 - File names come from the caption and a hash of the content, so never name files by hand.
 - Keep every example below full scale: `* 0.5` on a full-scale source.
+- A score over about 30 bars is too heavy for one widget (250 KB of SVG per figure): show an excerpt with `s.notation(bars=(first, last))` and the whole as `s.roll()`.
 
 ## Pacing
 
