@@ -3,9 +3,7 @@
 Chapter 17 stopped on a question: why does the Invention stay on seven of the twelve notes for three bars, and what does one new note change? Here is where this chapter ends up, on eight bars from the middle of its closing piece, and at the fifth of them the whole band steps up by one semitone:
 
 ```python {run echo=false}
-# The teaser: bars 17 to 24 of the finale, four bars in D and four in E♭, built by the code of this
-# chapter's two named finale blocks, which it reads from this file so the two never differ. The blocks'
-# own views are skipped.
+# The teaser: bars 17 to 24 of the finale, built by this chapter's two named blocks, read from this file.
 import re
 from pathlib import Path
 
@@ -17,7 +15,6 @@ scope = {}
 for name in ("tune", "joy"):
     code = re.search(rf"```python \{{[^}}\n]*name={name}\b[^}}\n]*\}}\n(.*?)\n```", text, re.S).group(1)
     exec("\n".join(line for line in code.split("\n") if "listen(" not in line and "display(" not in line), scope)
-# Two beats a bar at 116 bpm.
 bar = 2 * 60 / 116
 samples = render(scope["song"], 24 * bar)[int(16 * bar * 48000):]
 display(Clip(samples, caption="Joy to the World: the end of the verse in D, then its start in E♭"))
@@ -27,25 +24,25 @@ Every note after the turn is a semitone higher than the note it replaces, and th
 
 ## Steps
 
-Chapter 16 found that the white keys climb by 2s and 1s, and left it there. `Scale` holds a *tonic*, the note a scale is named after, and a mode, and `steps` gives the semitones from each note to the next, ending back on the tonic. A step of 2 is a *whole step*, W, and a step of 1 a *half step*, H, the semitone of chapter 16:
+Chapter 16 found that the white keys climb by 2s and 1s, and left it there. `Scale` holds a *tonic*, the note a scale is named after, and a mode, here major, and `steps` gives the semitones from each note to the next, ending back on the tonic. A step of 2 is a *whole step*, W, and a step of 1 a *half step*, H, the semitone of chapter 16:
 
 ```python {run output=code}
 from euterpe import Scale
 
 c_major = Scale("C", "major")
 print(c_major.pitches())
-print(c_major.steps, "".join("HW"[step - 1] for step in c_major.steps))
+print(c_major.steps)
 for tonic in ("G", "D"):
     print(Scale(tonic, "major").pitches(), Scale(tonic, "major").steps)
 ```
 
-The pattern W W H W W W H is what *major* means. Start it on any of the twelve keys of a piano and you get a major scale, and it has to use whichever black keys the pattern lands on. This is the rule chapter 16 borrowed. From G the pattern needs a whole step from E, which F does not give, since E to F is a half step. So the sixth step lands on the black key above F, and because a scale uses one note per letter, its name is F♯.
+The pattern W W H W W W H is what *major* means. Start it on any of the twelve keys of a piano and you get a major scale, and it has to use whichever black keys the pattern lands on. This is the rule chapter 16 borrowed. From G the pattern needs a whole step from E, which F does not give, since E to F is a half step. So the sixth step lands on the black key above F, and because a scale uses one note per letter, its name is F♯. `keyboard` marks a scale's notes in red on a piano, so look for the black keys that turn red: none in C major, and in G major that one F♯:
 
 ```python {run}
 from euterpe import Scale, display
 
 display(Scale("C", "major").keyboard(caption="C major: the pattern fits the white keys from C"),
-        Scale("D", "major").keyboard(caption="D major: the same pattern from D needs F♯ and C♯"))
+        Scale("G", "major").keyboard(caption="G major: the same pattern from G needs F♯"))
 ```
 
 A scale is not yet a tune, but this one nearly is. Lowell Mason printed a hymn tune called Antioch in Boston in 1839, and everyone knows it as Joy to the World. Its first line is D major, walked down from top to bottom. `Meter("2/4")` makes a bar of two quarters, which chapter 19 explains, and chapter 13's brass section plays it. The two ♯ at the start of the staff are D major's F♯ and C♯:
@@ -62,7 +59,7 @@ display(s, caption="The first line of Joy to the World: D major, from the top do
 
 ## The tonic
 
-That line ends with a thump of arrival on its last note. The same steps stopped one note short do not. `Key` holds a tonic and a mode, as a `Scale` does, and `degree(n)` counts its notes from 1. Two takes of D major on the harp, the first climbing to degree 7 and the second to degree 8:
+That line comes to rest on its last note, the D it started from, an octave lower. A scale does the same from below. `Key` holds a tonic and a mode, as a `Scale` does, and `degree(n)` counts its notes from 1. Two takes of D major climbing on the harp, the first stopping on degree 7 and the second on degree 8:
 
 ```python {run continue}
 from euterpe import Key, display
@@ -74,9 +71,9 @@ for top in (7, 8):
     display(Harp().play(run).take(4.0, f"D major climbing to degree {top}, {d_major.degree(top)}"))
 ```
 
-The first take leaves you hanging on C♯5, as chapter 16's run did on B4, and the second puts you down. The note that ends things, the first degree, is the tonic, and the piece's home. Degree 7 here is the *leading tone*, a half step under it. There is habit in this: music in this tradition has ended on the tonic for centuries, and your ear has learned that. Later sections add the mechanism.
+The first take stops on C♯5 and sounds unfinished, as chapter 16's run did on B4, and the second comes to rest. Degree 8 is degree 1 an octave up. The note that ends things, the first degree, is the tonic, and the piece's home. Degree 7 here is the *leading tone*, a half step under it. There is habit in this: music in this tradition has ended on the tonic for centuries, and your ear has learned that. Later sections add the mechanism.
 
-The next most important note is degree 5, a fifth above the tonic, called the *dominant*, and music often stands on it before it goes home. For centuries those two were the only notes an orchestra's timpani were tuned to. Chapter 14's kettles join here on D, the tonic, and on A, the dominant, a fourth under it, so that bar 3 falls from A to D as the tune lands on D. A `decay` of 1.2 s, half the default, keeps repeated strokes from piling up:
+The next most important note is degree 5, a fifth above the tonic, called the *dominant*, and music often stands on it before it goes home. For centuries those two were the only notes an orchestra's timpani were tuned to. Chapter 14's kettles join here on D, the tonic, and on A, the dominant, a fourth under it, so that the A of bar 3 rises to D at bar 4, as the tune lands on D. A `decay` of 1.2 s, half the default, keeps repeated strokes from piling up:
 
 ```python {run continue}
 from euterpe import display, melody
@@ -91,7 +88,7 @@ display(s, caption="The first line, with timpani on the tonic and the dominant")
 The answer to chapter 17's question starts with its smoothest interval. After the octave, the fifth is the distance whose partials meet lowest, 3 to 2. So stack seven notes a fifth apart, from F, then bring them all into one octave. `Pitch(letter, alter, octave)` rebuilds a name in another octave, and `alter` counts its sharps:
 
 ```python {run continue output=code}
-from euterpe import Interval, Pitch, Scale
+from euterpe import Interval, Pitch
 from euterpe.pitch import B4, F4
 
 stack = [F4]
@@ -99,13 +96,22 @@ for _ in range(6):
     stack.append(stack[-1] + Interval("P5"))
 print(stack)
 print(sorted(Pitch(p.letter, p.alter, 4) for p in stack))
-print(Interval.between(F4, B4))
+print(Interval.between(F4, B4).pretty)
 print(stack[-1] + Interval("P5"))
 ```
 
 Seven notes a fifth apart, from F, are the seven white keys. That is one account of why W W H W W W H has this uneven shape: it is what is left when a line of fifths is folded into one octave. Seven is also where the stack has to stop if each letter is to appear once, since the next fifth, in the last line, comes back to the letter F.
 
-The stack holds six fifths, but its two ends, F and B, form something else, printed on the third line: the augmented fourth of chapter 17, the tritone, which no other pair of the seven forms. Each of its notes sits on one of the scale's two half steps: B is a semitone under C and F a semitone over E. So when the restless tritone moves, the shortest way out lands on C and E, and those seven notes point at C. That is the mechanism next to the habit, and it is why a leading tone leans.
+The stack holds six fifths, but its two ends, F and B, form something else, printed on the third line: chapter 17's tritone, which no other pair of the seven forms. Each of its notes sits on one of the scale's two half steps: B is a semitone under C and F a semitone over E. So the shortest way out of the tritone lands on C and E. Hear the move, with F falling and B rising:
+
+```python {run continue}
+from euterpe.instruments import Harp
+from euterpe.pitch import B4, C5, E4, F4
+
+Harp().play([(0.0, F4, 2.0), (0.0, B4, 2.0), (2.0, E4, 3.0), (2.0, C5, 3.0)]).take(5.5, "The tritone F4 and B4, then E4 and C5")
+```
+
+The first pair rubs and the second is the sweet interval of a sixth, with C on top. So those seven notes point at C. That is the mechanism next to the habit, and it is why a leading tone leans.
 
 The last line is the other half of the question. One more fifth above B gives F♯. Add it at the top of the stack, drop F from the bottom, and you have G major. So moving by one fifth changes exactly one note.
 
@@ -118,14 +124,14 @@ from euterpe import Key
 
 for name in "C G D A E B F Bb Eb Ab".split():
     key = Key(f"{name} major")
-    print(f"{name:3}{key.signature:3} ", " ".join(str(p)[:-1] for p in key.scale.pitches() if p.alter))
+    print(name, key.signature, [p for p in key.scale.pitches() if p.alter])
 c_major, g_major = Key("C major"), Key("C major").dominant
 print(g_major, [p for p in g_major.scale.pitches() if p not in c_major.scale])
 ```
 
-Now the Invention can be read. For three bars it stays on the signature of C major, which has no sign at all. Bar 4 brings F♯, the one note that tells C major from G major, and by bar 7 the music stands on G and sounds as if it has arrived, because it has: one note moved the whole home by a fifth. Chapter 24 does this on purpose.
+Now the Invention can be read. For three bars it stays on the signature of C major, which has no sign at all. Bar 4 brings F♯, the one note that tells C major from G major, and by bar 7 the music stands on G: one note moved the whole home by a fifth. Chapter 17's closing player reaches bar 7 at 20 s, so play it from there and hear the arrival. Chapter 24 does this on purpose.
 
-The line of fifths closes into a circle on the twelve keys of a piano, because twelve fifths come back to the note they started on: that is what equal temperament bought in chapter 17. `circle` draws it, with majors outside and their *relative* minors inside. Neighbours differ by one note, and keys on opposite sides share only two. Here is D major and, next to it, the key we are heading for:
+The line of fifths closes into a circle on the twelve keys of a piano, because twelve fifths come back to the note they started on: that is what equal temperament bought in chapter 17. `circle` draws it, with majors outside and minors inside, which the Minor section below explains. Neighbours differ by one note, and keys on opposite sides share only two. Here is D major and, next to it, the key we are heading for:
 
 ```python {run continue}
 from euterpe import Key, display
@@ -136,7 +142,7 @@ display(Key("D major").circle(caption="D major, with its neighbours A and G"),
 
 So D and E♭ are a semitone apart on the keyboard and five places apart on the circle. They share two notes, D and G, out of seven. That is why the turn at the start of this chapter is such a big change for so small a move.
 
-A key also tells a chord what it is made of. `chords` writes chords by *Roman numeral*: I is the chord on the 1st note of the key, IV on the 4th, V on the 5th, and V7 adds one note on top. Chapter 21 builds them. For now what matters is that a numeral names a degree, not a note, so it follows whichever key is in force. Chapter 12's organ takes them, under the same two parts:
+A key also tells a chord what it is made of. `chords` writes chords by *Roman numeral*: I is the chord on the 1st note of the key, IV on the 4th, V on the 5th, and V7 adds one note on top. Chapter 21 builds them. For now what matters is that a numeral names a degree, not a note, so it follows whichever key is in force. Chapter 12's organ takes them, under the same two parts, and `octave=3` voices them from the octave below C4:
 
 ```python {run continue}
 from euterpe import chords, display
@@ -160,7 +166,7 @@ for mode in ("natural minor", "harmonic minor", "melodic minor"):
     display(Harp().play(run).take(4.0, f"A {mode}, steps {' '.join(map(str, scale.steps))}"))
 ```
 
-The *natural minor* is that scale as it is. The *harmonic minor* raises degree 7 to G♯, which gives it a leading tone, but it opens a step of 3 from F to G♯, and you can hear the gap. The *melodic minor* also raises degree 6 to F♯, which closes it. Musicians traditionally play that going up and fall back to natural minor coming down, which `Scale` leaves to you, since it only lists the climb. The reason for the raised 7th is one note against the next. `leading_tone` gives the note a half step under the tonic whatever the mode's own 7th is:
+All three have a minor third from the tonic to degree 3, where major has a major third, and that is the semitone chapter 17 heard as darker: listen for it on the third note of each run. The *natural minor* is that scale as it is. The *harmonic minor* raises degree 7 to G♯, which gives it a leading tone, but it opens a step of 3 from F to G♯, and you can hear the gap. The *melodic minor* also raises degree 6 to F♯, which closes it. Musicians traditionally play that going up and fall back to natural minor coming down, which `Scale` leaves to you, since it only lists the climb. The reason for the raised 7th is one note against the next. `leading_tone` gives the note a half step under the tonic whatever the mode's own 7th is:
 
 ```python {run continue}
 from euterpe import Interval, Key, display
@@ -179,7 +185,7 @@ G up to A is a step on the way somewhere. G♯ up to A closes. Chapter 22 builds
 
 The fifths gave seven notes and no first note, and the first note is a choice. The same white keys from D are a different scale, from E another, and so on. These are the seven *church modes*, named by medieval and Renaissance writers after Greek regions and peoples they have little to do with: from C ionian, from D dorian, then phrygian, lydian, mixolydian, aeolian and locrian. Each is the same cycle of steps entered at another place, so `Scale("D", "dorian").steps` is 2 1 2 2 2 1 2. `Scale` has all seven.
 
-Ionian is major and aeolian is natural minor. Dorian is natural minor with one note changed: its degree 6 is a whole step higher. On a D tonic that note is B against B♭, and it is the whole sound of the sea shanty Drunken Sailor, which R. R. Terry printed in The Shanty Book in 1921. `Key("D", "dorian")` has no signature at all, since these are the white keys, and the staff stays clear of signs. The flute has the tune, and the harp plays fifths under it:
+Ionian is major and aeolian is natural minor. Dorian is natural minor with one note changed: its degree 6 is a half step higher. On a D tonic that note is B against B♭, and it is the whole sound of the sea shanty Drunken Sailor, which R. R. Terry printed in The Shanty Book in 1921. `Key("D", "dorian")` has no signature at all, since these are the white keys, and the staff stays clear of signs. The flute has the tune, and the harp plays fifths under it:
 
 ```python {run continue}
 from euterpe import Key, Score, display, melody
@@ -201,23 +207,16 @@ Listen for bar 6, from 10 s: the climb A, B, C, D. The B is the raised degree, t
 
 ## Transposing a key
 
-Chapter 17 ended by saying that equal temperament leaves every key usable. Now use that. `Score.transpose` moves a whole score by an interval, with its key, its notes and, through the key, its numerals. The first line of Joy to the World with all its parts, up a minor second:
-
-```python {run continue}
-from euterpe import Interval, display
-
-eb = s.transpose(Interval("m2"))
-display(eb, caption="The first line moved up a minor second, into E♭ major")
-```
-
-The tune is the same and only its height changes. Each D has become E♭ and each F♯ has become G, each spelled by the interval: `m2` is one letter up, so `eb.key.scale` holds E♭, F, G, A♭, B♭, C and D. Now try the other name for the same semitone. `A1`, an *augmented unison*, moves by a semitone too and stays on the same letter. The block compares the samples of the two scores and engraves them both:
+Chapter 17 ended by saying that equal temperament leaves every key usable. Now use that. `Score.transpose` moves a whole score by an interval, with its key, its notes and, through the key, its numerals. The first line of Joy to the World with all its parts, up a minor second, is `eb` below. Each D becomes E♭ and each F♯ becomes G, each spelled by the interval: `m2` is one letter up, so `eb.key.scale` holds E♭, F, G, A♭, B♭, C and D. `sharp` uses the other name for the same semitone. `A1`, an *augmented unison*, moves by a semitone too and stays on the same letter. The block plays the first, compares the samples of the two scores and engraves them both:
 
 ```python {run continue}
 import numpy as np
 from euterpe import Interval, display
 from euterpe.sound import render
 
+eb = s.transpose(Interval("m2"))
 sharp = s.transpose(Interval("A1"))
+display(eb, caption="The first line moved up a minor second, into E♭ major")
 a, b = eb.play(), sharp.play()
 same = np.array_equal(render(a, a.duration), render(b, b.duration))
 display(eb.notation(bars=(1, 2), caption=f"E♭ major, signature {eb.key.signature}"),
@@ -274,7 +273,7 @@ There is one note here that this chapter has not explained, and it is in bar 17,
 ## Summary
 
 - `Scale(tonic, mode)` lists a scale, and `steps` gives its semitones. Major is W W H W W W H, 2 2 1 2 2 2 1, from any of the twelve keys, with one note per letter.
-- `Key` adds what a piece needs: `degree(n)`, `signature`, `dominant`, `relative`, `parallel`, `leading_tone` and `spell`. The tonic is home, the dominant is degree 5, and the leading tone is the half step under the tonic.
+- `Key` adds what a piece needs: `degree(n)`, `signature`, `dominant`, `relative`, `parallel` and `leading_tone`. The tonic is home, the dominant is degree 5, and the leading tone is the half step under the tonic.
 - Seven notes a fifth apart, folded into one octave, are the seven notes of a major scale. Their two ends form the scale's single tritone, which sits on its two half steps and points at the tonic.
 - A tonic a fifth up keeps six notes and sharpens one. `key.circle()` draws the circle of fifths, on which neighbours share six notes and distant keys few.
 - A minor scale shares its notes with its relative major. Harmonic minor raises degree 7 for a leading tone, and melodic minor also raises degree 6 to close the gap.
@@ -283,13 +282,13 @@ There is one note here that this chapter has not explained, and it is in bar 17,
 
 ## Exercises
 
-1. In the first block, change `("G", "D")` to `("F#", "Gb")`. What do the two new scales print, and do they sound different?
+1. In the first block, change `("G", "D")` to `("F#", "Gb")`. What do the two new scales print, and are they the same keys on a piano?
 2. In the Drunken Sailor block, change the `b` in bar 6 to `bb`. What happens to the sound of bar 6, and what appears on the staff?
 3. In the block with `eb = s.transpose(Interval("m2"))`, change `"m2"` to `"M2"`. What key do you get, how many notes does it share with D major, and did the numerals need any change?
 
 ### Answers
 
-1. `F#4 G#4 A#4 B4 C#5 D#5 E#5` and `Gb4 Ab4 Bb4 Cb5 Db5 Eb5 F5`, both with steps 2 2 1 2 2 2 1. They are the same keys on a piano under different names, so they sound alike. They are the far side of the circle of fifths, with six sharps and six flats.
+1. `F#4 G#4 A#4 B4 C#5 D#5 E#5` and `Gb4 Ab4 Bb4 Cb5 Db5 Eb5 F5`, both with steps 2 2 1 2 2 2 1. They are the same keys on a piano under different names, so they would sound alike. They are the far side of the circle of fifths, with six sharps and six flats.
 2. The climb to the top is darker, because it is now D natural minor's B♭, the note Dorian raises. The staff prints a flat in front of that note, since the key says D dorian, in which plain B belongs.
 3. E major, with four sharps. It shares five notes with D major, E, F♯, A, B and C♯, because it is two places round the circle. The numerals need no change: `I` becomes E major's own tonic chord.
 
