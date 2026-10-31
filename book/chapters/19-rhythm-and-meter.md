@@ -3,8 +3,7 @@
 Chapter 18 stopped on one note of Joy to the World, a top D that starts between two beats and holds across the next one. This chapter is about notes like that. Here is where it ends up: a left hand as even as a march, and a right hand that keeps arriving just ahead of it:
 
 ```python {run echo=false}
-# The teaser: the first phrase of the strain, from the finale built by this chapter's three named blocks, read from
-# this file. The blocks' own views are skipped.
+# The teaser: bars 4 to 8 of the finale, built by this chapter's three named blocks, read from this file.
 import re
 from pathlib import Path
 
@@ -18,14 +17,14 @@ for name in ("strain", "hands", "rag"):
     exec("\n".join(line for line in code.split("\n") if "listen(" not in line and "display(" not in line), scope)
 bar = 2 * 60 / 76
 samples = render(scope["song"], 8 * bar)[int(3.75 * bar * 48000):]
-display(Clip(samples, caption="The Entertainer: the first phrase of its first strain"))
+display(Clip(samples, caption="The Entertainer: the first phrase of its tune"))
 ```
 
 Scott Joplin's The Entertainer, published in St. Louis in 1902. What makes it a rag is when its notes start, and this chapter gives you every tool it takes to write that down: lengths, beats, the strong and weak places in a bar, and the distance between a written time and a played one.
 
 ## Fractions of a whole
 
-Chapter 16 said that `q` is a quarter of a whole note, and every other length works the same way: `w h q e s t` are 1, 1/2, 1/4, 1/8, 1/16 and 1/32. A length does not say how many seconds a note takes, since that depends on the tempo. It says what fraction of a whole note the note takes. A dot adds half again, and a tie adds any two lengths. `Line.duration` gives the sum:
+Chapter 16 said that `q` is a quarter of a whole note, and every other length works the same way: `w h q e s t` are 1, 1/2, 1/4, 1/8, 1/16 and 1/32. A length does not say how many seconds a note takes, since that depends on the tempo. It says what fraction of a whole note the note takes. A dot adds half again. A tie, `~`, joins a note to the next note of the same pitch, and so adds any two lengths. `Line.duration` gives the sum:
 
 ```python {run output=code}
 from euterpe import melody
@@ -63,15 +62,15 @@ for finding in s.lint().errors:
 
 ## Tuplets
 
-Halving gives every length so far, and halving alone never gives a third. `3[...]` plays three notes in the time of two, so three eighths in brackets last one quarter and each takes 1/12. `5:4[...]` is five in the time of four. A run of eight notes, then the same stretch of time cut into twelve:
+Halving gives every length so far, and halving alone never gives a third. `3[...]` plays three notes in the time of two, so three eighths in brackets last one quarter and each takes 1/12. A run of eight notes, then the same stretch of time cut into twelve:
 
 ```python {run}
-from euterpe import Key, Score, display, melody
+from euterpe import Key, Meter, Score, display, melody
 from euterpe.instruments import Harp
 
 for how, run in (("eighths", "c5:e d e f g f e d"),
                  ("triplets", "3[c5:e d e] 3[f g a] 3[g f e] 3[d e d]")):
-    s = Score(key=Key("C major"), tempo=84)
+    s = Score(key=Key("C major"), meter=Meter("4/4"), tempo=84)
     s.part("harp", Harp()).add(melody(run))
     display(s, caption=f"One bar in {how}, {melody(run).duration} of a whole note")
 ```
@@ -89,24 +88,13 @@ for _ in range(6):
 print(place, place == 1 / 2)
 ```
 
-The difference is about 6 × 10^−17 of a whole note and no ear could find it, but a program asking whether a bar is full, or whether two notes start together, gets the wrong answer. A score keeps written time in fractions, and only the performance turns it into seconds.
+The difference is about 6 × 10^−17 of a whole note and no ear could find it, but a program asking whether a bar is full, or whether two notes start together, gets the wrong answer. A score keeps written time in fractions, and turns it into seconds only when it plays.
 
 ## Beat and meter
 
-Tap your foot to a piece and you are tapping its *beat*. `Meter("3/4")` is a time signature, the two numbers at the start of a staff: each bar holds three quarters. In `Meter("6/8")` each bar holds six eighths, the same length of bar, and yet it is not the same thing. 3/4 is *simple*: three beats, each dividing in two. 6/8 is *compound*: two beats, each dividing in three, and `compound` is true when the top number is divisible by 3 and above 3. `strength` ranks a place in the bar, with 0 for the strongest. Here are the six eighths of each:
+Tap your foot to a piece and you are tapping its *beat*. `Meter("3/4")` is a time signature, the two numbers at the start of a staff: each bar holds three quarters. In `Meter("6/8")` each bar holds six eighths, the same length of bar, and yet it is not the same thing. 3/4 is *simple*: three beats, each dividing in two. 6/8 is *compound*: two beats, each dividing in three.
 
-```python {run output=code}
-from fractions import Fraction
-from euterpe import Meter
-
-for text in ("3/4", "6/8"):
-    m = Meter(text)
-    print(text, m.bar, m.beats, m.beat, m.compound, [m.strength(Fraction(i, 8)) for i in range(6)])
-```
-
-Same bar, 3/4 of a whole note, and other ranks. In 3/4 the strong eighths are the 1st, 3rd and 5th. In 6/8 they are the 1st and 4th. A strong place is where a listener expects something to happen, and that expectation is what the rest of this chapter plays against.
-
-Here are six eighths on chapter 14's kit in each meter. `drums` writes a kit's grid into a score, in the characters of `Kit.pattern`, and `X` is a harder stroke than `x`. A number tempo counts the meter's beat, so 120 quarters and 80 dotted quarters are the same eighth, 0.25 s long. Same drums, same speed:
+Here are six eighths on chapter 14's kit in each meter. `drums` writes a kit's grid into a score, in the characters of `Kit.pattern`, and `X` is a harder stroke than `x`. A tempo counts the meter's beat, so 120 quarters and 80 dotted quarters are the same eighth, 0.25 s long. Same drums, same speed:
 
 ```python {run}
 from euterpe import Meter, Score, display, drums
@@ -118,7 +106,18 @@ for meter, tempo, hats in (("3/4", 120, "Xx Xx Xx |"), ("6/8", 80, "Xxx Xxx |"))
     display(s, caption=f"Six eighths in {meter}, at {tempo} beats a minute")
 ```
 
-Count along and you count 1 2 3 on the first and 1 2 on the second, at the same speed of eighths. The performance adds a little level on a downbeat and takes the same from the weakest places, so even a plain line leans towards its meter. These grids add the rest by hand.
+Count along and you count 1 2 3 on the first and 1 2 on the second, at the same speed of eighths. `Meter` holds what you counted. `bar` is the bar's length, `beats` how many beats it holds, `beat` the length of one, and `compound` is true when the top number is divisible by 3 and above 3. `strength` ranks a place in the bar, with 0 for the strongest. Each line prints those in that order, with the ranks of the six eighths last:
+
+```python {run output=code}
+from fractions import Fraction
+from euterpe import Meter
+
+for text in ("3/4", "6/8"):
+    m = Meter(text)
+    print(text, m.bar, m.beats, m.beat, m.compound, [m.strength(Fraction(i, 8)) for i in range(6)])
+```
+
+Same bar, 3/4 of a whole note, and other ranks. In 3/4 the strong eighths are the 1st, 3rd and 5th. In 6/8 they are the 1st and 4th. A strong place is where a listener expects something to happen, and that expectation is what the rest of this chapter plays against. When a score plays, it adds a little level on a downbeat and takes the same from the weakest places, so even a plain line leans towards its meter. The harder strokes in these grids are written by hand, on top of that.
 
 ## Syncopation
 
@@ -135,7 +134,9 @@ for how, figure in (("on the beat", "e4:e c5 e4 c5 | c5:h"),
     display(s, caption=f"{how}: syncopation index {s.lint().value('T-SYNCOPATION'):.0f}")
 ```
 
-The first take is a child's tune. The second is the start of The Entertainer. Here is the whole of the first strain's right hand on chapter 12's electric piano. It is spelled from Joplin's edition, three short lines with names and the bars between them. Notes in angle brackets strike together, and most of these have the tune on top with an octave under it. Its first two notes come before the first full bar, and that is a *pickup*: `pickup=Fraction(1, 8)` tells the score that bar 1 holds only that eighth:
+In 2/4 the sixteenths rank 0 3 2 3 1 3 2 3. The first high C starts on rank 3 and holds across rank 2, for 1. The tied one starts on rank 3 and holds across the bar line, rank 0, for 3.
+
+The first take is a child's tune. The second is the start of The Entertainer. A rag comes in sections called *strains*, each 16 bars, and here is the right hand of its first strain on chapter 12's electric piano, spelled from Joplin's edition. `hook`, `fall` and `top` are the figures that come back, and `strain` strings them together with the bars that come once. Notes in angle brackets strike together, and most of these have the tune on top with an octave under it. Its first two notes come before the first full bar, and that is a *pickup*: `pickup=Fraction(1, 8)` tells the score that bar 1 holds only that eighth:
 
 ```python {run name=strain}
 from fractions import Fraction
@@ -156,11 +157,9 @@ s.part("right", ElectricPiano()).add(lead + strain + close)
 display(s, caption="The first strain, right hand alone")
 ```
 
-Bar after bar has the same habit: a note arrives a sixteenth before the beat, usually the top of a figure, and holds over it. Now you can name what bar 17 of Joy to the World did. This is a *rag*, ragged time, and the habit needs a steady thing to lean against, which is the next layer.
+Bar after bar has the same habit: a note arrives a sixteenth before the beat, usually the top of a figure, and holds over it. Bar 17 of Joy to the World was one syncopation. A piece that does it bar after bar is a *rag*, ragged time, and the habit needs a steady thing to lean against, which is the next layer.
 
-## Tempo
-
-The left hand plays what a march plays: a low note on each beat, and a chord between them. Joplin's edition has it in eighths under the whole strain, and `coda` is its last four bars, kept apart for the block after this one. The clef on a part sets the staff it is written on:
+The left hand plays what a march plays: a low note on each beat, and a chord between them. Joplin's edition has it in eighths under the whole strain, and `coda` and `home` are its last four bars, kept apart for the block after this one; `home` is the bar that ends on the low C. The clef on a part sets the staff it is written on:
 
 ```python {run continue name=hands}
 from euterpe import display, melody
@@ -181,13 +180,15 @@ display(s.notation(bars=(1, 5), caption="The first phrase of the strain, both ha
 listen(s.play(), 7.0, "The first phrase of the strain, both hands")
 ```
 
-So far a tempo has been one number. A musician also slows down at the end of something. `s.ramp(bar, bars, to)` moves the tempo evenly from where it is to `to`, over that many bars: below the current tempo it is a *ritardando*, and above it an *accelerando*. `s.change(bar, tempo=...)` jumps instead. The strain's last four bars with both hands, at 76 throughout and then slowing over bars 3 and 4 to 46:
+## Tempo
+
+So far a tempo has been one number. A musician also slows down at the end of something. `s.ramp(bar, bars, to)` moves the tempo evenly from where it is to `to`, over that many bars: below the current tempo it is a *ritardando*, and above it an *accelerando*. The strain's last four bars with both hands, at 76 throughout and then slowing over bars 3 and 4 to 46:
 
 ```python {run continue}
 from euterpe import Key, Meter, Score, display
 from euterpe.instruments import ElectricPiano
 
-for to, how in ((76, "in time"), (46, "slowing over its last two bars")):
+for to, how in ((76, "in time"), (46, "with a ramp over its last two bars")):
     s = Score(key=Key("C major"), meter=Meter("2/4"), tempo=76)
     s.part("right", ElectricPiano()).add(top * 2 + fall + close)
     s.part("left", ElectricPiano(), gain=0.5, clef="bass").add(coda + home)
@@ -195,12 +196,12 @@ for to, how in ((76, "in time"), (46, "slowing over its last two bars")):
     display(s, caption=f"The strain's last four bars, {how}")
 ```
 
-Listen to the second take stretch into its last chord. How long do those two slowing bars last? A tempo that moves evenly from a to b beats a minute over n beats takes the integral of 60 / tempo over those beats, which comes out as 60 n ln(a / b) / (a − b) seconds. Here that is, against the tempo map the score plays from. Its `seconds` takes a place in whole notes, and bars 3 and 4 run from 1 to 2:
+Listen to the second take stretch into its last chord. How long do those two slowing bars last? A tempo that moves evenly from a to b beats a minute over n beats takes the integral of 60 / tempo over those beats, which comes out as 60 n ln(a / b) / (a − b) seconds. Here that is, with `to` still holding the loop's last value, against the tempo map the score plays from. Its `seconds` takes a place in whole notes, and bars 3 and 4 run from 1 to 2:
 
 ```python {run continue output=code}
 import math
 
-a, b, n = 76, 46, 4
+a, b, n = 76, to, 4
 print(60 * n * math.log(a / b) / (a - b))
 tempo = s.tempo_map()
 print(tempo.seconds(2) - tempo.seconds(1))
@@ -211,7 +212,7 @@ The two agree, and the last line is the same bars with no ramp: the slowing adds
 
 ## Swing
 
-A written time goes through three steps on its way to seconds, in this order: swing, tempo, humanization. *Swing* comes first because it changes where a beat's inside falls. `Swing(ratio, unit)` takes pairs of units and gives the first one `ratio` of the pair. At the default, 2/3 on eighths, the second eighth of each beat moves late, to 2/3 of the way through the beat, and beats themselves stay where they are. A score takes it in `performance`, and everything else about the score stays written as it was. So here is a groove of the book's own, a ride cymbal over a walking bass, chapter 10's bass guitar in quarters. The ride's pattern is the jazz drummer's, with its third and last strokes on the off-beat eighths:
+A written time goes through three steps on its way to seconds, in this order: swing, tempo, humanization. *Swing* comes first because it changes where a beat's inside falls. `Swing(ratio, unit)` takes pairs of units and gives the first one `ratio` of the pair. At the default, 2/3 on eighths, the second eighth of each beat moves late, to 2/3 of the way through the beat, and beats themselves stay where they are. `Performance` holds how a score is played, as against how it is written: `Score(performance=...)` sets it, and `s.play(performance=...)` overrides it for one take. So here is a groove of the book's own, a ride cymbal over a walking bass, chapter 10's bass guitar in quarters. The ride's pattern is the jazz drummer's, with its third and last strokes on the off-beat eighths:
 
 ```python {run continue}
 from fractions import Fraction
@@ -225,15 +226,15 @@ for how, swing in (("straight", None), ("swung", Swing())):
     s = Score(meter=m, tempo=132, performance=Performance(swing=swing))
     s.part("kit", Kit()).add(ride)
     s.part("bass", BassGuitar()).add(walk)
-    place = swing.moved(Fraction(1, 8), m) if swing else Fraction(1, 8)
-    display(s, caption=f"The groove {how}: the second eighth starts at {place} of a whole note")
+    display(s, caption=f"The groove {how}")
+print(Swing().moved(Fraction(1, 8), m))
 ```
 
-The staffs are the same and the two sound like two styles: the first is a march and the second is jazz. Nothing but those few ride strokes moved, and only by 1/6 − 1/8 = 1/24 of a whole note. Each bass note is on a beat, so swing leaves it where it was. Joplin's rag stays straight here: his edition's only word on how to play it is the heading, Not fast.
+The staffs are the same and the two sound like two styles: the first is a march and the second is jazz. `moved` says where a written place goes, here the second eighth, from 1/8 of a whole note to the 1/6 it prints. Nothing but those few ride strokes moved, and only by 1/6 − 1/8 = 1/24 of a whole note. Each bass note is on a beat, so swing leaves it where it was. Joplin's rag stays straight here: his edition's only word on how to play it is the heading, Not fast.
 
 ## Humanize
 
-Everything so far starts on its exact time, and no player does. `Humanize(timing, velocity)` adds a seeded Gaussian draw to each note's start and velocity. The defaults have standard deviations of 8 ms and 0.04, each clipped at 3 of them. The same bars three times: exact, and then under two seeds. Each caption prints the starts of the right hand's second to fifth notes, in seconds:
+Everything so far starts on its exact time, and no player does. `Humanize(timing, velocity)` adds a seeded Gaussian draw to each note's start and velocity. The defaults have standard deviations of 8 ms and 0.04, each clipped at 3 of them. The same bars with it off and on. Then the block reads what was played: `play` returns the audio, its `parts` hold each part's sound by name, their `notes` are in time order, and a note's `time` is its start in seconds. It prints the starts of the right hand's second to fifth notes, exact and then under two seeds:
 
 ```python {run continue}
 from euterpe import Humanize, Key, Meter, Performance, Score, display, melody
@@ -243,17 +244,19 @@ from euterpe.view import listen
 s = Score(key=Key("C major"), meter=Meter("2/4"), tempo=76)
 s.part("right", ElectricPiano()).add(hook + fall)
 s.part("left", ElectricPiano(), gain=0.5, clef="bass").add(march)
-for humanize, seed in ((None, 0), (Humanize(), 1), (Humanize(), 2)):
-    take = s.play(seed=seed, performance=Performance(humanize=humanize))
-    starts = [round(note.time, 3) for note in take.parts["right"].notes[1:5]]
-    display(listen(take, caption=f"Humanize {'on' if humanize else 'off'}, seed {seed}: {starts}"))
+off, on = Performance(), Performance(humanize=Humanize())
+display(listen(s.play(performance=off), caption="The same bars with Humanize off"))
+display(listen(s.play(seed=1, performance=on), caption="The same bars with Humanize on"))
+for performance, seed in ((off, 0), (on, 1), (on, 2)):
+    take = s.play(seed=seed, performance=performance)
+    print([round(note.time, 3) for note in take.parts["right"].notes[1:5]])
 ```
 
-The first take has starts on an exact grid, and `humanize=None` uses no random draws at all. The other two give each note its own small error, which is different under each seed and the same every time under one, so a piece renders to the same samples every time. Listen for the difference in the attacks of the chords, where notes that started as one now spread by a few milliseconds.
+The first line is on an exact grid, and with `humanize` left at None no random draw is made at all. The other two give each note its own small error, which is different under each seed and the same every time under one, so a piece renders to the same samples every time. Listen for the difference in the attacks of the chords, where notes that started as one now spread by a few milliseconds.
 
 ## Putting it all together
 
-The closing piece is the introduction and first strain of The Entertainer as John Stark & Son printed it in St. Louis in 1902: this chapter's two hands, with four bars added in front and one difference at the end. Joplin's strain repeats, and its second ending runs straight on into the second strain, so here the last bar closes on a held chord, and the ritardando is ours. The score doubles his low notes on chapter 10's pizzicato strings, with light humanizing over all of it. There is no `pickup` here: the introduction's fourth bar has room for those two sixteenths, so they are simply the end of it. Its first three bars are one falling figure, played in octaves by both hands, each time an octave down:
+The closing piece is the introduction and first strain of The Entertainer as John Stark & Son printed it in St. Louis in 1902: this chapter's two hands, with four bars added in front and one difference at the end. Joplin's strain is played twice, and the second time its last bar runs on into the next strain, so here the last bar closes on a held chord, and the ritardando is ours. The score doubles his low notes on chapter 10's pizzicato strings, where `at=5` starts the part at bar 5, with light humanizing over all of it. There is no `pickup` here: the introduction's fourth bar has room for those two sixteenths, so they are simply the end of it. Its first three bars are one falling figure, played in octaves by both hands, each time an octave down:
 
 ```python {run continue name=rag}
 from euterpe import Humanize, Interval, Key, Meter, Performance, Score, display, melody
@@ -282,17 +285,17 @@ The rhythm is now written down: every length in that score is a fraction, each n
 
 ## Summary
 
-- A length is a fraction of a whole note, kept as an exact `Fraction`. A dot adds half again, a tie adds two lengths, a rest takes time silently. `N-MEASURE` reports a bar that doesn't add up.
-- `3[...]` is three in the time of two and `5:4[...]` five in the time of four. Their sums are exact, where the same sums in floats are not.
-- `Meter` says how a bar divides: `beats`, `beat`, `compound` and `strength`. 3/4 is three beats of two eighths, and 6/8 two beats of three, in the same length of bar. A number tempo counts the beat.
+- A length is a fraction of a whole note, kept as an exact `Fraction`. A dot adds half again, a tie, `~`, joins two notes of one pitch and adds their lengths, and a rest takes time silently. `N-MEASURE` reports a bar that doesn't add up.
+- `3[...]` is three in the time of two. Its sums are exact, where the same running total in floats is not.
+- `Meter` says how a bar divides: `beats`, `beat`, `compound` and `strength`. 3/4 is three beats of two eighths, and 6/8 two beats of three, in the same length of bar. A tempo counts the beat.
 - `drums` writes a kit's grid into a score.
 - A note that starts in a weak place and holds across a stronger one is syncopated. `T-SYNCOPATION` adds up by how many ranks. `Score(pickup=...)` lets notes come before the first full bar.
 - `s.ramp(bar, bars, to)` moves the tempo evenly, and n beats from a to b take 60 n ln(a / b) / (a − b) seconds. `s.tempo_map().seconds` reads the place of any written time.
-- `Performance(swing=Swing())` moves off-beats and leaves beats alone. `Performance(humanize=Humanize())` gives each note a small seeded error, and the same seed gives the same samples.
+- `Performance` holds how a score is played. `Performance(swing=Swing())` moves off-beats and leaves beats alone. `Performance(humanize=Humanize())` gives each note a small seeded error, and the same seed gives the same samples.
 
 ## Exercises
 
-1. In the block with `s.ramp(3, 2, to=to)`, change `46` to `120`, and in the block after it change `a, b, n` to `76, 120, 4`. How long do the two bars take now, and what is this ramp called?
+1. In the block with `s.ramp(3, 2, to=to)`, change `46` to `120`. How long do the two bars take now, and what is this ramp called?
 2. In the swing block, change `Swing()` to `Swing(3 / 4)`. Where does the second eighth start now, and what does the groove sound like?
 3. In the closing piece, add `swing=Swing(unit=Fraction(1, 16))` to the `Performance`, importing `Swing` from `euterpe` and `Fraction` from `fractions`. What happens to the rag's sixteenths, and which notes stay where they were?
 
