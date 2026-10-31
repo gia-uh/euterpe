@@ -75,5 +75,12 @@ class Scale:
             return False
         return any((p.letter, p.alter) == (pitch.letter, pitch.alter) for p in self.pitches())
 
+    def keyboard(self, **kw):
+        """The scale's notes pressed on a keyboard, from the tonic in octave 4, as a view. caption and id go to the view."""
+        from euterpe.view.style import signs
+        from euterpe.view.theory import keyboard
+
+        return keyboard(self.pitches(), label=f"{signs(self.tonic)} {self.mode}", **kw)
+
     def __repr__(self) -> str:
         return f'Scale("{self.tonic}", "{self.mode}")'

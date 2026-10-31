@@ -568,6 +568,13 @@ class Score:
 
         return roll(self, part, peak)
 
+    def chroma(self, **kw) -> Any:
+        """The written pitch classes per beat as a view, with no render, in the ink of Clip.chroma and the numerals of
+        harmony() above the bars, ? where it finds none. caption and id go to the view."""
+        from euterpe.view.theory import written_chroma
+
+        return written_chroma(self, **kw)
+
     def view(self, normalize: bool = True) -> Any:
         """What display() shows: the notation with the sound widget under it and a cursor that walks the staves as it
         plays, or the same on the roll if verovio is missing, at -16 LUFS unless normalize is false. A part with no

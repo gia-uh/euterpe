@@ -1,4 +1,4 @@
-"""Views of signals: waveform, the default view, spectrum, spectrogram and level."""
+"""Views of signals: waveform, the default view, spectrum, spectrogram, chroma and level."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from euterpe.sound.clip import Clip
 from euterpe.sound.core import Unit
 from euterpe.view.base import View, sources
 from euterpe.view.style import (
-    INK, MADDER, PRUSSIAN, RULE, SERIES, default_mark, inkmap, keyboard_strip, label_axis, octave_ruler,
+    INK, MADDER, NOTE_NAMES, PRUSSIAN, RULE, SERIES, default_mark, inkmap, keyboard_strip, label_axis, octave_ruler,
 )
 
 _FLOOR = 1e-9  # a level that keeps log10 finite on silence
@@ -289,6 +289,66 @@ class Spectrogram(_Many):
         return fig
 
 
+_WINDOW, _HOP = 8192, 2048  # the chromagram's STFT, in samples
+_BAND = (55.0, 5000.0)  # Hz: below it a bin is wider than a semitone's share, above it partials say little of the note
+_SILENT = 1e-10  # a frame's power at or under -100 dBFS has no pitch to name
+
+
+def chromagram(clip: Unit | Clip) -> np.ndarray:
+    """Pitch classes over time, shape (12, frames), row 0 being C: an 8192-point STFT with a 2048 hop, energy from 55 to
+    5000 Hz folded into pitch classes. Each frame sums to 1, or is all zeros where the clip is silent. Frame k is
+    centred on the kth hop of the clip, so it stands for the time from k * 2048 to (k + 1) * 2048 samples."""
+    c = sources(clip)[0]
+    freqs = np.fft.rfftfreq(_WINDOW, 1 / c.rate)
+    band = (freqs >= _BAND[0]) & (freqs <= _BAND[1])
+    classes = (np.round(12 * np.log2(freqs[band] / 440.0)).astype(int) + 9) % 12
+    window = np.hanning(_WINDOW)
+    scale = 2 / window.sum()  # a sine of amplitude 1 has power near 1 in its bin
+    lead = np.zeros(_WINDOW // 2 - _HOP // 2)
+    channels = [np.concatenate([lead, ch, np.zeros(_WINDOW)]) for ch in _channels(c)]
+    frames = -(-len(c) // _HOP)
+    chroma = np.zeros((12, frames))
+    for k in range(frames):
+        at = k * _HOP
+        power = sum(np.abs(np.fft.rfft(ch[at:at + _WINDOW] * window) * scale) ** 2 for ch in channels)
+        folded = np.bincount(classes, power[band], 12)
+        total = folded.sum()
+        if total > _SILENT:
+            chroma[:, k] = folded / total
+    return chroma
+
+
+def draw_chroma(ax, chroma: np.ndarray, edges: np.ndarray) -> None:
+    """Twelve named rows in the spectrogram's ink, C at the bottom; edges are the frames' bounds on the x axis."""
+    peak = float(chroma.max()) if chroma.size else 0.0
+    ax.pcolormesh(edges, np.arange(13) - 0.5, chroma, cmap=inkmap(), vmin=0, vmax=peak or 1.0, shading="flat", rasterized=True)
+    ax.set_yticks(range(12), NOTE_NAMES, fontstyle="italic")
+    ax.tick_params(axis="y", length=0)
+    ax.spines["left"].set_visible(False)
+    ax.spines["bottom"].set_position(("outward", 4))
+
+
+class Chroma(_Many):
+    """The clip's pitch classes over time, as chromagram measures them; share of the frame's energy is ink density."""
+
+    def draw(self):
+        import matplotlib.pyplot as plt
+
+        k = len(self.clips)
+        fig, axes = plt.subplots(1, k, figsize=(self.width, 2.8), sharey=True, squeeze=False, gridspec_kw={"wspace": 0.12})
+        for i, (c, ax) in enumerate(zip(self.clips, axes[0])):
+            if _too_short(ax, [c]):
+                continue
+            chroma = chromagram(c)
+            draw_chroma(ax, chroma, np.arange(chroma.shape[1] + 1) * _HOP / c.rate)
+            ax.set_xlim(0, c.seconds)
+            ax.set_xlabel("time (s)", fontstyle="italic")
+            if self.labels:
+                ax.set_title(self.labels[i], fontstyle="italic", fontsize=9.5, color=INK, loc="left")
+        _mark_default(self.clips, axes[0][-1])
+        return fig
+
+
 class Level(_Many):
     """Level in dBFS over time, one step every `every` seconds; marks as in Waveform."""
 
@@ -336,6 +396,10 @@ def spectrum(*xs, **kw) -> Spectrum:
 
 def spectrogram(*xs, **kw) -> Spectrogram:
     return Spectrogram(*xs, **kw)
+
+
+def chroma(*xs, **kw) -> Chroma:
+    return Chroma(*xs, **kw)
 
 
 def level(*xs, **kw) -> Level:
