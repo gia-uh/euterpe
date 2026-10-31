@@ -96,7 +96,7 @@ def _parallel(score: Score, params: dict, severity: Severity) -> list[Finding]:
                 message = (f"parallel {kind}s with {_other(lower, upper)} "
                            f"({lower_from!r}–{upper_from!r} to {lower_to!r}–{upper_to!r})")
                 findings.append(_found("V-PARALLEL", severity, score, starts, lower, at, message,
-                                           float(upper_to - lower_to)))
+                                       float(upper_to - lower_to)))
     return findings
 
 
@@ -143,14 +143,14 @@ def _overlap(score: Score, params: dict, severity: Severity) -> list[Finding]:
         for at, upper_from, lower_from, upper_to, lower_to in _moves(upper, lower):
             if upper_to == upper_from or lower_to == lower_from:
                 continue
-            if lower_to.number > upper_from.number:
+            if lower_from.number <= upper_from.number < lower_to.number:
                 message = f"moves to {lower_to!r}, above {upper_from!r}, where {_other(lower, upper)} just was"
                 findings.append(_found("V-OVERLAP", severity, score, starts, lower, at, message,
-                                           float(lower_to - upper_from)))
-            if upper_to.number < lower_from.number:
+                                       float(lower_to - upper_from)))
+            if upper_to.number < lower_from.number <= upper_from.number:
                 message = f"moves to {upper_to!r}, below {lower_from!r}, where {_other(upper, lower)} just was"
                 findings.append(_found("V-OVERLAP", severity, score, starts, upper, at, message,
-                                           float(upper_to - lower_from)))
+                                       float(upper_to - lower_from)))
     return findings
 
 
@@ -209,7 +209,7 @@ def _doubling(score: Score, params: dict, severity: Severity) -> list[Finding]:
         if doubled and doubled != last:
             message = f"the leading tone {leading} is in {len(holding)} lines"
             findings.append(_found("V-DOUBLING", severity, score, starts, read[holding[1]], at, message,
-                                       float(len(holding))))
+                                   float(len(holding))))
         last = doubled
     return findings
 

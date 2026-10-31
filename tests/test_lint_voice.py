@@ -182,6 +182,12 @@ def test_v_overlap_reads_neighbours_either_way():
     assert (f.part, f.value) == ("alto", 1.0)
 
 
+def test_v_overlap_leaves_lines_already_crossed_to_v_crossing():
+    s = _score("c5:q d5:q c5:h | c6:w", "g5:q f5:q g5:h | c4:w")
+    assert not _found(s, "V-OVERLAP")
+    assert len(_found(s, "V-CROSSING")) == 1
+
+
 def test_v_overlap_is_a_crossing_when_the_neighbour_stays():
     s = _score("e4:w", "c4:h f4:h")
     assert not _found(s, "V-OVERLAP")
