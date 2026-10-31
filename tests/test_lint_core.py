@@ -17,6 +17,11 @@ def _short(text="a4:q", tempo=480):
     return s
 
 
+def _written(report):
+    """The findings of the rules in force under every profile: style rules measure any score that has notes."""
+    return [f for f in report.findings if f.rule[0] in "NR"]
+
+
 def test_an_empty_score_has_no_findings():
     assert Score().lint().findings == []
     assert lint_piece(Score()).findings == []
@@ -49,7 +54,7 @@ def test_a_rule_is_a_small_object():
 def test_notation_and_instrument_rules_are_the_same_in_every_profile(name):
     for fixture in (n_measure, n_spelling, r_playable):
         s = fixture.trigger()
-        assert s.lint(name) == s.lint() == lint_score(s, PROFILES[name])
+        assert _written(s.lint(name)) == _written(s.lint()) == _written(lint_score(s, PROFILES[name]))
 
 
 @pytest.mark.parametrize("name", ["chorale", "pop", "techno"])
@@ -63,23 +68,23 @@ def test_each_profile_holds_the_same_n_r_and_a_rows(name):
 
 def test_none_turns_a_rule_off():
     s = n_measure.trigger()
-    assert not lint_score(s, Profile("my", {"N-MEASURE": None})).findings
+    assert not _written(lint_score(s, Profile("my", {"N-MEASURE": None})))
 
 
 def test_a_profile_raising_a_rule_says_so_in_its_message():
-    [f] = lint_score(n_spelling.trigger(), Profile("my", {"N-SPELLING": "error"})).findings
+    [f] = _written(lint_score(n_spelling.trigger(), Profile("my", {"N-SPELLING": "error"})))
     assert f.severity == "error" and f.message.endswith(", an error under the my profile")
-    [f] = lint_score(n_measure.trigger(), Profile("my", {"N-MEASURE": "warn"})).findings
+    [f] = _written(lint_score(n_measure.trigger(), Profile("my", {"N-MEASURE": "warn"})))
     assert f.severity == "warn" and f.message.endswith(", a warning under the my profile")
 
 
 def test_a_profile_lowering_a_rule_to_a_metric_names_no_profile():
-    [f] = lint_score(n_measure.trigger(), Profile("my", {"N-MEASURE": "metric"})).findings
+    [f] = _written(lint_score(n_measure.trigger(), Profile("my", {"N-MEASURE": "metric"})))
     assert f.severity == "metric" and "profile" not in f.message
 
 
 def test_a_profile_leaving_a_rule_alone_names_no_profile():
-    [f] = lint_score(n_measure.trigger(), "chorale").findings
+    [f] = _written(lint_score(n_measure.trigger(), "chorale"))
     assert f.severity == "error" and "profile" not in f.message
 
 
@@ -96,7 +101,7 @@ def test_a_rule_reads_its_profiles_params(monkeypatch):
 
 def test_a_copy_of_a_profile_is_a_profile():
     mine = replace(PROFILES["pop"], name="my", severities={**PROFILES["pop"].severities, "N-MEASURE": None})
-    assert not lint_score(n_measure.trigger(), mine).findings
+    assert not _written(lint_score(n_measure.trigger(), mine))
     assert PROFILES["pop"].severities["N-MEASURE"] == "error"
 
 
@@ -156,7 +161,7 @@ def test_a_profile_leaving_an_audio_rule_alone_or_lowering_it_names_no_profile()
 def test_lint_piece_skips_the_audio_of_a_score_it_cannot_play():
     s = Score()
     s.part("alto").add(melody("c4:w"))
-    assert lint_piece(s).findings == []
+    assert not [f for f in lint_piece(s).findings if f.rule.startswith("A-")]
 
 
 def test_lint_piece_on_a_part_with_no_notes():

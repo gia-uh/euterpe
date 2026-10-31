@@ -187,6 +187,11 @@ class Line:
                   for a, b in zip_longest((self, *self.together), (other, *other.together))]
         return Line(joined[0], meters.pop() if len(meters) == 1 else None, tuple(Line(bars) for bars in joined[1:]))
 
+    def then(self, other: Line) -> Line:
+        """This line carrying on inside its last bar: other's first bar joins it, and other's later bars follow. + keeps
+        the bar line between the two, so use this for a figure that enters in the middle of a bar."""
+        return Line((*self.bars[:-1], self.bars[-1] + other.bars[0], *other.bars[1:]), self.meter or other.meter)
+
     def __mul__(self, times: int) -> Line:
         return Line(self.bars * times, self.meter, tuple(line * times for line in self.together))
 

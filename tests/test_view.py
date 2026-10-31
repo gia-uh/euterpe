@@ -83,6 +83,11 @@ def test_stems_of_several_sources_are_small_multiples():
     assert len(spectrum(Sine(220).take(0.5), Saw(220).take(0.5), f0=220).figure().axes) == 2
 
 
+def test_spectrum_stems_each_source_at_its_own_f0():
+    fig = spectrum(Saw(220).take(0.5), Saw(233).take(0.5), f0=[220, 233], harmonics=3).figure()
+    assert [line.get_xdata()[0] for line in fig.axes[1].lines if len(line.get_xdata()) == 2][:3] == [233, 466, 699]
+
+
 
 
 def test_unit_view_is_the_default_view():
