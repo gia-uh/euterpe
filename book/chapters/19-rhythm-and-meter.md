@@ -72,10 +72,10 @@ for how, run in (("eighths", "c5:e d e f g f e d"),
                  ("triplets", "3[c5:e d e] 3[f g a] 3[g f e] 3[d e d]")):
     s = Score(key=Key("C major"), meter=Meter("4/4"), tempo=84)
     s.part("harp", Harp()).add(melody(run))
-    display(s, caption=f"One bar in {how}, {melody(run).duration} of a whole note")
+    display(s, caption=f"One bar in {how}")
 ```
 
-The first take walks in twos and the second rolls in threes, and both land on the next bar at the same moment. That is the reason for `Fraction`. Two triplets of eighths must fill a half note exactly. Walk through them in floating point, one note at a time, as a player's position does, and they don't:
+The first take walks in twos and the second rolls in threes. Eight eighths and twelve twelfths each last one whole note, so both land on the next bar at the same moment. That is the reason for `Fraction`. Two triplets of eighths must fill a half note exactly. Walk through them in floating point, one note at a time, as a player's position does, and they don't:
 
 ```python {run output=code}
 from fractions import Fraction
@@ -94,7 +94,7 @@ The difference is about 6 × 10^−17 of a whole note and no ear could find it, 
 
 Tap your foot to a piece and you are tapping its *beat*. `Meter("3/4")` is a time signature, the two numbers at the start of a staff: each bar holds three quarters. In `Meter("6/8")` each bar holds six eighths, the same length of bar, and yet it is not the same thing. 3/4 is *simple*: three beats, each dividing in two. 6/8 is *compound*: two beats, each dividing in three.
 
-Here are six eighths on chapter 14's kit in each meter. `drums` writes a kit's grid into a score, in the characters of `Kit.pattern`, and `X` is a harder stroke than `x`. A tempo counts the meter's beat, so 120 quarters and 80 dotted quarters are the same eighth, 0.25 s long. Same drums, same speed:
+Here are six eighths on chapter 14's kit in each meter. `drums` writes a kit's grid into a score, in the characters of `Kit.pattern`, and `X` is a harder stroke than `x`. Each character lasts `step`, here a written eighth rather than chapter 14's seconds; a `|` ends a bar, and spaces only group the characters. A tempo counts the meter's beat, so 120 quarters and 80 dotted quarters are the same eighth, 0.25 s long. Same drums, same speed:
 
 ```python {run}
 from euterpe import Meter, Score, display, drums
@@ -117,18 +117,18 @@ for text in ("3/4", "6/8"):
     print(text, m.bar, m.beats, m.beat, m.compound, [m.strength(Fraction(i, 8)) for i in range(6)])
 ```
 
-Same bar, 3/4 of a whole note, and other ranks. In 3/4 the strong eighths are the 1st, 3rd and 5th. In 6/8 they are the 1st and 4th. A strong place is where a listener expects something to happen, and that expectation is what the rest of this chapter plays against. When a score plays, it adds a little level on a downbeat and takes the same from the weakest places, so even a plain line leans towards its meter. The harder strokes in these grids are written by hand, on top of that.
+Same bar, 3/4 of a whole note, and other ranks. In 3/4 the strong eighths are the 1st, 3rd and 5th. In 6/8 they are the 1st and 4th. A strong place is where a listener expects something to happen, and that expectation is what the rest of this chapter plays against. When a score plays, it adds a little level on a bar's first beat, its *downbeat*, and takes the same from the weakest places, so even a plain line leans towards its meter. The harder strokes in these grids are written by hand, on top of that.
 
 ## Syncopation
 
-A note is *syncopated* when it starts in a weak place and holds across a stronger one. The ear expects a new note on the strong place and gets the old one still sounding. Two takes of one figure on nearly the same notes. The first is on the beat. The second cuts the bar's eight sixteenths into 3, 3 and 2, so two of its three high Cs miss the beat, and the last one ties across the bar line. `T-SYNCOPATION` measures this, by the index of Longuet-Higgins and Lee: for each note, how many ranks stronger is the strongest place it holds across than the place it starts on, added up over the part:
+A note is *syncopated* when it starts in a weak place and holds across a stronger one. The ear expects a new note on the strong place and gets the old one still sounding. Two takes of one figure on nearly the same notes. The first holds nothing across a stronger place, since each of its eighths ends where the next stronger place begins. The second cuts the bar's eight sixteenths into 3, 3 and 2, so two of its high Cs start in a weak place and hold across a stronger one, and the second of those ties across the bar line. `T-SYNCOPATION` measures this, by the index of Longuet-Higgins and Lee: for each note, how many ranks stronger is the strongest place it holds across than the place it starts on, added up over the part:
 
 ```python {run}
 from euterpe import Key, Meter, Score, display, melody
 from euterpe.instruments import ElectricPiano
 
-for how, figure in (("on the beat", "e4:e c5 e4 c5 | c5:h"),
-                    ("across the beat", "e4:s c5:e e4:s c5:e e4:s c5:s~ | c5:h")):
+for how, figure in (("holding across nothing", "e4:e c5 e4 c5 | c5:h"),
+                    ("holding across stronger places", "e4:s c5:e e4:s c5:e e4:s c5:s~ | c5:h")):
     s = Score(key=Key("C major"), meter=Meter("2/4"), tempo=76)
     s.part("right", ElectricPiano()).add(melody(figure))
     display(s, caption=f"{how}: syncopation index {s.lint().value('T-SYNCOPATION'):.0f}")
@@ -159,7 +159,7 @@ display(s, caption="The first strain, right hand alone")
 
 Bar after bar has the same habit: a note arrives a sixteenth before the beat, usually the top of a figure, and holds over it. Bar 17 of Joy to the World was one syncopation. A piece that does it bar after bar is a *rag*, ragged time, and the habit needs a steady thing to lean against, which is the next layer.
 
-The left hand plays what a march plays: a low note on each beat, and a chord between them. Joplin's edition has it in eighths under the whole strain, and `coda` and `home` are its last four bars, kept apart for the block after this one; `home` is the bar that ends on the low C. The clef on a part sets the staff it is written on:
+The left hand plays what a march plays: a low note on each beat, and a chord between them. Joplin's edition has it in eighths under the whole strain, and `coda` and `home` are its last four bars, kept apart for the block after this one; `home` is the bar that ends on the low C. `under` is the whole left hand but that last bar, and the rest `r:e` in front of it fills the pickup bar. `gain`, as in chapter 16, keeps the left hand behind the tune. The clef on a part sets the staff it is written on:
 
 ```python {run continue name=hands}
 from euterpe import display, melody
@@ -212,7 +212,7 @@ The two agree, and the last line is the same bars with no ramp: the slowing adds
 
 ## Swing
 
-A written time goes through three steps on its way to seconds, in this order: swing, tempo, humanization. *Swing* comes first because it changes where a beat's inside falls. `Swing(ratio, unit)` takes pairs of units and gives the first one `ratio` of the pair. At the default, 2/3 on eighths, the second eighth of each beat moves late, to 2/3 of the way through the beat, and beats themselves stay where they are. `Performance` holds how a score is played, as against how it is written: `Score(performance=...)` sets it, and `s.play(performance=...)` overrides it for one take. So here is a groove of the book's own, a ride cymbal over a walking bass, chapter 10's bass guitar in quarters. The ride's pattern is the jazz drummer's, with its third and last strokes on the off-beat eighths:
+A written time goes through three steps on its way to seconds, in this order: swing, tempo, humanization. *Swing* comes first because it changes where a beat's inside falls. `Swing(ratio, unit)` takes pairs of units and gives the first one `ratio` of the pair. At the default, 2/3 on eighths, the second eighth of each beat moves late, to 2/3 of the way through the beat, and beats themselves stay where they are. `Performance` holds how a score is played, as against how it is written: `Score(performance=...)` sets it, and `s.play(performance=...)` overrides it for one take. So here is a groove of the book's own, a ride cymbal and a hi-hat on beats 2 and 4 over a walking bass, chapter 10's bass guitar in quarters. The ride's pattern is the jazz drummer's, with its third and last strokes on the off-beat eighths:
 
 ```python {run continue}
 from fractions import Fraction
@@ -230,11 +230,11 @@ for how, swing in (("straight", None), ("swung", Swing())):
 print(Swing().moved(Fraction(1, 8), m))
 ```
 
-The staffs are the same and the two sound like two styles: the first is a march and the second is jazz. `moved` says where a written place goes, here the second eighth, from 1/8 of a whole note to the 1/6 it prints. Nothing but those few ride strokes moved, and only by 1/6 − 1/8 = 1/24 of a whole note. Each bass note is on a beat, so swing leaves it where it was. Joplin's rag stays straight here: his edition's only word on how to play it is the heading, Not fast.
+The staffs are the same and the two sound like two styles: the first is stiff and even, and the second is jazz. `moved` says where a written place goes, here the second eighth, from 1/8 of a whole note to the 1/6 it prints. Nothing but those few ride strokes moved, and only by 1/6 − 1/8 = 1/24 of a whole note. The hi-hat and each bass note are on beats, so swing leaves them where they were. Joplin's rag stays straight here: his edition's only word on how to play it is the heading, Not fast.
 
 ## Humanize
 
-Everything so far starts on its exact time, and no player does. `Humanize(timing, velocity)` adds a seeded Gaussian draw to each note's start and velocity. The defaults have standard deviations of 8 ms and 0.04, each clipped at 3 of them. The same bars with it off and on. Then the block reads what was played: `play` returns the audio, its `parts` hold each part's sound by name, their `notes` are in time order, and a note's `time` is its start in seconds. It prints the starts of the right hand's second to fifth notes, exact and then under two seeds:
+Everything so far starts on its exact time, and no player does. `Humanize(timing, velocity)` adds a seeded Gaussian draw to each note's start and velocity. The defaults have standard deviations of 8 ms and 0.04, each clipped at 3 of them. The strain's first three bars with it off and on. Then the block reads what was played: `play` returns the audio, its `parts` hold each part's sound by name, their `notes` are in time order, and a note's `time` is its start in seconds. It prints the starts of the right hand's second to fifth notes, exact and then under two seeds:
 
 ```python {run continue}
 from euterpe import Humanize, Key, Meter, Performance, Score, display, melody
@@ -245,8 +245,8 @@ s = Score(key=Key("C major"), meter=Meter("2/4"), tempo=76)
 s.part("right", ElectricPiano()).add(hook + fall)
 s.part("left", ElectricPiano(), gain=0.5, clef="bass").add(march)
 off, on = Performance(), Performance(humanize=Humanize())
-display(listen(s.play(performance=off), caption="The same bars with Humanize off"))
-display(listen(s.play(seed=1, performance=on), caption="The same bars with Humanize on"))
+display(listen(s.play(performance=off), caption="The strain's first three bars with Humanize off"))
+display(listen(s.play(seed=1, performance=on), caption="The strain's first three bars with Humanize on"))
 for performance, seed in ((off, 0), (on, 1), (on, 2)):
     take = s.play(seed=seed, performance=performance)
     print([round(note.time, 3) for note in take.parts["right"].notes[1:5]])
@@ -256,7 +256,7 @@ The first line is on an exact grid, and with `humanize` left at None no random d
 
 ## Putting it all together
 
-The closing piece is the introduction and first strain of The Entertainer as John Stark & Son printed it in St. Louis in 1902: this chapter's two hands, with four bars added in front and one difference at the end. Joplin's strain is played twice, and the second time its last bar runs on into the next strain, so here the last bar closes on a held chord, and the ritardando is ours. The score doubles his low notes on chapter 10's pizzicato strings, where `at=5` starts the part at bar 5, with light humanizing over all of it. There is no `pickup` here: the introduction's fourth bar has room for those two sixteenths, so they are simply the end of it. Its first three bars are one falling figure, played in octaves by both hands, each time an octave down:
+The closing piece is the introduction and first strain of The Entertainer as John Stark & Son printed it in St. Louis in 1902: this chapter's two hands, with four bars added in front and one difference at the end. Joplin's strain is played twice, and the second time its last bar runs on into the next strain, so here the last bar closes on a held chord, and the ritardando is ours. The score doubles his low notes on chapter 10's pizzicato strings, where `at=5` starts the part at bar 5 and `gain` keeps it under the piano, with light humanizing over all of it. There is no `pickup` here: the introduction's fourth bar has room for those two sixteenths, so they are simply the end of it. Its first three bars are one falling figure, played in octaves by both hands, each time an octave down:
 
 ```python {run continue name=rag}
 from euterpe import Humanize, Interval, Key, Meter, Performance, Score, display, melody
@@ -303,7 +303,7 @@ The rhythm is now written down: every length in that score is a fraction, each n
 
 1. 60 × 4 × ln(76 / 120) / (76 − 120) = 2.49 s, against 3.16 s with no ramp. It is an accelerando, and it also pushes the last chord forward.
 2. At 3/16 of a whole note, 3/4 of the way through the beat. The off-beat stroke is now a sixteenth before the next beat, as a dotted eighth and a sixteenth would be. It sounds choppier, nearer to a march's dotted rhythm.
-3. In each pair of sixteenths the first gets 2/3 and the second 1/3, so the right hand limps and the sixteenth before the beat comes later and closer to it. Every eighth stays, so from bar 5 on the left hand doesn't move. It has become another style of piece, since the printed sixteenths are even.
+3. In each pair of sixteenths the first gets 2/3 and the second 1/3, so the right hand limps and the sixteenth before the beat comes later and closer to it. Every note that starts on an eighth's place stays, whatever its length, so from bar 5 on the left hand doesn't move. It has become another style of piece, since the printed sixteenths are even.
 
 ```python {run echo=false}
 # Level check: lint every sound in build/audio, this chapter's and any written before it.
