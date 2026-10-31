@@ -44,7 +44,7 @@ from euterpe import Scale, display
 display(Scale("G", "major").keyboard(caption="G major: the pattern from G needs F♯"))
 ```
 
-A scale is not yet a tune, but this one nearly is. Lowell Mason printed a hymn tune called Antioch in Boston in 1839, and everyone knows it as Joy to the World. Its first line is D major, walked down from top to bottom. `Meter("2/4")` makes a bar of two quarters, which chapter 19 explains, and chapter 13's brass section plays it. `gain`, as in chapter 16, keeps this tune in front of the parts that join it later. The two ♯ at the start of the staff are D major's F♯ and C♯:
+A scale is not yet a tune, but D major, printed in the block above, nearly is. Lowell Mason printed a hymn tune called Antioch in Boston in 1839, and everyone knows it as Joy to the World. Its first line is D major, walked down from top to bottom. `Meter("2/4")` makes a bar of two quarters, which chapter 19 explains, and chapter 13's brass section plays it. `gain`, as in chapter 16, keeps this tune in front of the parts that join it later. The two ♯ at the start of the staff are D major's F♯ and C♯:
 
 ```python {run}
 from euterpe import Key, Meter, Score, display, melody
@@ -73,7 +73,7 @@ for top, run in (("degree 7, C♯5", "d4:e e f# g a b c#5 r"),
 
 The first take stops on C♯5 and sounds unfinished, as chapter 16's run did on B4, and the second comes to rest. Degree 8 is degree 1 an octave up. The note that ends things, the first degree, is the tonic, and the piece's home. Degree 7 here is the *leading tone*, a half step under it. There is habit in this: music in this tradition has ended on the tonic for centuries, and your ear has learned that. Later sections add the mechanism.
 
-The next most important note is degree 5, a fifth above the tonic, called the *dominant*, and music often stands on it before it goes home. For centuries those two were the only notes an orchestra's timpani were tuned to. Chapter 14's kettles join here on D, the tonic, and on A, the dominant, a fourth under it, so that the A of bar 3 rises to D at bar 4, as the tune lands on D. A `decay` of 1.2 s, half the default, keeps repeated strokes from piling up:
+The next most important note is degree 5, a fifth above the tonic, called the *dominant*, and music often stands on it before it goes home. For centuries those two were the only notes an orchestra's timpani were tuned to. Chapter 14's kettles join here on D, the tonic, and on A, the dominant, a fourth under it, so that the A of bar 3 rises to D at bar 4, as the tune lands on D. A `decay` of 1.2 s, about half the default of 2.5 s, keeps repeated strokes from piling up:
 
 ```python {run continue}
 from euterpe import display, melody
@@ -85,7 +85,7 @@ display(s, caption="The first line, with timpani on the tonic and the dominant")
 
 ## Why those seven
 
-The answer to chapter 17's question starts with its smoothest interval. After the octave, the fifth is the distance whose partials meet lowest, 3 to 2. So stack seven notes a fifth apart, from F, then bring them all into one octave. `Pitch(letter, alter, octave)` rebuilds a name in another octave, and `alter` counts its sharps:
+The answer to chapter 17's question starts with its smoothest interval. After the octave, the fifth is the distance whose partials meet lowest, 3 to 2. So stack seven notes a fifth apart, from F, then bring them all into one octave. `Pitch(letter, alter, octave)` rebuilds a name in another octave, and `alter` counts its sharps, negative for flats:
 
 ```python {run continue output=code}
 from euterpe import Interval, Pitch
@@ -130,6 +130,16 @@ print(g_major, [p for p in g_major.scale.pitches() if p not in c_major.scale])
 print([p for p in Key("D major").scale.pitches() if p in Key("Eb major").scale])
 ```
 
+A key also tells a chord what it is made of. `chords` writes chords by *Roman numeral*: I is the chord on the 1st note of the key, IV on the 4th, V on the 5th, and V7 adds one note on top. Chapter 21 builds them. For now what matters is that a numeral names a degree, not a note, so it follows whichever key is in force. Chapter 12's organ takes them, under the same two parts, and `octave=3` voices them from the octave below C4:
+
+```python {run continue}
+from euterpe import chords, display
+from euterpe.instruments import Organ
+
+s.part("organ", Organ(), gain=0.25).add(chords("I:h | I:q. IV:e | I:q V7 | I:h", octave=3))
+display(s, caption="The first line, with the organ on Roman numerals")
+```
+
 Now the Invention can be read. For three bars it stays on the signature of C major, which has no sign at all. Bar 4 brings F♯, the one note that tells C major from G major, and by bar 7 the music stands on G: one note moved the whole home by a fifth. Chapter 17's closing player reaches bar 7 at 20 s, so play it from there and hear the arrival. Chapter 24 is about such moves.
 
 The line of fifths closes into a circle on the twelve notes of the octave, because twelve fifths come back to the note they started on: that is what equal temperament bought in chapter 17. `circle` draws it, with majors outside and minors inside, which the Minor section below explains. Neighbours differ by one note, and two keys on opposite sides of the circle have only two piano keys in common, one of them under another name. Here is D major and, next to it, the key we are heading for:
@@ -141,21 +151,11 @@ display(Key("D major").circle(caption="D major, with its neighbours A and G"),
         Key("Eb major").circle(caption="E♭ major, five places round from D"))
 ```
 
-So D and E♭ are a semitone apart on the keyboard and five places apart on the circle. The block above printed what they share: D and G, out of seven. That is why the turn at the start of this chapter is such a big change for so small a move.
-
-A key also tells a chord what it is made of. `chords` writes chords by *Roman numeral*: I is the chord on the 1st note of the key, IV on the 4th, V on the 5th, and V7 adds one note on top. Chapter 21 builds them. For now what matters is that a numeral names a degree, not a note, so it follows whichever key is in force. Chapter 12's organ takes them, under the same two parts, and `octave=3` voices them from the octave below C4:
-
-```python {run continue}
-from euterpe import chords, display
-from euterpe.instruments import Organ
-
-s.part("organ", Organ(), gain=0.25).add(chords("I:h | I:q. IV:e | I:q V7 | I:h", octave=3))
-display(s, caption="The first line, with the organ on Roman numerals")
-```
+So D and E♭ are a semitone apart on the keyboard and five places apart on the circle. The last line of the signature table printed what they share: D and G, out of seven. That is why the turn at the start of this chapter is such a big change for so small a move.
 
 ## Minor
 
-A *minor* scale starts from degree 6 of a major one and uses the same notes. `relative` finds it: `Key("C major").relative` is A minor, with no signs, and `parallel` gives the key of the other mode on one tonic, so `Key("A minor").parallel` is A major. The cost of the move is the leading tone. A minor's degree 7 is G, a whole step under the tonic, and so it does not lean. Musicians use three versions of the scale, here from one tonic. Their steps are 2 1 2 2 1 2 2, 2 1 2 2 1 3 1 and 2 1 2 2 2 2 1, which is what `steps` gives for each:
+A *minor* scale starts from degree 6 of a major one and uses the same notes. `relative` finds it: `Key("C major").relative` is A minor, with no signs, and `parallel` gives the key of the other mode on one tonic, so `Key("A minor").parallel` is A major. The cost of the move is the leading tone. A minor's degree 7 is G, a whole step under the tonic, and so it does not lean. Musicians use three versions of the scale, here from one tonic. Their steps are 2 1 2 2 1 2 2, 2 1 2 2 1 3 1 and 2 1 2 2 2 2 1, as `Scale("A", "natural minor").steps` gives the first, and `"harmonic minor"` and `"melodic minor"` the other two:
 
 ```python {run continue}
 from euterpe import Key, Score, display, melody
@@ -182,7 +182,7 @@ for seventh in (a_minor.degree(7), a_minor.leading_tone):
     display(Harp().play([(0.0, seventh, 1.0), (1.0, top, 1.5)]).take(2.5, f"{seventh} up to {top}, a {step}"))
 ```
 
-G up to A is a step on the way somewhere. G♯ up to A closes. Chapter 22 builds this into the cadence.
+G up to A is a step on the way somewhere. G♯ up to A closes. Chapter 22 builds this into the *cadence*, the few notes or chords that end a phrase.
 
 ## Modes
 
