@@ -110,5 +110,12 @@ class Key:
 
         return Roman(text, self)
 
+    def circle(self, **kw):
+        """The circle of fifths as a view, majors outside and minors in italic inside, this key's wedge and its two
+        neighbours shaded. A mode sits with its signature, so D dorian marks C's. caption and id go to the view."""
+        from euterpe.view.theory import circle
+
+        return circle(self, **kw)
+
     def __repr__(self) -> str:
         return f'Key("{self.tonic} {self.mode}")'

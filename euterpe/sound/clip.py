@@ -64,6 +64,11 @@ class Clip:
 
         return spectrogram(self, **kw)
 
+    def chroma(self, **kw):
+        from euterpe.view import chroma
+
+        return chroma(self, **kw)
+
     def level(self, **kw):
         from euterpe.view import level
 

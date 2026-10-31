@@ -144,6 +144,13 @@ class Chord:
                     return Chord(chord.root, quality, inversion=chord.tones.index(_name(stack[0])))
         return None
 
+    def keyboard(self, **kw):
+        """The chord's tones pressed on a keyboard, as pitches() places them, as a view. caption and id go to the view."""
+        from euterpe.view.style import signs
+        from euterpe.view.theory import keyboard
+
+        return keyboard(self.pitches(), label=signs(self.name), **kw)
+
     def __repr__(self) -> str:
         return f'Chord("{self.name}")'
 

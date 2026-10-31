@@ -12,7 +12,8 @@ import html
 import math
 
 from euterpe.pitch import Pitch
-from euterpe.view.style import INK, MADDER, NOTE_NAMES, PRUSSIAN, RULE, WASH
+from euterpe.theory import Chord, Key
+from euterpe.view.style import INK, MADDER, NOTE_NAMES, PRUSSIAN, RULE, WASH, signs
 
 W = 640  # every special view is this wide in its own viewBox
 X0, X1 = 64, W - 8  # where time runs, after the row names
@@ -74,10 +75,21 @@ def special_view(x, seconds: float) -> tuple | None:
     return None
 
 
+def _chord_name(shape, tuning) -> str | None:
+    """The shape's chord symbol, or None when no chord fits. A fret has no spelling, so sharps are tried, then flats, then
+    flats with C♭: C minor's third only reads as a chord as E♭, and D♭7's seventh only as C♭."""
+    numbers = [_number(t) + f for t, f in zip(tuning, shape.frets) if f is not None]
+    for spell in (Pitch, Key("F major").spell, Key("Gb major").spell):
+        found = Chord.from_pitches(spell(n) for n in numbers)
+        if found is not None:
+            return signs(found.name)
+    return None
+
+
 def chord(shape, tuning) -> tuple:
     """A chord diagram: strings low to high from left to right, × over a string not played, ○
     over an open one, a dot with its fret number on each stopped string, each string's note
-    under it, and the tab as the label."""
+    under it, and the tab as the label, after the chord's name when it has one."""
     frets = shape.frets
     n = len(frets)
     stopped = [f for f in frets if f]
@@ -113,7 +125,10 @@ def chord(shape, tuning) -> tuple:
     sep = "-" if any(f is not None and f > 9 for f in frets) else ""
     tab = sep.join("x" if f is None else str(f) for f in frets)
     h = top + rows * dy + 44
-    p.append(f'<text x="{W / 2}" y="{h - 8}" text-anchor="middle" font-size="14" font-family="ui-monospace,monospace">{tab}</text>')
+    mono = 'font-family="ui-monospace,monospace"'
+    name = _chord_name(shape, tuning)
+    label = (f'<tspan font-style="italic">{name}</tspan> <tspan {mono}>{tab}</tspan>' if name else tab)
+    p.append(f'<text x="{W / 2}" y="{h - 8}" text-anchor="middle" font-size="14"{"" if name else " " + mono}>{label}</text>')
     return "".join(p), W, h, None, None
 
 

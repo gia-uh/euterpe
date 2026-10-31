@@ -73,6 +73,11 @@ def rc() -> dict:
     }
 
 
+def signs(name: str) -> str:
+    """A key or chord name with real sharp and flat signs: Bbm7b5 is B♭m7♭5."""
+    return name.replace("#", "♯").replace("b", "♭")
+
+
 def hz(midi: float) -> float:
     return 440.0 * 2 ** ((midi - 69) / 12)
 
