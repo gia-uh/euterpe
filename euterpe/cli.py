@@ -115,6 +115,8 @@ def _render(args) -> int:
     if _is_piece(args.target):
         score = _piece(args.target, args.seed)
         if notated:
+            if args.seconds is not None or args.rate != RATE:
+                raise _TargetError(f"{args.output} holds notation, not audio, so it takes no --seconds or --rate")
             return _export(score, args)
         unit = _play(score, args.target, args.seed)
         if args.seconds is None and unit.duration == 0:

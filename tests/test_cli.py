@@ -183,6 +183,18 @@ def test_render_a_piece_to_notation_writes_no_audio(tmp_path, capsys, suffix, st
 
 
 @pytest.mark.parametrize("suffix", [".mid", ".musicxml"])
+@pytest.mark.parametrize("flags", [["--seconds", "-3"], ["--seconds", "2"], ["--rate", "8000"]])
+def test_notation_takes_no_audio_flags(written, tmp_path, capsys, suffix, flags):
+    out = tmp_path / f"x{suffix}"
+    assert main(["render", str(written), "-o", str(out), *flags]) == 2
+    assert flags[0] in capsys.readouterr().err and not out.exists()
+
+
+def test_notation_takes_the_default_rate(written, tmp_path):
+    assert main(["render", str(written), "-o", str(tmp_path / "x.mid"), "--rate", "48000"]) == 0
+
+
+@pytest.mark.parametrize("suffix", [".mid", ".musicxml"])
 def test_a_function_target_cannot_write_notation(piece, tmp_path, capsys, suffix):
     out = tmp_path / f"x{suffix}"
     assert main(["render", f"{piece}:tone", "-o", str(out), "--seconds", "1"]) == 2
@@ -298,6 +310,26 @@ def test_score_seed_receives_seed_and_the_same_seed_reaches_the_performance(tmp_
     assert seeds == [4]
     assert main(["render", str(path), "-o", str(tmp_path / "y.mid")]) == 2
     assert "--seed" in capsys.readouterr().err
+
+
+@pytest.fixture
+def played(monkeypatch):
+    """The seeds Score.play is called with."""
+    seeds = []
+    real = Score.play
+    monkeypatch.setattr(Score, "play", lambda self, seed=0, performance=None: seeds.append(seed) or real(self, seed, performance))
+    return seeds
+
+
+def test_lint_passes_the_seed_to_the_performance(written, played):
+    assert main(["lint", str(written), "--seed", "5"]) == 0
+    assert played == [5]
+
+
+def test_inspect_passes_the_seed_to_the_performance(written, tmp_path, monkeypatch, played):
+    monkeypatch.setattr("euterpe.inspect._png", lambda view, path: path)
+    assert main(["inspect", str(written), "-o", str(tmp_path / "o"), "--seed", "6"]) == 0
+    assert played == [6]
 
 
 def test_inspect_prints_each_file_and_summary_last(written, tmp_path, monkeypatch, capsys):
