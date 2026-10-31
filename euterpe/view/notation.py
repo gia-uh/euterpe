@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from euterpe.sound.clip import Clip
 
 SCALE = 36  # percent, verovio's staff size
-PAGE_WIDTH = 2280  # verovio's units: at SCALE this is 820 wide, the column's width
+PAGE_WIDTH = 1530  # verovio's units: at SCALE this is about 550 wide, the width the book's column gives the plate
 PAGE_HEIGHT = 60000  # verovio's largest page: more than 700 bars of one staff, fewer on several
 MARGIN = 20
 # Verovio writes a metronome's note in a music font it would embed. These are the same notes in plain Unicode.
