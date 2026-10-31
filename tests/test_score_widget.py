@@ -49,7 +49,7 @@ def _widget_html(s: Score, **options) -> str:
 
 def test_the_natural_width_is_the_columns():
     width, root = _natural(_score().notation()._repr_mimebundle_()[0]["text/html"])
-    assert 780 <= width <= 860
+    assert 520 <= width <= 580
     assert f"max-width:{width:g}px" in root
     assert "width:100%" in root
 
