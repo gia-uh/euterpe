@@ -98,13 +98,13 @@ def _check_seconds(seconds: float) -> None:
 
 def _export(score: Score, args) -> int:
     out = Path(args.output)
-    out.parent.mkdir(parents=True, exist_ok=True)
     try:
+        out.parent.mkdir(parents=True, exist_ok=True)
         if out.suffix.lower() == ".musicxml":
             score.to_musicxml(out)
         else:
             score.to_midi(out)
-    except ValueError as e:
+    except (OSError, ValueError) as e:
         raise _TargetError(f"cannot write {out}: {e}") from None
     print(f"{out}: bars 1 to {score.bars}")
     return 0
@@ -135,6 +135,8 @@ def _render(args) -> int:
         out = write(samples, args.output, rate=args.rate)
     except ValueError as e:
         raise _TargetError(str(e)) from None
+    except OSError as e:
+        raise _TargetError(f"cannot write {args.output}: {e}") from None
     peak = float(np.abs(samples).max()) if samples.size else 0.0
     level = f"{20 * np.log10(peak):.1f} dBFS" if peak > 0 else "silent"
     print(f"{out}: {seconds:g} s, peak {level}")
@@ -148,7 +150,10 @@ def _lint_piece(args) -> int:
     if args.seconds is not None or args.loop:
         raise _TargetError(f"linting {args.input} takes no --seconds or --loop: "
                            "a piece renders whole and does not loop")
-    report = lint_piece(score, args.profile, args.seed or 0, audio=not args.no_audio)
+    try:
+        report = lint_piece(score, args.profile, args.seed or 0, audio=not args.no_audio)
+    except ValueError as e:
+        raise _TargetError(f"cannot play {args.input}: {e}") from None
     print(report.to_json() if args.json else report.to_text())
     return 1 if report.errors else 0
 

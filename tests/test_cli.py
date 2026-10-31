@@ -360,3 +360,29 @@ def test_inspect_without_matplotlib_says_what_to_install(written, tmp_path, monk
     monkeypatch.setitem(sys.modules, "matplotlib", None)
     assert main(["inspect", str(written), "-o", str(tmp_path / "o")]) == 2
     assert "pip install 'euterpe[view]'" in capsys.readouterr().err
+
+
+NO_DRUM = '''
+from euterpe import Score, melody
+from euterpe.instruments import Kit
+
+
+def score():
+    s = Score(tempo=120)
+    s.part("a", Kit()).add(melody("c4:q"))
+    return s
+'''
+
+
+def test_lint_a_piece_that_cannot_play_exits_2(tmp_path, capsys):
+    path = _file(tmp_path, NO_DRUM)
+    assert main(["lint", str(path)]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("euterpe: cannot play") and "names no drum" in err
+
+
+@pytest.mark.parametrize("name", ["x.mid", "x.wav"])
+def test_an_output_under_a_file_exits_2(written, tmp_path, capsys, name):
+    (tmp_path / "taken").write_text("")
+    assert main(["render", str(written), "-o", str(tmp_path / "taken" / name)]) == 2
+    assert capsys.readouterr().err.startswith("euterpe: cannot write")
