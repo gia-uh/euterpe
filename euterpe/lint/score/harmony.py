@@ -60,11 +60,11 @@ def _same(first: Chord | None, second: Chord | None) -> bool:
 
 
 def _soprano(score: Score, start: Fraction, end: Fraction) -> Pitch | None:
-    """The pitch of the highest line sounding in a stretch of time, or None."""
+    """The last pitch of the highest line sounding in a stretch of time, or None."""
     for line in lines(score):
-        for offset, until, pitch in line:
-            if offset < end and start < until:
-                return pitch
+        sounding = [pitch for offset, until, pitch in line if offset < end and start < until]
+        if sounding:
+            return sounding[-1]
     return None
 
 

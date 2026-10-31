@@ -5,7 +5,7 @@ import pytest
 
 from euterpe.lint.score import PROFILES, Profile, lint_score
 from euterpe.score import Score, drums, melody
-from euterpe.theory import Key
+from euterpe.theory import Key, Meter
 
 LOCATED = [
     ("H-CADENCE", None, "metric", None, 1, 3.0),
@@ -118,6 +118,34 @@ def test_h_cadence_holds_a_chord_through_its_inversions():
 ])
 def test_h_cadence_reads_each_chord_as_it_last_sounded(text):
     assert not _found(_score(text), "H-CADENCE", "chorale")
+
+
+def _in_six_eight(top):
+    s = Score(meter=Meter("6/8"))
+    s.part("soprano").add(melody(top))
+    s.part("lower").add(melody("<g3 b3 d4>:q. <g3 b3 d4>:q. | <c3 e3 g3>:q. <c3 e3 g3>:q."))
+    return s
+
+
+def test_h_cadence_reads_the_soprano_from_the_last_note_of_the_last_beat():
+    assert not _found(_in_six_eight("g4:q. g4:q. | g5:q. e5:e d5:e c5:e"), "H-CADENCE", "chorale")
+    assert not _found(_in_six_eight("g4:q. g4:q. | g5:q. c5:q."), "H-CADENCE", "chorale")
+    [f] = _found(_in_six_eight("g4:q. g4:q. | g5:q. c5:e d5:e e5:e"), "H-CADENCE", "chorale")
+    assert f.message == "the piece ends on IAC, not PAC or plagal, a warning under the chorale profile"
+
+
+def test_h_cadence_reads_the_soprano_before_a_rest_in_the_last_beat():
+    s = Score()
+    s.part("soprano").add(melody("g4:h e5:e c5:e r:q"))
+    s.part("lower").add(melody("<g3 b3 d4>:h <c3 e3 g3>:q r:q"))
+    assert not _found(s, "H-CADENCE", "chorale")
+
+
+def test_h_cadence_falls_through_to_the_next_line_when_the_top_is_silent():
+    s = Score()
+    s.part("soprano").add(melody("g5:h r:h"))
+    s.part("lower").add(melody("<g3 b3 d4 g4>:h <c3 e3 g3 c5>:h"))
+    assert not _found(s, "H-CADENCE", "chorale")
 
 
 def test_h_cadence_places_a_chord_held_through_its_inversions_at_its_arrival():
