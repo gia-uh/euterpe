@@ -168,3 +168,22 @@ def test_claves_ring_at_their_tune_with_a_free_bar_overtone_and_die_fast():
     assert abs(peak_hz(x) - 2500.0) < 25
     assert band_db(x, 6800, 6980) > band_db(x, 4900, 5100) + 15   # the 2.756 overtone, not a harmonic 2
     assert np.abs(x[len(x) // 2:]).max() < 0.01 * np.abs(x).max()   # 40 dB down after 0.3 s
+
+
+def test_bongo_macho_sounds_above_hembra_and_a_muted_stroke_dies_sooner():
+    from euterpe.instruments import Bongo, Muted
+    from euterpe.sound.core import render
+    from tests.helpers import peak_hz
+    bongo = Bongo(variation=0.0)
+    macho = render(bongo.play(bongo.hit(0.0, drum="macho")), 0.8)
+    hembra = render(bongo.play(bongo.hit(0.0, drum="hembra")), 0.8)
+    muted = render(bongo.play(bongo.hit(0.0, drum="macho", articulation=Muted())), 0.8)
+    assert abs(peak_hz(macho) - 420) < 10 and abs(peak_hz(hembra) - 290) < 10
+    ring = lambda x: np.abs(np.asarray(x)[int(0.1 * 48000):int(0.2 * 48000)]).max() / np.abs(x).max()
+    assert ring(muted) < ring(macho) / 4
+
+
+def test_bongo_refuses_a_third_drum():
+    from euterpe.instruments import Bongo
+    with pytest.raises(ValueError, match="macho and a hembra"):
+        Bongo().hit(0.0, drum="tumba")
