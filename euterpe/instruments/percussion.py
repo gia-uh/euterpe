@@ -317,13 +317,13 @@ class Bongo(Struck):
 
 
 class Bass(Articulation):
-    """A cajón's bass stroke: the flat hand low in the centre of the tapa, so the box's air and
-    the plate's lowest modes ring. Other instruments ignore it."""
+    """A low stroke with the flat hand: a cajón's bass in the centre of the tapa, so the box's
+    air and the plate's lowest modes ring, or a tumbadora's palm in the centre of the head."""
 
 
 class Slap(Articulation):
-    """A cajón's slap: the relaxed fingers at the top edge, a bright crack over a short body.
-    Other instruments ignore it."""
+    """A bright, short slap: a cajón's relaxed fingers at the top edge, or a tumbadora's dry
+    crack over a short body."""
 
 
 class Cajon(Struck):
@@ -381,6 +381,78 @@ class Cajon(Struck):
         air = Sine(f0 * 1.92) * fall(self.decay * 0.8) * 0.25
         hand = BandPass(WhiteNoise(_seed(note)), 260.0, 0.8) * fall(0.010) * (0.35 * b)
         return (plate + air + hand) * (note.velocity * self.level * force)
+
+
+class Tumbadora(Struck):
+    """A tumbadora (a conga): a tall, narrow, single-headed hand drum from Cuba, staved like a
+    barrel and played with the hands. It is the larger cousin of the bongó: each head is a
+    membrane's five lowest modes, but a wider head rings lower and longer, and a set has one to
+    three drums. A hit names its drum and its stroke: no articulation for an open tone near the
+    edge, Muted() for a muted tone with the fingers left on the head, Slap() for the dry, bright
+    crack, and Bass() for the palm's low stroke in the centre.
+
+    drums: the drum names and their pitches in Hz, lowest first; one to three drums.
+    decay: an open stroke's seconds to fall 60 dB, longest on the lowest drum.
+    slap_tune, slap_decay: the slap's bright ring.
+    level: the gain of one stroke at full velocity.
+    variation: how far each hit's force and brightness move, as a fraction.
+    seed: which tumbadora of its make this is.
+
+    Limit: one membrane per drum and only its five lowest modes; the heel-toe stroke, the
+    pitch bend and the shell's resonance are not modelled, and the four strokes approximate
+    the hand's techniques rather than reproducing a measured drum.
+    """
+
+    gm_program = 116
+
+    def __init__(self, drums: dict[str, float] | None = None, decay: float = 0.55,
+                 slap_tune: float = 1900.0, slap_decay: float = 0.045, slap_level: float = 1.4,
+                 level: float = 0.55, variation: float = 0.08, seed: int = 0):
+        self.drums = dict(drums) if drums else {"tumba": 98.0, "tres-dos": 147.0, "quinto": 220.0}
+        if not 1 <= len(self.drums) <= 3:
+            raise ValueError(f"a tumbadora has one to three drums, got {len(self.drums)}")
+        self.decay, self.slap_tune, self.slap_decay = decay, slap_tune, slap_decay
+        self.slap_level, self.level, self.variation, self.seed = slap_level, level, variation, seed
+        self.tune = next(iter(self.drums.values()))
+
+    def hit(self, at: float, velocity: float = 0.8, pitch: Pitch | float | None = None,
+            articulation: Articulation | None = None, drum: str | None = None) -> list[Note]:
+        """One stroke at time at on drum, by default the lowest drum."""
+        drum = drum or next(iter(self.drums))
+        if drum not in self.drums:
+            raise ValueError(f"a tumbadora has no drum {drum!r}; it has {', '.join(self.drums)}")
+        tune = self.drums[drum]
+        return [Note(at, tune if pitch is None else pitch, 0.1, velocity, articulation, resource=drum)]
+
+    def resource(self, note: Note) -> Hashable | None:
+        """The drum: a new stroke on it stops the one still ringing there."""
+        return note.resource
+
+    def voice(self, note: Note) -> Unit:
+        force, bright, tuning = self.vary(note)
+        f0 = float(note.freq) * tuning
+        b = min(1.0, bright * (0.5 + 0.5 * note.velocity))
+        decay = self.decay * (self.tune / f0) ** 0.3
+        if isinstance(note.articulation, Slap):
+            edge = self.slap_tune * tuning
+            plate = Modal([edge, edge * 1.6, edge * 2.2],
+                          [self.slap_decay, self.slap_decay * 0.55, self.slap_decay * 0.35],
+                          [0.6, 0.35 * b, 0.22 * b])
+            crack = HighPass(WhiteNoise(_seed(note)), 2500.0) * fall(0.008) * (0.9 * b)
+            thump = Sine(f0 * 1.2) * fall(self.slap_decay * 1.4) * 0.12
+            return (plate + crack + thump) * (note.velocity * self.level * self.slap_level * force)
+        if isinstance(note.articulation, Bass):
+            head = Modal([f0, f0 * 1.59, f0 * 2.14], [decay, decay * 0.5, decay * 0.4],
+                         [1.0, 0.25 * b, 0.12 * b])
+            hand = BandPass(WhiteNoise(_seed(note)), 220.0, 0.7) * fall(0.012) * (0.2 * b)
+            return (head + hand) * (note.velocity * self.level * force)
+        muted = isinstance(note.articulation, Muted)
+        decay *= 0.15 if muted else 1.0
+        b *= 0.45 if muted else 1.0
+        head = Modal([f0 * r for r in MEMBRANE], [decay * k for k in (1.0, 0.6, 0.45, 0.4, 0.35)],
+                     [1.0, 0.5 * b, 0.35 * b, 0.25 * b, 0.2 * b])
+        skin = BandPass(WhiteNoise(_seed(note)), 900.0 if muted else 2000.0, 1.0) * fall(0.010) * (0.55 if muted else 0.2) * b
+        return (head + skin) * (note.velocity * self.level * force)
 
 
 class Maracas(Struck):

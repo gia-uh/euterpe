@@ -210,6 +210,35 @@ def test_a_cajon_slap_does_not_cut_a_bass_still_ringing():
     assert cajon.resource(cajon.hit(0.0, articulation=Slap())[0]) == "slap"
 
 
+def test_tumbadora_four_strokes_sound_unlike_each_other_and_its_drums_rise():
+    from euterpe.instruments import Bass, Muted, Slap, Tumbadora
+    from euterpe.sound.core import render
+    from tests.helpers import band_db, peak_hz
+    tumbadora = Tumbadora(variation=0.0)
+    open_tone = render(tumbadora.play(tumbadora.hit(0.0, velocity=1.0)), 0.8)
+    muted = render(tumbadora.play(tumbadora.hit(0.0, velocity=1.0, articulation=Muted())), 0.8)
+    slap = render(tumbadora.play(tumbadora.hit(0.0, velocity=1.0, articulation=Slap())), 0.8)
+    bass = render(tumbadora.play(tumbadora.hit(0.0, velocity=1.0, articulation=Bass())), 0.8)
+    high = lambda x: band_db(x, 2000, 12000)
+    mid = lambda x: band_db(x, 200, 800)
+    ring = lambda x: np.abs(np.asarray(x)[int(0.08 * 48000):int(0.18 * 48000)]).max() / np.abs(x).max()
+    assert peak_hz(bass) < 130 and peak_hz(open_tone) < 130  # both keep the low fundamental
+    assert mid(open_tone) > mid(bass) + 6  # the open tone's upper modes, which the palm damps
+    assert high(slap) > high(open_tone) + 10  # the slap's bright crack
+    assert ring(muted) < ring(open_tone) / 3 and ring(slap) < ring(open_tone) / 3  # both die fast
+    low, mid_drum, high_drum = (render(tumbadora.play(tumbadora.hit(0.0, drum=d)), 0.8)
+                                for d in ("tumba", "tres-dos", "quinto"))
+    assert peak_hz(low) < peak_hz(mid_drum) < peak_hz(high_drum)
+
+
+def test_tumbadora_refuses_a_fourth_drum_and_an_unknown_one():
+    from euterpe.instruments import Tumbadora
+    with pytest.raises(ValueError, match="one to three drums"):
+        Tumbadora(drums={"a": 100.0, "b": 150.0, "c": 200.0, "d": 250.0})
+    with pytest.raises(ValueError, match="no drum 'requinto'"):
+        Tumbadora().hit(0.0, drum="requinto")
+
+
 def test_maracas_seeds_make_a_broadband_rattle_and_not_a_knock():
     from euterpe.instruments import Maracas
     from euterpe.sound.core import render
