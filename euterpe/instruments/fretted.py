@@ -24,7 +24,7 @@ from euterpe.instruments.plucked import (
     String,
     _string_of,
 )
-from euterpe.pitch import A1, A2, B3, C4, D2, D3, E1, E2, E4, G2, G3, G4, Pitch
+from euterpe.pitch import A1, A2, A4, B3, C4, D2, D3, D5, E1, E2, E4, Fs3, G2, G3, G4, Pitch
 from euterpe.sound import Segments, Sine
 from euterpe.sound.core import RATE, Unit
 
@@ -274,6 +274,38 @@ class Tres(Fretted):
         cents = float(note.rng.uniform(-4.0, 4.0))
         pair = self.pluck(note, note.freq, vary, traits) + self.pluck(note, note.freq * ratio * 2 ** (cents / 1200), vary, traits)
         return self.finish(note, pair * (1 / math.sqrt(2)), vary[2] * (1 + traits[1]))
+
+
+class Laud(Tres):
+    """The Cuban laud: six courses of two steel strings tuned D3 F#3 B3 E4 A4 D5, played with
+    a plectrum through a guitar body. It shares the tres's doubled courses, but has six of
+    them, in fourths except the major third between the sixth and fifth, and a shorter neck
+    than the Spanish laud: this model has 16 frets.
+
+    Every note sounds on both strings of its course, and the second string sits a few cents
+    off the first, drawn per note, which gives a doubled course its chorus.
+
+    courses: for each course in tab order, the second string's ratio to the first (0.5 is an
+    octave below, 1.0 a unison); the default is six unisons, as the sources describe the
+    Cuban laud. A player who pairs a course in octaves passes 0.5 in its place.
+
+    Techniques: those of Guitar, strum and pick, over six courses.
+
+    Limit: the two strings of a course are plucked at the same instant and do not couple; the
+    body is a guitar's, larger than a laud's, and the string length is the guitar's, while a
+    Cuban laud's is about 400 mm.
+    """
+
+    gm_program = 25
+    tuning = (D3, Fs3, B3, E4, A4, D5)
+    frets = 16
+    polyphony = 6
+
+    def __init__(self, tuning: Sequence[Pitch] | None = None, capo: int = 0, exciter: Exciter = Plectrum(),
+                 string: String = Steel(), body: Soundboard | None = GuitarBody(), let_ring: bool = True,
+                 mute: float = 0.08, level: float = 0.6, courses: Sequence[float] = (1.0,) * 6,
+                 seed: int = 0):
+        super().__init__(tuning, capo, exciter, string, body, let_ring, mute, level, courses, seed)
 
 
 class BassGuitar(Fretted):

@@ -1,6 +1,6 @@
 import pytest
 from euterpe.instruments import BassGuitar, Guitar, Note, Shape
-from euterpe.pitch import A2, A3, B2, B3, B5, C2, C3, C4, Cs4, D2, D3, Ds4, E1, E2, E3, E4, E5, F2, F3, F4, Fs3, Fs4, G2, G3, G4
+from euterpe.pitch import A2, A3, A4, B2, B3, B5, C2, C3, C4, Cs4, D2, D3, D5, Ds4, E1, E2, E3, E4, E5, F2, F3, F4, Fs3, Fs4, G2, G3, G4
 from euterpe.sound.core import RATE
 
 A = Shape(None, 0, 2, 2, 2, 0)
@@ -125,3 +125,28 @@ def test_the_tres_wants_one_ratio_per_course():
     from euterpe.instruments import Tres
     with pytest.raises(ValueError, match="2 course ratios for 3"):
         Tres(courses=(0.5, 1.0))
+
+
+def test_the_laud_strums_its_six_doubled_courses_in_d():
+    from euterpe.instruments import Laud
+    notes = Laud().strum(Shape(0, 0, 0, 0, 0, 0), at=0.0, length=0.5)
+    assert [n.resource for n in notes] == [6, 5, 4, 3, 2, 1]
+    assert [n.pitch for n in notes] == [D3, Fs3, B3, E4, A4, D5]
+
+
+def test_the_laud_sounds_both_strings_of_a_course():
+    """The defining trait: six courses, each of two strings. A course tuned in octaves must
+    carry its lower octave; plucking one string per note would leave that band empty."""
+    from euterpe.instruments import Laud
+    from tests.helpers import band_db
+    laud = Laud(body=None, courses=(1.0, 1.0, 1.0, 0.5, 1.0, 1.0))
+    x = laud.play(laud.pick(3, 0, at=0.0, length=1.0)).take(1.0)
+    assert band_db(x, 160, 170) > band_db(x, 180, 190) + 40   # E3 under E4, beyond its neighbours
+
+
+def test_the_laud_has_six_courses_and_sixteen_frets():
+    from euterpe.instruments import Laud
+    laud = Laud()
+    assert laud.tuning == (D3, Fs3, B3, E4, A4, D5) and laud.frets == 16
+    with pytest.raises(ValueError, match="5 course ratios for 6"):
+        Laud(courses=(1.0,) * 5)
