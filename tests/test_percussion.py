@@ -214,3 +214,39 @@ def test_maracas_refuses_a_third_hand():
     from euterpe.instruments import Maracas
     with pytest.raises(ValueError, match="left and a right hand"):
         Maracas().hit(0.0, hand="centro")
+
+
+def test_a_faster_scrape_is_brighter_and_crosses_more_ridges():
+    from euterpe.instruments import Guiro
+    from euterpe.sound.core import render
+    from tests.helpers import band_db
+    guiro = Guiro(variation=0.0)
+    slow = np.asarray(render(guiro.play(guiro.scrape(0.0, length=0.4, speed=0.2, velocity=1.0)), 0.8))
+    fast = np.asarray(render(guiro.play(guiro.scrape(0.0, length=0.4, speed=1.0, velocity=1.0)), 0.8))
+    crosses = lambda x: int(np.sum(np.diff(np.sign(x)) != 0))
+    assert band_db(fast, 4000, 16000) > band_db(slow, 4000, 16000) + 4.5
+    assert crosses(fast) > 1.8 * crosses(slow)
+
+
+def test_the_metal_guira_is_brighter_than_the_gourd_guiro():
+    from euterpe.instruments import GOURD, STEEL, Guiro
+    from euterpe.sound.core import render
+    from tests.helpers import band_db
+    gourd = Guiro(material=GOURD, variation=0.0)
+    steel = Guiro(material=STEEL, variation=0.0)
+    scrape = lambda g: np.asarray(render(g.play(g.scrape(0.0, length=0.4, speed=0.5, velocity=1.0)), 0.8))
+    assert band_db(scrape(steel), 4000, 16000) > band_db(scrape(gourd), 4000, 16000) + 4.0
+
+
+def test_a_new_scrape_stops_the_one_still_sounding_on_the_guiro():
+    from euterpe.instruments import Guiro
+    from euterpe.sound.core import RATE
+    g = Guiro()
+    p = g.play(g.scrape(0.0, length=0.5) + g.scrape(0.3, length=0.5))
+    assert p.stops[0] <= round(0.3 * RATE) + round(0.005 * RATE) < p.ends[0]
+
+
+def test_a_scrape_refuses_a_speed_of_zero():
+    from euterpe.instruments import Guiro
+    with pytest.raises(ValueError, match="speed above 0"):
+        Guiro().scrape(0.0, speed=0.0)
