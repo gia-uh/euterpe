@@ -24,7 +24,7 @@ from euterpe.instruments.plucked import (
     String,
     _string_of,
 )
-from euterpe.pitch import A1, A2, A4, B3, C4, D2, D3, D5, E1, E2, E4, Fs3, G2, G3, G4, Pitch
+from euterpe.pitch import A1, A2, A3, A4, B2, B3, C4, D2, D3, D4, D5, E1, E2, E3, E4, Fs3, G2, G3, G4, Pitch
 from euterpe.sound import Segments, Sine
 from euterpe.sound.core import RATE, Unit
 
@@ -304,6 +304,38 @@ class Laud(Tres):
     def __init__(self, tuning: Sequence[Pitch] | None = None, capo: int = 0, exciter: Exciter = Plectrum(),
                  string: String = Steel(), body: Soundboard | None = GuitarBody(), let_ring: bool = True,
                  mute: float = 0.08, level: float = 0.6, courses: Sequence[float] = (1.0,) * 6,
+                 seed: int = 0):
+        super().__init__(tuning, capo, exciter, string, body, let_ring, mute, level, courses, seed)
+
+
+class Cuatro(Tres):
+    """The Puerto Rican cuatro: five courses of two steel strings tuned B2 E3 A3 D4 G4, played
+    with a plectrum through a violin-shaped wooden body. It has ten strings, the top three
+    courses in unison and the two lowest in octaves, so the fifth course pairs B2 with B3 and
+    the fourth E3 with E4. This model has 17 frets.
+
+    Every note sounds on both strings of its course, and the second string sits a few cents off
+    the first, drawn per note, which gives a doubled course its chorus.
+
+    courses: for each course in tab order, the second string's ratio to the first (2.0 is an
+    octave above, 1.0 a unison); the default is the modern cuatro's stringing, with the two
+    lowest courses in octaves.
+
+    Techniques: those of Guitar, strum and pick, over five courses.
+
+    Limit: the two strings of a course are plucked at the same instant and do not couple; the
+    body is a guitar's, deeper than a cuatro's (whose scale is about 500 mm), and the instrument
+    is written an octave above its sounding pitch, which the caller does.
+    """
+
+    gm_program = 25
+    tuning = (B2, E3, A3, D4, G4)
+    frets = 17
+    polyphony = 5
+
+    def __init__(self, tuning: Sequence[Pitch] | None = None, capo: int = 0, exciter: Exciter = Plectrum(),
+                 string: String = Steel(), body: Soundboard | None = GuitarBody(), let_ring: bool = True,
+                 mute: float = 0.08, level: float = 0.6, courses: Sequence[float] = (2.0, 2.0, 1.0, 1.0, 1.0),
                  seed: int = 0):
         super().__init__(tuning, capo, exciter, string, body, let_ring, mute, level, courses, seed)
 

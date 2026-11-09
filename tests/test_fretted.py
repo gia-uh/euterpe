@@ -1,6 +1,7 @@
+import numpy as np
 import pytest
 from euterpe.instruments import BassGuitar, Guitar, Note, Shape
-from euterpe.pitch import A2, A3, A4, B2, B3, B5, C2, C3, C4, Cs4, D2, D3, D5, Ds4, E1, E2, E3, E4, E5, F2, F3, F4, Fs3, Fs4, G2, G3, G4
+from euterpe.pitch import A2, A3, A4, B2, B3, B5, C2, C3, C4, Cs4, D2, D3, D4, D5, Ds4, E1, E2, E3, E4, E5, F2, F3, F4, Fs3, Fs4, G2, G3, G4
 from euterpe.sound.core import RATE
 
 A = Shape(None, 0, 2, 2, 2, 0)
@@ -150,3 +151,28 @@ def test_the_laud_has_six_courses_and_sixteen_frets():
     assert laud.tuning == (D3, Fs3, B3, E4, A4, D5) and laud.frets == 16
     with pytest.raises(ValueError, match="5 course ratios for 6"):
         Laud(courses=(1.0,) * 5)
+
+
+def test_the_cuatro_strums_its_five_doubled_courses_in_g():
+    from euterpe.instruments import Cuatro
+    notes = Cuatro().strum(Shape(0, 0, 0, 0, 0), at=0.0, length=0.5)
+    assert [n.resource for n in notes] == [5, 4, 3, 2, 1]
+    assert [n.pitch for n in notes] == [B2, E3, A3, D4, G4]
+
+
+def test_a_cuatro_course_in_octaves_sounds_both_strings():
+    """The defining trait: five doubled courses. A course strung an octave lower must carry
+    that lower octave; a model that plucks one string per note leaves that band empty."""
+    from euterpe.instruments import Cuatro
+    from tests.helpers import band_db
+    cuatro = Cuatro(body=None, courses=(1.0, 1.0, 1.0, 0.5, 1.0))
+    x = cuatro.play(cuatro.pick(2, 0, at=0.0, length=1.0)).take(1.0)
+    assert band_db(x, 140, 152) > band_db(x, 155, 168) + 20   # D3 at 147 Hz under D4
+
+
+def test_the_cuatro_has_five_courses_and_seventeen_frets():
+    from euterpe.instruments import Cuatro
+    cuatro = Cuatro()
+    assert cuatro.tuning == (B2, E3, A3, D4, G4) and cuatro.frets == 17
+    with pytest.raises(ValueError, match="4 course ratios for 5"):
+        Cuatro(courses=(1.0,) * 4)
