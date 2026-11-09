@@ -28,6 +28,7 @@ from euterpe.instruments.chip import (
 from euterpe.instruments.bowed import Bowed, Bowing, StringSection, Violin
 from euterpe.instruments.fretted import BassGuitar, Electric, ElectricBass, ElectricGuitar, Fretted, Guitar, Shape, Tres
 from euterpe.instruments.keys import ElectricPiano, Organ
+from euterpe.instruments.lamellophones import Marimbula, MarimbulaBox
 from euterpe.instruments.winds import Blown, BrassSection, Breath, Clarinet, Flute
 from euterpe.instruments.synths import AcidBass, Lead, Pad, Patch, Supersaw, SynthPluck
 from euterpe.instruments.mallets import Bar, Barred, Celesta, Glockenspiel, Marimba, Xylophone
@@ -89,6 +90,8 @@ __all__ = [
     "Mallet",
     "Xylophone",
     "Marimba",
+    "Marimbula",
+    "MarimbulaBox",
     "Organ",
     "Patch",
     "Lead",
