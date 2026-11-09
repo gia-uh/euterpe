@@ -268,6 +268,52 @@ class Claves(Struck):
         click = HighPass(WhiteNoise(_seed(note)), 4000.0) * fall(0.004) * (0.25 * b)
         return (bar + click) * (note.velocity * self.level * force)
 
+class Muted(Articulation):
+    """A hand drum's muted stroke: a finger or the palm stays on the head, so it thumps instead of ringing."""
+
+
+class Bongo(Struck):
+    """Bongos: two small open-bottomed hand drums joined together, the smaller macho tuned higher
+    than the larger hembra. Each head is a membrane's five lowest modes; an open stroke near the
+    edge lets them ring for decay seconds, and a Muted() stroke cuts them to a fifth of that with
+    a soft thump of the fingers. A hit names its drum.
+
+    macho, hembra: each drum's pitch in Hz. decay: an open stroke's seconds to fall 60 dB.
+
+    Limit: no slap and no pitch bend from pressing the head, and both heads ring alike apart
+    from their pitch.
+    """
+
+    gm_program = 116
+    drums = ("macho", "hembra")
+
+    def __init__(self, macho: float = 420.0, hembra: float = 290.0, decay: float = 0.35, level: float = 0.5,
+                 variation: float = 0.08, seed: int = 0):
+        self.macho, self.hembra, self.decay, self.level, self.variation, self.seed = macho, hembra, decay, level, variation, seed
+        self.tune = macho
+
+    def hit(self, at: float, velocity: float = 0.8, pitch: Pitch | float | None = None,
+            articulation: Articulation | None = None, drum: str = "macho") -> list[Note]:
+        """One stroke at time at on drum, macho or hembra."""
+        if drum not in self.drums:
+            raise ValueError(f"a bongo has a macho and a hembra, not {drum!r}")
+        tune = self.macho if drum == "macho" else self.hembra
+        return [Note(at, tune if pitch is None else pitch, 0.1, velocity, articulation, resource=drum)]
+
+    def resource(self, note: Note) -> Hashable | None:
+        """The drum: a new stroke on it stops the one still ringing there."""
+        return note.resource
+
+    def voice(self, note: Note) -> Unit:
+        force, bright, tuning = self.vary(note)
+        f0 = float(note.freq) * tuning
+        muted = isinstance(note.articulation, Muted)
+        decay = self.decay * (0.2 if muted else 1.0)
+        b = min(1.0, bright * (0.5 + 0.5 * note.velocity)) * (0.5 if muted else 1.0)
+        head = Modal([f0 * r for r in MEMBRANE], [decay * k for k in (1.0, 0.6, 0.45, 0.4, 0.35)], [1.0, 0.5 * b, 0.35 * b, 0.25 * b, 0.2 * b])
+        skin = BandPass(WhiteNoise(_seed(note)), 900.0 if muted else 2500.0, 1.0) * fall(0.012) * (0.6 if muted else 0.25)
+        return (head + skin) * (note.velocity * self.level * force)
+
 METAL = (205.3, 304.4, 369.6, 522.7, 540.0, 800.0)  # six square waves that beat as metal, in Hz
 
 
