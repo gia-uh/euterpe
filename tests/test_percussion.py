@@ -189,6 +189,27 @@ def test_bongo_refuses_a_third_drum():
         Bongo().hit(0.0, drum="tumba")
 
 
+def test_cajon_bass_is_low_and_slap_is_a_short_bright_crack():
+    from euterpe.instruments import Bass, Cajon, Slap
+    from euterpe.sound.core import render
+    from tests.helpers import band_db, peak_hz
+    cajon = Cajon(variation=0.0)
+    bass = render(cajon.play(cajon.hit(0.0, velocity=1.0, articulation=Bass())), 0.6)
+    slap = render(cajon.play(cajon.hit(0.0, velocity=1.0, articulation=Slap())), 0.6)
+    edge = lambda x: band_db(x, 2000, 12000) - band_db(x, 40, 250)
+    assert peak_hz(bass) < 150 and peak_hz(slap) > 1000  # the centre's low thump, the edge's crack
+    assert edge(slap) > edge(bass) + 25  # the slap carries its energy high, the bass low
+    ring = lambda x: np.abs(np.asarray(x)[int(0.05 * 48000):int(0.15 * 48000)]).max() / np.abs(x).max()
+    assert ring(slap) < ring(bass) / 5  # the crack dies, the bass goes on ringing
+
+
+def test_a_cajon_slap_does_not_cut_a_bass_still_ringing():
+    from euterpe.instruments import Bass, Cajon, Slap
+    cajon = Cajon()
+    assert cajon.resource(cajon.hit(0.0, articulation=Bass())[0]) == "bajo"
+    assert cajon.resource(cajon.hit(0.0, articulation=Slap())[0]) == "slap"
+
+
 def test_maracas_seeds_make_a_broadband_rattle_and_not_a_knock():
     from euterpe.instruments import Maracas
     from euterpe.sound.core import render
