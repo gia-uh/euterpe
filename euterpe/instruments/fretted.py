@@ -24,7 +24,7 @@ from euterpe.instruments.plucked import (
     String,
     _string_of,
 )
-from euterpe.pitch import A1, A2, B3, D2, D3, E1, E2, E4, G2, G3, Pitch
+from euterpe.pitch import A1, A2, B3, C4, D2, D3, E1, E2, E4, G2, G3, G4, Pitch
 from euterpe.sound import Segments, Sine
 from euterpe.sound.core import RATE, Unit
 
@@ -232,6 +232,48 @@ class Guitar(Fretted):
                  string: String = Steel(), body: Soundboard | None = GuitarBody(), let_ring: bool = True,
                  mute: float = 0.08, level: float = 0.75, seed: int = 0):
         super().__init__(tuning, capo, exciter, string, body, let_ring, mute, level, seed)
+
+
+class Tres(Fretted):
+    """The Cuban tres: three courses of two steel strings tuned G4 C4 E4, played with a
+    plectrum through a guitar body. Every note sounds on both strings of its course: the G
+    course pairs G4 with G3, an octave below, and the other two are unisons. The second string
+    of a pair sits a few cents off the first, drawn per note, which gives a doubled course its
+    chorus. This model has 17 frets.
+
+    courses: for each course in tab order, the second string's ratio to the first (0.5 is an
+    octave below, 1.0 a unison); a tresero who tunes the E course in octaves passes
+    (0.5, 1.0, 0.5).
+
+    Techniques: those of Guitar, strum and pick, over three courses.
+
+    Limit: the two strings of a course are plucked at the same instant and do not couple, and
+    the body is a guitar's, larger than a tres's.
+    """
+
+    gm_program = 25
+    tuning = (G4, C4, E4)
+    frets = 17
+    polyphony = 3
+
+    def __init__(self, tuning: Sequence[Pitch] | None = None, capo: int = 0, exciter: Exciter = Plectrum(),
+                 string: String = Steel(), body: Soundboard | None = GuitarBody(), let_ring: bool = True,
+                 mute: float = 0.08, level: float = 0.6, courses: Sequence[float] = (0.5, 1.0, 1.0),
+                 seed: int = 0):
+        super().__init__(tuning, capo, exciter, string, body, let_ring, mute, level, seed)
+        if len(courses) != len(self.tuning):
+            raise ValueError(f"{len(courses)} course ratios for {len(self.tuning)} courses")
+        self.courses = tuple(courses)
+
+    def voice(self, note: Note) -> Unit:
+        course = _string_of(self, note)
+        n = len(self.tuning)
+        ratio = self.courses[n - course] if isinstance(course, int) and 1 <= course <= n else 1.0
+        traits = self.traits(course)
+        vary = self.vary(note)
+        cents = float(note.rng.uniform(-4.0, 4.0))
+        pair = self.pluck(note, note.freq, vary, traits) + self.pluck(note, note.freq * ratio * 2 ** (cents / 1200), vary, traits)
+        return self.finish(note, pair * (1 / math.sqrt(2)), vary[2] * (1 + traits[1]))
 
 
 class BassGuitar(Fretted):
