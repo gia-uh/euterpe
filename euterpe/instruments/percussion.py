@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Hashable
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -368,6 +369,110 @@ class Maracas(Struck):
             points += [(float(t), float(a)), (float(t + 0.35 * step), 0.0)]
         seeds = BandPass(WhiteNoise(_seed(note)), 5200.0 * tuning, 0.7) * Segments(points)
         return (shell + seeds * (1.6 * bright)) * (note.velocity * self.level * force)
+
+
+@dataclass(frozen=True)
+class Material:
+    """A scraped body's material as data: the shell's modes, and how its surface answers the
+    stick. modes are ratios over the body's pitch (tune, in Hz), each with its decay in
+    seconds and its amplitude; ridge is the rate in Hz at which the stick crosses ridges at
+    speed 1; brightness is the contact noise's high-pass cutoff in Hz at speed 1; noise is its
+    level."""
+
+    name: str
+    modes: tuple[float, ...]
+    decays: tuple[float, ...]
+    amps: tuple[float, ...]
+    tune: float
+    ridge: float
+    brightness: float
+    noise: float
+
+
+# A dried higüero gourd: few, low, quickly dying modes and wide carved grooves.
+GOURD = Material("gourd", (1.0, 1.83, 2.71, 3.91), (0.10, 0.06, 0.04, 0.025),
+                 (0.7, 0.4, 0.25, 0.15), 185.0, 150.0, 2200.0, 0.55)
+# The Dominican güira's brushed steel: higher, longer, more inharmonic modes and a finer surface.
+STEEL = Material("steel", (1.0, 2.42, 4.13, 6.35), (0.16, 0.10, 0.06, 0.035),
+                 (0.7, 0.45, 0.3, 0.2), 260.0, 210.0, 5200.0, 0.9)
+
+
+@dataclass
+class Scrape(Articulation):
+    """A stick dragged across a ridged surface: speed (0 to 1) is how fast it crosses the
+    ridges, so a slow drag is separate clicks and a fast one a bright rasp; pressure (0 to 1)
+    leans the stick into the surface, adding level and contact noise. Other instruments ignore
+    it."""
+
+    speed: float = 0.5
+    pressure: float = 0.5
+
+
+class Guiro(Struck):
+    """A güiro: a hollow gourd with parallel grooves, scraped with a stick. The stick crosses
+    the ridges at a rate set by its speed, so the same stroke is a row of separate clicks when
+    it is slow and a bright continuous rasp when it is fast; each crossing rings the shell's
+    modes. The material is data, so the same class is the Cuban gourd güiro (GOURD) and the
+    Dominican metal güira (STEEL).
+
+    tune: the shell's fundamental in Hz; a note's pitch retunes one scrape.
+    material: the shell's modes and surface (GOURD or STEEL).
+    level: the gain of one scrape at full velocity.
+    variation: how far each scrape's force and brightness move, as a fraction.
+    seed: which güiro of its make this is.
+
+    Limit: the ridges are regular, not the irregular carved grooves of a real güiro, and the
+    stick is not modelled on its own; a tap is the same model with a short, medium-speed stroke.
+    """
+
+    gm_program = 115
+
+    def __init__(self, tune: float | None = None, material: Material = GOURD, level: float = 0.3,
+                 variation: float = 0.06, seed: int = 0):
+        self.tune = material.tune if tune is None else tune
+        self.material, self.level, self.variation, self.seed = material, level, variation, seed
+
+    def scrape(self, at: float, length: float = 0.3, speed: float = 0.5, velocity: float = 0.8,
+               pressure: float = 0.5, pitch: Pitch | float | None = None) -> list[Note]:
+        """One stroke from at for length seconds at speed (0 to 1)."""
+        if not (np.isfinite(speed) and speed > 0):
+            raise ValueError(f"a scrape needs a speed above 0, got {speed:g}")
+        if not (np.isfinite(pressure) and 0.0 <= pressure <= 1.0):
+            raise ValueError(f"a scrape needs a pressure from 0 to 1, got {pressure:g}")
+        if not length > 0:
+            raise ValueError(f"a scrape needs a length above 0 s, got {length:g}")
+        return [Note(at, self.tune if pitch is None else pitch, length, velocity,
+                     Scrape(min(1.0, speed), pressure), resource=self)]
+
+    def _crossings(self, note: Note, speed: float) -> list[tuple[float, float]]:
+        """The stick's contacts: one click per ridge crossed, each dying in a third of a step."""
+        length = note.duration
+        n = max(1, int(np.ceil(length * self.material.ridge * speed)))
+        step = length / n
+        amps = note.rng.uniform(0.55, 1.0, n)
+        points: list[tuple[float, float]] = [(0.0, 0.0)]
+        for i, a in enumerate(amps):
+            t = i * step
+            points += [(float(t), float(a)), (float(t + 0.35 * step), 0.0)]
+        points.append((float(length), 0.0))
+        return points
+
+    def voice(self, note: Note) -> Unit:
+        force, bright, tuning = self.vary(note)
+        stroke = note.articulation if isinstance(note.articulation, Scrape) else Scrape()
+        speed, pressure = stroke.speed, stroke.pressure
+        f0 = float(note.freq) * tuning
+        m = self.material
+        # A faster stick crosses more ridges a second: more clicks, more high harmonics. It also
+        # presses harder and lifts more grit, so the contact noise is louder and reaches higher.
+        noise_cut = m.brightness * (0.25 + 0.75 * speed)
+        gain = 0.35 + 0.65 * speed
+        crossings = self._crossings(note, speed)
+        body = Modal([f0 * r for r in m.modes], [d * (0.7 + 0.3 * pressure) for d in m.decays],
+                     [a * bright for a in m.amps], excite=Segments(crossings))
+        grit = HighPass(WhiteNoise(_seed(note)), noise_cut) * Segments(crossings) * m.noise
+        return (body * 0.06 + grit * (0.12 + 0.5 * speed)) * (
+            note.velocity * self.level * force * gain * (0.5 + 0.5 * pressure))
 
 
 METAL = (205.3, 304.4, 369.6, 522.7, 540.0, 800.0)  # six square waves that beat as metal, in Hz
