@@ -534,6 +534,75 @@ class Tambora(Struck):
         return sound * (note.velocity * self.level * force)
 
 
+class Bata(Struck):
+    """Batá: a Cuban set of three double-headed hourglass drums, the iyá (largest), the itótele
+    (middle) and the okónkolo (smallest). Each drum has a large head, the enu, and a small head,
+    the chacha, of different diameter and pitch; both are played by hand. A hit names its drum
+    and its head. No articulation is an open stroke that lets the membrane ring; Muted() is a
+    stroke with the hand left on the head, shorter and duller.
+
+    pitches: drum name to its two head pitches in Hz, largest drum first. decay: an open stroke's
+    seconds to fall 60 dB, shorter on a small head. level: the gain of one stroke at full
+    velocity. variation: how far each hit's force and brightness move, as a fraction.
+    seed: which set of its make this is.
+
+    The default pitches are model choices, not measured: batá are tuned by ear and by the
+    tension of their hide lacing. Limit: each head is the five lowest modes of an ideal
+    membrane; the shell's air coupling between the two heads, the lacing and the hands are not
+    modelled, so a stroke on one head does not colour the other.
+    """
+
+    gm_program = 116
+    drums = ("iya", "itotele", "okonkolo")
+    heads = ("enu", "chacha")
+
+    def __init__(self, pitches: dict[str, dict[str, float]] | None = None, decay: float = 0.6,
+                 level: float = 0.55, variation: float = 0.08, seed: int = 0):
+        self.pitches = pitches or {
+            "iya": {"enu": 80.0, "chacha": 160.0},
+            "itotele": {"enu": 110.0, "chacha": 220.0},
+            "okonkolo": {"enu": 150.0, "chacha": 320.0},
+        }
+        if set(self.pitches) != set(self.drums):
+            raise ValueError(f"a batá has an iyá, an itótele and an okónkolo, got {', '.join(self.pitches)}")
+        for drum, heads in self.pitches.items():
+            if set(heads) != set(self.heads):
+                raise ValueError(f"a batá drum has an enu and a chacha, {drum} has {', '.join(heads)}")
+        self.decay, self.level, self.variation, self.seed = decay, level, variation, seed
+        self.tune = min(heads["enu"] for heads in self.pitches.values())
+
+    def hit(self, at: float, velocity: float = 0.8, pitch: Pitch | float | None = None,
+            articulation: Articulation | None = None, drum: str = "iya", head: str = "enu") -> list[Note]:
+        """One stroke at time at on drum (iya, itotele, okonkolo) and head (enu, chacha)."""
+        if drum not in self.drums:
+            raise ValueError(f"a batá has an iyá, an itótele and an okónkolo, not {drum!r}")
+        if head not in self.heads:
+            raise ValueError(f"a batá drum has an enu and a chacha, not {head!r}")
+        tune = self.pitches[drum][head]
+        return [Note(at, tune if pitch is None else pitch, 0.1, velocity, articulation,
+                     resource=f"{drum}-{head}")]
+
+    def resource(self, note: Note) -> Hashable | None:
+        """The head: a new stroke there stops the one still ringing, while the other head goes on."""
+        return note.resource
+
+    def voice(self, note: Note) -> Unit:
+        force, bright, tuning = self.vary(note)
+        f0 = float(note.freq) * tuning
+        head = str(note.resource).rsplit("-", 1)[-1]
+        small = head == "chacha"
+        muted = isinstance(note.articulation, Muted)
+        decay = self.decay * (0.6 if small else 1.0) * (0.2 if muted else 1.0)
+        b = min(1.0, bright * (0.5 + 0.5 * note.velocity)) * (0.45 if muted else 1.0)
+        upper = (0.6, 0.4, 0.3, 0.22) if small else (0.45, 0.3, 0.22, 0.16)
+        shell = Modal([f0 * r for r in MEMBRANE],
+                      [decay * k for k in (1.0, 0.6, 0.45, 0.4, 0.35)],
+                      [1.0, *(a * b for a in upper)])
+        skin = BandPass(WhiteNoise(_seed(note)), (2800.0 if small else 1500.0), 1.0) * fall(
+            0.006 if small else 0.012) * ((0.45 if small else 0.3) * (0.5 if muted else 1.0) * b)
+        return (shell + skin) * (note.velocity * self.level * force)
+
+
 class Maracas(Struck):
     """Maracas: a pair of dried gourds on wooden handles, each filled with seeds, one in each
     hand. The lower gourd is the macho and the higher the hembra. A shake throws the seeds
