@@ -455,6 +455,85 @@ class Tumbadora(Struck):
         return (head + skin) * (note.velocity * self.level * force)
 
 
+class Tambora(Struck):
+    """A Dominican tambora: one cylindrical body of boards or a salvaged rum barrel, two hide
+    heads laced to each other, played on its side. One head, the palo, is struck with a short
+    wooden stick; the other, the mano, with the bare hand. The air inside the body couples the
+    heads, so a stroke on either makes the other answer at its own pitch; that second tone under
+    the strike is what gives the drum its open, two-headed sound.
+
+    palo, mano: each head's pitch in Hz; the model's stick head is the higher and brighter one.
+    decay: an open stroke's seconds to fall 60 dB.
+    coupling: how much of a stroke reaches the other head, from 0 (two heads that do not hear
+    each other) to 1 (the other head as loud as the struck one).
+    travel: the seconds the pressure takes to cross the body before the other head answers.
+    level: the gain of one stroke at full velocity.
+    variation: how far each hit's force and brightness move, as a fraction.
+    seed: which tambora of its make this is.
+
+    A note's resource is the head it was struck on; a new stroke on a head stops the one still
+    ringing there, while the other head goes on. Muted() is a damped stroke: shorter, softer and
+    duller, on either head.
+
+    Limit: each head is the five lowest modes of an ideal membrane; the body's own resonances
+    and the lacing are not modelled, and the other head answers with its own modes rather than
+    the two heads' true coupled normal modes.
+    """
+
+    gm_program = 116
+    drums = ("palo", "mano")
+
+    def __init__(self, palo: float = 170.0, mano: float = 110.0, decay: float = 0.55,
+                 coupling: float = 0.4, travel: float = 0.003, level: float = 0.6,
+                 variation: float = 0.08, seed: int = 0):
+        if not 0.0 <= coupling <= 1.0:
+            raise ValueError(f"a tambora's coupling goes from 0 to 1, got {coupling:g}")
+        if travel < 0:
+            raise ValueError(f"a tambora's travel cannot be negative, got {travel:g} s")
+        self.palo, self.mano, self.decay = palo, mano, decay
+        self.coupling, self.travel = coupling, travel
+        self.level, self.variation, self.seed = level, variation, seed
+        self.tune = mano
+
+    def hit(self, at: float, velocity: float = 0.8, pitch: Pitch | float | None = None,
+            articulation: Articulation | None = None, drum: str = "mano") -> list[Note]:
+        """One stroke at time at on drum, palo (with the stick) or mano (with the hand)."""
+        if drum not in self.drums:
+            raise ValueError(f"a tambora has a palo and a mano, not {drum!r}")
+        tune = self.palo if drum == "palo" else self.mano
+        return [Note(at, tune if pitch is None else pitch, 0.1, velocity, articulation, resource=drum)]
+
+    def resource(self, note: Note) -> Hashable | None:
+        """The head: a new stroke on it stops the one still ringing there, and the other head goes on."""
+        return note.resource
+
+    def voice(self, note: Note) -> Unit:
+        force, bright, tuning = self.vary(note)
+        f0 = float(note.freq) * tuning
+        stick = note.resource == "palo"
+        muted = isinstance(note.articulation, Muted)
+        # A stick is harder and brighter than the hand, and its contact is a shorter click.
+        decay = self.decay * (0.85 if stick else 1.0) * (0.18 if muted else 1.0)
+        b = min(1.0, bright * (0.5 + 0.5 * note.velocity)) * (0.45 if muted else 1.0)
+        upper = (0.7, 0.5, 0.38, 0.3) if stick else (0.45, 0.3, 0.22, 0.16)
+        head = Modal([f0 * r for r in MEMBRANE],
+                     [decay * k for k in (1.0, 0.6, 0.45, 0.4, 0.35)],
+                     [1.0, *(a * b for a in upper)])
+        skin = BandPass(WhiteNoise(_seed(note)), (3200.0 if stick else 1400.0) * (0.5 if muted else 1.0), 1.0) * fall(
+            0.005 if stick else 0.011) * ((0.55 if stick else 0.3) * (0.5 if muted else 1.0) * b)
+        sound = head + skin
+        # The air in the barrel carries the stroke to the other head, which answers at its own
+        # pitch: this coupling is what makes one body sound like a two-headed drum.
+        if self.coupling:
+            other = self.mano if stick else self.palo
+            reach = self.coupling * (0.5 if muted else 1.0)
+            answer = Modal([other * r for r in MEMBRANE],
+                           [decay * 0.9 * k for k in (1.0, 0.6, 0.45, 0.4, 0.35)],
+                           [reach, 0.3 * reach, 0.2 * reach, 0.15 * reach, 0.1 * reach])
+            sound = sound + answer * Segments([(0.0, 0.0), (self.travel, 1.0)])
+        return sound * (note.velocity * self.level * force)
+
+
 class Maracas(Struck):
     """Maracas: a pair of dried gourds on wooden handles, each filled with seeds, one in each
     hand. The lower gourd is the macho and the higher the hembra. A shake throws the seeds
