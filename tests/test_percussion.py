@@ -239,6 +239,37 @@ def test_tumbadora_refuses_a_fourth_drum_and_an_unknown_one():
         Tumbadora().hit(0.0, drum="requinto")
 
 
+def test_tambora_heads_sound_their_own_pitch_and_a_muted_stroke_dies_sooner():
+    from euterpe.instruments import Muted, Tambora
+    from euterpe.sound.core import render
+    from tests.helpers import peak_hz
+    tambora = Tambora(variation=0.0, coupling=0.0)
+    palo = render(tambora.play(tambora.hit(0.0, drum="palo")), 0.8)
+    mano = render(tambora.play(tambora.hit(0.0, drum="mano")), 0.8)
+    muted = render(tambora.play(tambora.hit(0.0, drum="mano", articulation=Muted())), 0.8)
+    assert abs(peak_hz(palo) - 170) < 10 and abs(peak_hz(mano) - 110) < 10
+    ring = lambda x: np.abs(np.asarray(x)[int(0.1 * 48000):int(0.2 * 48000)]).max() / np.abs(x).max()
+    assert ring(muted) < ring(mano) / 4
+
+
+def test_the_other_tambora_head_answers_through_the_air():
+    from euterpe.instruments import Tambora
+    from euterpe.sound.core import render
+    from tests.helpers import band_db
+    hit = lambda t: np.asarray(render(t.play(t.hit(0.0, velocity=1.0, drum="palo")), 0.6))
+    closed, coupled = Tambora(variation=0.0, coupling=0.0), Tambora(variation=0.0, coupling=0.4)
+    # The stick head alone has no mode near the hand head's 110 Hz; with the coupling it does.
+    assert band_db(hit(coupled), 100, 120) > band_db(hit(closed), 100, 120) + 10
+
+
+def test_tambora_refuses_a_third_head_and_a_coupling_outside_zero_and_one():
+    from euterpe.instruments import Tambora
+    with pytest.raises(ValueError, match="palo and a mano"):
+        Tambora().hit(0.0, drum="aro")
+    with pytest.raises(ValueError, match="coupling"):
+        Tambora(coupling=1.5)
+
+
 def test_maracas_seeds_make_a_broadband_rattle_and_not_a_knock():
     from euterpe.instruments import Maracas
     from euterpe.sound.core import render
