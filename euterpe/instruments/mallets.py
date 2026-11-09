@@ -10,7 +10,7 @@ import numpy as np
 from euterpe.instruments.core import Note
 from euterpe.instruments.percussion import Mallet, Struck
 from euterpe.instruments.plucked import Tolerance
-from euterpe.pitch import C2, C3, C4, C5, C6, C7, C8, F4, F7, G5
+from euterpe.pitch import C2, C3, C4, C5, C6, C7, C8, D4, E4, F4, F6, F7, G5
 from euterpe.sound import Modal
 from euterpe.sound.core import Unit
 
@@ -101,6 +101,32 @@ class Xylophone(Barred):
                  mallet: Mallet | None = None, decay: float = 0.3, resonator: bool = True, level: float = 0.5,
                  variation: float = 0.08, seed: int = 0):
         super().__init__(bar, mallet or Mallet(0.85), decay, resonator, level, variation, seed)
+
+
+class Steelpan(Barred):
+    """A tenor steelpan: a concave playing surface hammered into one end of a steel drum, its
+    oval note areas struck with sticks tipped with rubber. The drum's open side, the skirt,
+    hangs under the notes and lifts the fundamental.
+
+    The note areas are tuned, not left as a free bar: the octave (2:1) and the twelfth (3:1)
+    ring with the fundamental, and a fourth partial at the double octave is weaker still. That
+    harmonic tuning is what makes a pan shimmer instead of clanging, and it is why a note keeps
+    its pitch from stroke to stroke. A low-C tenor runs from C4 to E6 and a high-C one from D4 to
+    F6; lower pans have larger note areas and fewer of them.
+
+    Limit: one note is three or four modes of a flat area; the concave surface, the groove
+    between notes and the coupling of neighbouring notes are not modelled.
+    """
+
+    gm_program = 114
+    playable = (C4, F6)
+    comfortable = (E4, C6)
+    PARTIALS = (1.0, 2.0, 3.0, 4.0)  # the fundamental, its octave, its twelfth, its double octave
+
+    def __init__(self, bar: Bar = Bar(PARTIALS, (1.0, 0.5, 0.32, 0.2), (1.0, 0.3, 0.14, 0.07)),
+                 mallet: Mallet | None = None, decay: float = 0.8, skirt: bool = True, level: float = 0.55,
+                 variation: float = 0.06, seed: int = 0):
+        super().__init__(bar, mallet or Mallet(0.6), decay, skirt, level, variation, seed)
 
 
 class Glockenspiel(Barred):
