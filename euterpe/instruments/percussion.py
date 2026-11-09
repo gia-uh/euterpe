@@ -239,6 +239,35 @@ class Clap(Struck):
         return BandPass(noise, float(note.freq) * tuning, 1.2 * bright) * (note.velocity * self.level * force * 2.0)
 
 
+FREE_BAR = (1.0, 2.756, 5.404)  # a bar free at both ends: its lowest bending modes, over its fundamental
+
+
+class Claves(Struck):
+    """Claves: two hardwood sticks. The resting one, held lightly over a cupped hand, rings as a
+    free bar, its three lowest modes at 1, 2.756 and 5.404 times tune and dying in decay seconds;
+    the striking one adds a click a few milliseconds long.
+
+    tune: the resting stick's fundamental in Hz. decay: seconds for it to fall 60 dB; a tighter
+    grip shortens it.
+
+    Limit: the cupped hand's resonance is not modelled, only the shorter ring it allows, and the
+    striking stick does not ring.
+    """
+
+    gm_program = 115
+
+    def __init__(self, tune: float = 2500.0, decay: float = 0.22, level: float = 0.5,
+                 variation: float = 0.05, seed: int = 0):
+        self.tune, self.decay, self.level, self.variation, self.seed = tune, decay, level, variation, seed
+
+    def voice(self, note: Note) -> Unit:
+        force, bright, tuning = self.vary(note)
+        f0 = float(note.freq) * tuning
+        b = min(1.0, bright * (0.6 + 0.4 * note.velocity))
+        bar = Modal([f0 * r for r in FREE_BAR], [self.decay, self.decay * 0.4, self.decay * 0.2], [1.0, 0.35 * b, 0.15 * b])
+        click = HighPass(WhiteNoise(_seed(note)), 4000.0) * fall(0.004) * (0.25 * b)
+        return (bar + click) * (note.velocity * self.level * force)
+
 METAL = (205.3, 304.4, 369.6, 522.7, 540.0, 800.0)  # six square waves that beat as metal, in Hz
 
 

@@ -157,3 +157,14 @@ def test_a_decay_of_zero_names_the_decay():
         fall(0)
     with pytest.raises(ValueError, match="decay"):
         Kick(decay=0).play(Kick().hit(0.0)).take(0.01)
+
+
+def test_claves_ring_at_their_tune_with_a_free_bar_overtone_and_die_fast():
+    from euterpe.instruments import Claves
+    from euterpe.sound.core import render
+    from tests.helpers import band_db, peak_hz
+    claves = Claves(tune=2500.0, variation=0.0)
+    x = render(claves.play(claves.hit(0.0)), 0.6)
+    assert abs(peak_hz(x) - 2500.0) < 25
+    assert band_db(x, 6800, 6980) > band_db(x, 4900, 5100) + 15   # the 2.756 overtone, not a harmonic 2
+    assert np.abs(x[len(x) // 2:]).max() < 0.01 * np.abs(x).max()   # 40 dB down after 0.3 s
