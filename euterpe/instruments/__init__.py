@@ -26,7 +26,7 @@ from euterpe.instruments.chip import (
     WaveChannel,
 )
 from euterpe.instruments.bowed import Bowed, Bowing, StringSection, Violin
-from euterpe.instruments.fretted import BassGuitar, Electric, ElectricBass, ElectricGuitar, Fretted, Guitar, Shape
+from euterpe.instruments.fretted import BassGuitar, Electric, ElectricBass, ElectricGuitar, Fretted, Guitar, Shape, Tres
 from euterpe.instruments.keys import ElectricPiano, Organ
 from euterpe.instruments.winds import Blown, BrassSection, Breath, Clarinet, Flute
 from euterpe.instruments.synths import AcidBass, Lead, Pad, Patch, Supersaw, SynthPluck
@@ -120,6 +120,7 @@ __all__ = [
     "Finger",
     "Fretted",
     "Guitar",
+    "Tres",
     "GuitarBody",
     "Gut",
     "Harp",

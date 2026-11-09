@@ -103,3 +103,25 @@ def test_a_shape_must_stay_on_the_fingerboard():
 def test_strum_keeps_hz_pitches():
     notes = Guitar().strum([110.0, 445.0], at=0.0, length=0.5)
     assert sorted(n.pitch for n in notes) == [110.0, 445.0]
+
+
+def test_the_tres_strums_its_three_courses_in_c():
+    from euterpe.instruments import Tres
+    notes = Tres().strum(Shape(0, 0, 0), at=0.0, length=0.5)
+    assert [n.resource for n in notes] == [3, 2, 1] and [n.pitch for n in notes] == [G4, C4, E4]
+
+
+def test_the_tres_g_course_sounds_its_lower_octave_and_the_c_course_does_not():
+    from euterpe.instruments import Tres
+    from tests.helpers import band_db, peak_hz
+    tres = Tres(body=None)
+    g = tres.play(tres.pick(3, 0, at=0.0, length=1.0)).take(1.0)
+    c = tres.play(tres.pick(2, 0, at=0.0, length=1.0)).take(1.0)
+    assert band_db(g, 190, 202) > band_db(g, 150, 180) + 20   # G3 at 196 Hz
+    assert band_db(c, 125, 137) < band_db(c, 255, 268) - 20   # no C3 at 131 Hz under C4
+
+
+def test_the_tres_wants_one_ratio_per_course():
+    from euterpe.instruments import Tres
+    with pytest.raises(ValueError, match="2 course ratios for 3"):
+        Tres(courses=(0.5, 1.0))
