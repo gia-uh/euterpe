@@ -333,7 +333,7 @@ class Maracas(Struck):
     hands = ("izq", "der")
 
     def __init__(self, macho: float = 230.0, hembra: float = 310.0, decay: float = 0.05,
-                 spread: float = 0.055, level: float = 0.55, variation: float = 0.1, seed: int = 0):
+                 spread: float = 0.055, level: float = 0.8, variation: float = 0.1, seed: int = 0):
         if not spread > 0:
             raise ValueError(f"Maracas needs a spread above 0 s, got {spread:g}: the seeds need time to strike")
         self.macho, self.hembra, self.decay, self.spread = macho, hembra, decay, spread
