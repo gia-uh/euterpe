@@ -270,6 +270,41 @@ def test_tambora_refuses_a_third_head_and_a_coupling_outside_zero_and_one():
         Tambora(coupling=1.5)
 
 
+def test_bata_each_drum_has_two_heads_of_unequal_pitch_and_the_drums_rise():
+    from euterpe.instruments import Bata
+    from euterpe.sound.core import render
+    from tests.helpers import peak_hz
+    bata = Bata(variation=0.0)
+    heads = {drum: {head: render(bata.play(bata.hit(0.0, drum=drum, head=head)), 0.8)
+                    for head in ("enu", "chacha")} for drum in ("iya", "itotele", "okonkolo")}
+    for drum, pair in heads.items():
+        assert abs(peak_hz(pair["enu"]) - bata.pitches[drum]["enu"]) < 5
+        assert abs(peak_hz(pair["chacha"]) - bata.pitches[drum]["chacha"]) < 8
+        assert peak_hz(pair["chacha"]) > 1.5 * peak_hz(pair["enu"])  # the small head is the high one
+    enu = [peak_hz(heads[drum]["enu"]) for drum in ("iya", "itotele", "okonkolo")]
+    assert enu[0] < enu[1] < enu[2]  # largest drum lowest, smallest highest
+
+
+def test_bata_heads_are_separate_resources_and_a_muted_stroke_dies_sooner():
+    from euterpe.instruments import Bata, Muted
+    from euterpe.sound.core import render
+    bata = Bata(variation=0.0)
+    assert bata.resource(bata.hit(0.0, drum="iya", head="enu")[0]) == "iya-enu"
+    assert bata.resource(bata.hit(0.0, drum="iya", head="chacha")[0]) == "iya-chacha"
+    open_tone = render(bata.play(bata.hit(0.0, drum="iya", head="chacha")), 0.8)
+    muted = render(bata.play(bata.hit(0.0, drum="iya", head="chacha", articulation=Muted())), 0.8)
+    ring = lambda x: np.abs(np.asarray(x)[int(0.1 * 48000):int(0.2 * 48000)]).max() / np.abs(x).max()
+    assert ring(muted) < ring(open_tone) / 4
+
+
+def test_bata_refuses_an_unknown_drum_or_head():
+    from euterpe.instruments import Bata
+    with pytest.raises(ValueError, match="iyá, an itótele and an okónkolo"):
+        Bata().hit(0.0, drum="tumba")
+    with pytest.raises(ValueError, match="enu and a chacha"):
+        Bata().hit(0.0, head="centro")
+
+
 def test_maracas_seeds_make_a_broadband_rattle_and_not_a_knock():
     from euterpe.instruments import Maracas
     from euterpe.sound.core import render
