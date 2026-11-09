@@ -187,3 +187,30 @@ def test_bongo_refuses_a_third_drum():
     from euterpe.instruments import Bongo
     with pytest.raises(ValueError, match="macho and a hembra"):
         Bongo().hit(0.0, drum="tumba")
+
+
+def test_maracas_seeds_make_a_broadband_rattle_and_not_a_knock():
+    from euterpe.instruments import Maracas
+    from euterpe.sound.core import render
+    from tests.helpers import band_db
+    maracas = Maracas(variation=0.0)
+    x = np.asarray(render(maracas.play(maracas.hit(0.0, velocity=1.0)), 0.3))
+    assert band_db(x, 3000, 12000) > -20  # the seeds: broadband, where the bare shell is nearly silent
+    assert np.sum(np.diff(np.sign(x)) != 0) > 400  # a train of impacts, not one low tone
+
+
+def test_maracas_macho_and_hembra_each_sound_their_own_gourd():
+    from euterpe.instruments import Maracas
+    from euterpe.sound.core import render
+    from tests.helpers import band_db
+    maracas = Maracas(variation=0.0)
+    left = np.asarray(render(maracas.play(maracas.hit(0.0, velocity=1.0, hand="izq")), 0.2))
+    right = np.asarray(render(maracas.play(maracas.hit(0.0, velocity=1.0, hand="der")), 0.2))
+    assert band_db(left, 200, 260) > band_db(right, 200, 260) + 10
+    assert band_db(right, 280, 350) > band_db(left, 280, 350) + 10
+
+
+def test_maracas_refuses_a_third_hand():
+    from euterpe.instruments import Maracas
+    with pytest.raises(ValueError, match="left and a right hand"):
+        Maracas().hit(0.0, hand="centro")

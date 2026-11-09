@@ -31,7 +31,7 @@ from euterpe.instruments.keys import ElectricPiano, Organ
 from euterpe.instruments.winds import Blown, BrassSection, Breath, Clarinet, Flute
 from euterpe.instruments.synths import AcidBass, Lead, Pad, Patch, Supersaw, SynthPluck
 from euterpe.instruments.mallets import Bar, Barred, Celesta, Glockenspiel, Marimba, Xylophone
-from euterpe.instruments.percussion import Bongo, Claves, Muted, Clap, Crash, Cymbal, HiHat, Kick, Kit, Mallet, Open, Ride, Snare, Stomp, Struck, Timpani, Tom
+from euterpe.instruments.percussion import Bongo, Claves, Maracas, Muted, Clap, Crash, Cymbal, HiHat, Kick, Kit, Mallet, Open, Ride, Snare, Stomp, Struck, Timpani, Tom
 from euterpe.instruments.phrase import Phrase
 from euterpe.instruments.plucked import (
     BassBody,
@@ -123,6 +123,7 @@ __all__ = [
     "Tres",
     "Claves",
     "Bongo",
+    "Maracas",
     "Muted",
     "GuitarBody",
     "Gut",

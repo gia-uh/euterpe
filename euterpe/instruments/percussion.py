@@ -314,6 +314,62 @@ class Bongo(Struck):
         skin = BandPass(WhiteNoise(_seed(note)), 900.0 if muted else 2500.0, 1.0) * fall(0.012) * (0.6 if muted else 0.25)
         return (head + skin) * (note.velocity * self.level * force)
 
+
+class Maracas(Struck):
+    """Maracas: a pair of dried gourds on wooden handles, each filled with seeds, one in each
+    hand. The lower gourd is the macho and the higher the hembra. A shake throws the seeds
+    against the shell: a dense train of tiny impacts, broadband, over the shell's short modal
+    ring. A hit names its hand, izq or der; each hand is its own resource, so a second shake
+    on one hand cuts the one still ringing there while the other hand goes on.
+
+    macho, hembra: each gourd's shell pitch in Hz. decay: the shell's seconds to fall 60 dB.
+    spread: how long the seeds keep striking, in seconds.
+
+    Limit: the seeds are a train of gated noise, not a few hundred separate beads, and the two
+    gourds differ only in pitch, not in the number or size of their seeds.
+    """
+
+    gm_program = 112
+    hands = ("izq", "der")
+
+    def __init__(self, macho: float = 230.0, hembra: float = 310.0, decay: float = 0.05,
+                 spread: float = 0.055, level: float = 0.8, variation: float = 0.1, seed: int = 0):
+        if not spread > 0:
+            raise ValueError(f"Maracas needs a spread above 0 s, got {spread:g}: the seeds need time to strike")
+        self.macho, self.hembra, self.decay, self.spread = macho, hembra, decay, spread
+        self.level, self.variation, self.seed = level, variation, seed
+        self.tune = macho
+
+    def hit(self, at: float, velocity: float = 0.8, pitch: Pitch | float | None = None,
+            articulation: Articulation | None = None, hand: str = "izq") -> list[Note]:
+        """One shake at time at, in the hand izq (the macho) or der (the hembra)."""
+        if hand not in self.hands:
+            raise ValueError(f"a pair of maracas has a left and a right hand, not {hand!r}")
+        tune = self.macho if hand == "izq" else self.hembra
+        return [Note(at, tune if pitch is None else pitch, 0.1, velocity, articulation, resource=hand)]
+
+    def resource(self, note: Note) -> Hashable | None:
+        """The hand: a new shake on it stops the one still ringing there, and the other hand goes on."""
+        return note.resource
+
+    def voice(self, note: Note) -> Unit:
+        force, bright, tuning = self.vary(note)
+        f0 = float(note.freq) * tuning
+        shell = Modal([f0, f0 * 2.31, f0 * 4.02], [self.decay, self.decay * 0.5, self.decay * 0.3],
+                      [0.6, 0.25 * bright, 0.12 * bright])
+        # The seeds: grains whose density and force fall over spread seconds, each a click of
+        # band-passed noise. Their train is what makes the sound a rattle and not a knock.
+        n = max(12, int(self.spread * 420))
+        step = self.spread / n
+        times = np.arange(n) * step + note.rng.uniform(0.0, 0.4 * step, n)
+        amps = np.exp(-times / (0.55 * self.spread)) * note.rng.uniform(0.35, 1.0, n)
+        points = [(0.0, 0.0)]
+        for t, a in zip(times, amps):
+            points += [(float(t), float(a)), (float(t + 0.35 * step), 0.0)]
+        seeds = BandPass(WhiteNoise(_seed(note)), 5200.0 * tuning, 0.7) * Segments(points)
+        return (shell + seeds * (1.6 * bright)) * (note.velocity * self.level * force)
+
+
 METAL = (205.3, 304.4, 369.6, 522.7, 540.0, 800.0)  # six square waves that beat as metal, in Hz
 
 
