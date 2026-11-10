@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from euterpe.instruments import Blown, BrassSection, Breath, Clarinet, Flute, Legato, Note, Staccato
+from euterpe.instruments import Blown, BrassSection, Breath, Clarinet, FiveKeyFlute, Flute, Legato, Note, Staccato
 from euterpe.lint import lint_audio, lint_notes
-from euterpe.pitch import A2, A4, B4, C4
+from euterpe.pitch import A2, A4, B4, C4, E7
 from euterpe.sound import Jet, Lips, Reed
 from euterpe.sound.core import RATE, render
 from tests.helpers import peak_hz
@@ -98,3 +98,28 @@ def test_the_presets_keep_their_parts():
     assert isinstance(c.mouth, Reed) and c.breath.noise == 0.02 and c.vibrato.cents == 0
     assert isinstance(b.mouth, Lips) and b.players == 3 and b.vibrato.cents == 6.0 and b.polyphony == 8
     assert f.polyphony == c.polyphony == 1
+
+
+def _band(x, hz, width=20.0):
+    power = np.abs(np.fft.rfft(np.asarray(x, np.float64) * np.hanning(len(x)))) ** 2
+    f = np.fft.rfftfreq(len(x), 1 / RATE)
+    return 10 * np.log10(power[(f > hz - width) & (f < hz + width)].sum() + 1e-12)
+
+
+def test_a_five_key_flute_has_a_wooden_tone_and_carries_its_cone_octave():
+    held = slice(int(0.2 * RATE), int(0.4 * RATE))
+    metal = render(Flute().note(A4, 0.4, 0.8), 0.45)[held]
+    wooden = render(FiveKeyFlute().note(A4, 0.4, 0.8), 0.45)[held]
+    # the wood keeps the note's fundamental and takes the metal flute's edge off it
+    assert abs(1200 * np.log2(peak_hz(wooden) / A4.freq)) < 30
+    assert _centroid(wooden) < 0.85 * _centroid(metal)
+    # a conical bore supports the octave that the cylinder's jet nearly cancels
+    octave = lambda x: _band(x, 2 * A4.freq) - _band(x, A4.freq)
+    assert octave(wooden) > octave(metal) + 2
+
+
+def test_a_five_key_flute_reaches_the_charanga_register():
+    inst = FiveKeyFlute()
+    y = render(inst.note(E7, 0.3, 0.9), 0.35)
+    assert abs(1200 * np.log2(peak_hz(y) / E7.freq)) < 30
+    assert not lint_notes(inst.play([(0.0, E7, 0.2, 0.9)])).errors

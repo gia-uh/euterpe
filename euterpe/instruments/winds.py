@@ -8,8 +8,8 @@ import math
 from dataclasses import dataclass
 
 from euterpe.instruments.core import Instrument, Note, Staccato, Vibrato, _hz
-from euterpe.pitch import A2, A5, A6, Bb6, C4, C6, D3, D4, D6, D7, E2, E3
-from euterpe.sound import Bore, Jet, Lips, Reed, Segments
+from euterpe.pitch import A2, A5, A6, Bb6, C4, C6, D3, D4, D6, D7, E2, E3, E7
+from euterpe.sound import Body, Bore, Jet, Lips, Reed, Segments
 from euterpe.sound.core import Unit
 
 RING = 0.05  # seconds the tube rings after the breath has stopped, before the voice ends
@@ -160,3 +160,47 @@ class BrassSection(Blown):
             detune, late, phase = note.rng.uniform((-self.detune, 0.0, 0.0), (self.detune, 0.02, 1.0))
             section = section + self.blow(note, float(detune), float(late), float(phase))
         return self.finish(note, section * (1 / math.sqrt(self.players)))
+
+
+WOOD = ((0.84, 0.06, 0.5), (2.0, 0.04, 1.0), (3.1, 0.02, 0.25))  # a wooden tube's modes: ratio to the note, decay, amp
+
+
+class FiveKeyFlute(Flute):
+    """The Cuban five-key flute of the charanga: a wooden, conical, simple-system flute with six
+    open finger holes and five keys (Bb, G#, C, F, D#), built in France in the 19th century. Its
+    players open the embouchure and push the head cork in, and spend most of a piece in the third
+    and fourth octaves, which is why it reaches E7 where the orchestral Flute stops at D7.
+
+    A note is the tube plus the wood around it: the body's modes at 0.84, 2 and 3.1 times the
+    note (a low resonance, the cone's octave and a bright one above it), with the direct sound at
+    dry and the bell set low, so the tone keeps its fundamental and loses the metal flute's edge.
+    A conical tube supports the even harmonics a cylinder's jet nearly cancels, so the octave is
+    a few decibels stronger than the Flute's.
+
+    mouth, breath, vibrato: as in Blown; the breath is a little noisier than a metal flute's.
+    bell: the bell's cutoff in harmonics of the note; the default keeps the wooden tone dark.
+    wood: the gain of the body's modes; dry: how much of the bare tube reaches the ear.
+    seed: which instrument of its make this is.
+
+    Techniques: those of Blown; one voice, legato slurs in one breath, staccato tongues.
+
+    Limit: no tone holes and no keys, so a fingering is only a pitch and every note is one tube
+    of the same shape; the head cork's position is a range, not a moving resonance; no flutter
+    tongue or harmonics fingering.
+    """
+
+    gm_program = 73
+    playable = (C4, E7)
+    comfortable = (D4, E7)
+
+    def __init__(self, mouth: Reed | Lips | Jet = Jet(), breath: Breath = Breath(noise=0.07),
+                 vibrato: Vibrato = Vibrato(rate=5.0, cents=12.0), bell: float = 3.2, wood: float = 0.9,
+                 dry: float = 0.6, level: float = 0.5, seed: int = 0):
+        super().__init__(mouth, breath, vibrato, bell, level, seed)
+        self.wood, self.dry = wood, dry
+
+    def voice(self, note: Note) -> Unit:
+        f = _hz(note.pitch)
+        body = Body(self.blow(note), [f * r for r, _, _ in WOOD], [t for _, t, _ in WOOD],
+                    [self.wood * a for _, _, a in WOOD], dry=self.dry)
+        return self.finish(note, body)
