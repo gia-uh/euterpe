@@ -8,8 +8,8 @@ import math
 from dataclasses import dataclass
 
 from euterpe.instruments.core import Instrument, Note, Staccato, Vibrato, _hz
-from euterpe.pitch import A2, A5, A6, Bb6, C4, C6, D3, D4, D6, D7, E2, E3, E7
-from euterpe.sound import Body, Bore, Jet, Lips, Reed, Segments
+from euterpe.pitch import A2, A5, A6, Bb6, C4, C6, D3, D4, D5, D6, D7, E2, E3, E7
+from euterpe.sound import Body, Bore, HighPass, Jet, Lips, LowPass, Reed, Saw, Segments, WhiteNoise
 from euterpe.sound.core import Unit
 
 RING = 0.05  # seconds the tube rings after the breath has stopped, before the voice ends
@@ -204,3 +204,61 @@ class FiveKeyFlute(Flute):
         body = Body(self.blow(note), [f * r for r, _, _ in WOOD], [t for _, t, _ in WOOD],
                     [self.wood * a for _, _, a in WOOD], dry=self.dry)
         return self.finish(note, body)
+
+
+FREE_REED_CASE = ((760.0, 0.09, 0.35), (1500.0, 0.06, 0.22), (3000.0, 0.04, 0.12))  # the reed block's modes
+
+
+def _seed(note: Note) -> int:
+    return int(note.rng.integers(2**31))
+
+
+class Accordion(Instrument):
+    """A button accordion: a free reed, its metal tongue beating in a slot as the bellows push air
+    through it, so the air is chopped into a wave with every harmonic, and the tongue's own spring
+    and mass set the note. Two reed ranks sound each note, the second tuned tremolo cents above the
+    first, as most accordions tune their two 8' ranks a fraction of a semitone apart: the pair beats
+    at their difference, and that slow wavering is the accordion's tremolo. The reed block and case
+    add fixed modes, which is why the tone keeps the same nasal colour across the range.
+
+    The bellows, not the buttons, make the expression: velocity is the pressure, which sets the
+    loudness and opens the tone's high harmonics, and a note speaks over a short attack as the
+    valve opens and falls over a release when the player lets the bellows rest.
+
+    tremolo: cents between the two reeds of a note; 0 leaves one reed and a steady tone.
+    cutoff: the low-pass on the reed's harmonics at full pressure, in Hz.
+    breath: the air's hiss through the slot, as a gain.
+    level: the gain of one note at full pressure.
+    seed: which instrument of its make this is.
+
+    Limit: the two reeds beat as two sawtooths added, not as a reed and its slot's true
+    nonlinear flow; the button keyboard's two rows, bisonoric notes and the left hand's chords
+    are the player's, not the model's; the case is three fixed modes.
+    """
+
+    gm_program = 21
+    playable = (D3, D6)
+    comfortable = (D4, D5)
+
+    def __init__(self, tremolo: float = 10.0, cutoff: float = 4200.0, breath: float = 0.012,
+                 level: float = 0.4, seed: int = 0):
+        if tremolo < 0:
+            raise ValueError(f"an accordion's tremolo cannot be negative, got {tremolo:g} cents")
+        self.tremolo, self.cutoff, self.breath = float(tremolo), float(cutoff), float(breath)
+        self.level, self.seed = level, seed
+        self.attack, self.release = 0.035, 0.09
+
+    def voice(self, note: Note) -> Unit:
+        f = _hz(note.pitch)
+        high = 2 ** (self.tremolo / 1200) if self.tremolo else 1.0
+        # The two ranks: each tongue is a saw, every harmonic at 1/k, one tuned above the other.
+        pair = (Saw(f) + Saw(f * high)) * 0.5
+        tone = Body(pair, [f0 for f0, _, _ in FREE_REED_CASE], [d for _, d, _ in FREE_REED_CASE],
+                    [a for _, _, a in FREE_REED_CASE], dry=0.68)
+        # A harder bellows pressure opens the high harmonics: the valve closes harder each cycle.
+        tone = LowPass(tone, self.cutoff * (0.55 + 0.45 * note.velocity))
+        held = max(note.duration, self.attack)
+        pressure = Segments([(0.0, 0.0), (self.attack, 1.0), (held, 1.0), (held + self.release, 0.0)])
+        air = HighPass(WhiteNoise(_seed(note)), 2200.0) * Segments(
+            [(0.0, 0.0), (self.attack, self.breath), (held, self.breath), (held + self.release, 0.0)])
+        return (tone * pressure + air) * (note.velocity * self.level)

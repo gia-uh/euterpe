@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from euterpe.instruments import Blown, BrassSection, Breath, Clarinet, FiveKeyFlute, Flute, Legato, Note, Staccato
+from euterpe.instruments import Accordion, Blown, BrassSection, Breath, Clarinet, FiveKeyFlute, Flute, Legato, Note, Staccato
 from euterpe.lint import lint_audio, lint_notes
 from euterpe.pitch import A2, A4, B4, C4, E7
 from euterpe.sound import Jet, Lips, Reed
@@ -123,3 +123,37 @@ def test_a_five_key_flute_reaches_the_charanga_register():
     y = render(inst.note(E7, 0.3, 0.9), 0.35)
     assert abs(1200 * np.log2(peak_hz(y) / E7.freq)) < 30
     assert not lint_notes(inst.play([(0.0, E7, 0.2, 0.9)])).errors
+
+
+def _envelope(x, hop=0.01):
+    a = np.asarray(x, np.float64)
+    n = int(hop * RATE)
+    m = len(a) // n
+    return np.sqrt((a[:m * n].reshape(m, n) ** 2).mean(axis=1))
+
+
+def _beat_depth(x, start=0.15, end=0.55):
+    env = _envelope(x)[int(start / 0.01):int(end / 0.01)]
+    return float((env.max() - env.min()) / (env.max() + env.min()))
+
+
+def test_an_accordion_beats_between_its_two_reed_ranks():
+    # two reeds ten cents apart beat at about 2.5 Hz on A4: the accordion's wavering tremolo
+    assert _beat_depth(render(Accordion(tremolo=10).note(A4, 0.7, 0.8), 0.8)) > 0.2
+    # one rank alone is steady
+    assert _beat_depth(render(Accordion(tremolo=0).note(A4, 0.7, 0.8), 0.8)) < 0.06
+
+
+def test_an_accordion_keeps_its_pitch_and_chops_the_air_into_every_harmonic():
+    held = slice(int(0.2 * RATE), int(0.4 * RATE))
+    y = render(Accordion(tremolo=0).note(A4, 0.4, 0.8), 0.45)[held]
+    assert abs(1200 * np.log2(peak_hz(y) / A4.freq)) < 10
+    # a free reed interrupts the flow, so the octave and the twelfth are strong, not just the root
+    for k in (2, 3):
+        assert _band(y, k * A4.freq) > _band(y, A4.freq) - 20
+
+
+def test_a_harder_bellows_is_brighter():
+    held = slice(int(0.15 * RATE), int(0.35 * RATE))
+    soft, hard = (render(Accordion(tremolo=0).note(A4, 0.4, v), 0.35)[held] for v in (0.3, 1.0))
+    assert _centroid(hard) > _centroid(soft)
