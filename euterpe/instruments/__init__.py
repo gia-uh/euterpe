@@ -29,7 +29,7 @@ from euterpe.instruments.bowed import Bowed, Bowing, StringSection, Violin
 from euterpe.instruments.fretted import BassGuitar, Cuatro, Electric, ElectricBass, ElectricGuitar, Fretted, Guitar, Laud, Shape, Tres
 from euterpe.instruments.keys import ElectricPiano, Organ
 from euterpe.instruments.lamellophones import Marimbula, MarimbulaBox
-from euterpe.instruments.winds import Blown, BrassSection, Breath, Clarinet, FiveKeyFlute, Flute
+from euterpe.instruments.winds import Accordion, Blown, BrassSection, Breath, Clarinet, FiveKeyFlute, Flute
 from euterpe.instruments.synths import AcidBass, Lead, Pad, Patch, Supersaw, SynthPluck
 from euterpe.instruments.mallets import Bar, Barred, Celesta, Glockenspiel, Marimba, Steelpan, Xylophone
 from euterpe.instruments.percussion import Bass, Bata, Bongo, Cajon, Claves, GOURD, STEEL, Guiro, Maracas, Material, Scrape, Slap, Muted, Clap, Crash, Cymbal, HiHat, Kick, Kit, Mallet, Open, Ride, Snare, Stomp, Struck, Tambora, Timpani, Tom, Tumbadora
@@ -69,6 +69,7 @@ __all__ = [
     "NoiseDrum",
     "PulseChannel",
     "WaveChannel",
+    "Accordion",
     "Blown",
     "Bowed",
     "BrassSection",
