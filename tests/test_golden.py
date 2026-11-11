@@ -43,14 +43,14 @@ PRESETS = {
 }
 
 HASHES = {
-    "Harp": "be28cf1d9e36f3f864c48b30b9492f098386f2ef88f3dc869df5e78ef9d4aca9",
-    "PizzicatoStrings": "86210fa58a1e857e2b58f658f9cbb2cbe72ee67092af43eb8f8193857101a131",
-    "Guitar": "6aadb6fa41d884aeccb0cdf86361362aa423aff511942f966d906a2ccd340ea9",
-    "BassGuitar": "f654018793a31e8f0e90c25e63a5f51db35857e9c1cad2b04943d4ead372c56c",
-    "ElectricGuitar": "af04e3ee56761f81d4fc946ff4372fae9fae6e08d774941110cc19193573587e",
-    "ElectricBass": "9c4266a2e92c422db3f800343b20cb11d0b66af81319f1db4aeca643ed1272bf",
-    "Violin": "6b27368df680f9dad57dfc47902d7f7bb21b6db5b91f46507791b1bbba8df7a6",
-    "StringSection": "8a7de68fdcc671092a45d5fe4a967b5dc0e6f5a2bbba7d0056d8ac2958efe52f",
+    "Harp": "b2ee93fbd88bc0d4a63f8298611fe8c6b26b235e531e70c2f34c2989d887b8b5",
+    "PizzicatoStrings": "870e4bccb2b2701768deb7a305cd29efa21f9df292f6b2d5f88c90398718fae2",
+    "Guitar": "bf2f3b3173b7c059bb75e2e42ffb055e96283791f3948834f982d07c758768f2",
+    "BassGuitar": "d3f6801dc6e50cac0b23f85bd677cde8c266c89335aae690bd90e610fc764611",
+    "ElectricGuitar": "d5f8d4f7d38532dcf6eb90ba6046bbab1f6aac4b4f1185c39634f0c155fe45fa",
+    "ElectricBass": "2f91288f79636ee898b641f7660de82d5c3f70dccf0d26de097323e8e50609e7",
+    "Violin": "ff0d3ee4c436f2b80b3d9312fccaa6b006fdd3a5f95d91f630e5834110e72f20",
+    "StringSection": "16bfa35bf9ad75c37e84cdeb1725d1304e5eb98cf4d21a78cb9769ae78ed32af",
     "Flute": "24c0863cfdf13954cc75fa178926052422b95ba8c0ab62e6414f246827a4a374",
     "Clarinet": "fc05a1156421817f78183eefbb7f988b8fcc3b56e0280312273506e41353cf8e",
     "BrassSection": "02a4203f6b658471641213481a356a232a8418c21372e045cd916ed9c81790c4",
@@ -69,7 +69,7 @@ HASHES = {
     "Kit": "ee3456cbbc2eb7257b85cfa171088ea6a3a3c1de9c72dfa937ab652ddb661485",
     "ClassicChip": "8f2502e3d01b5cd56db9221e1570945572c91148b6e4430cde86a86a20cfb411",
     "ModernChip": "a73a87704b90c5949b695e75fad3edcca1c1c47ee49fe57208fe0ab57667cfca",
-    "Score": "cc0565d3df07664c652081c67a2faec5c4ff0108cc2ea5f7b885455cdc7e8b1f",
+    "Score": "59c6e9ed5c71a4a1c9e96fb6a0bc1e65a8b65430374a2d2a28b6ca0bff9a617e",
 }
 
 

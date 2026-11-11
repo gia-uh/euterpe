@@ -91,7 +91,7 @@ class String:
     tolerance: how far each string of the instrument is from the ideal (Tolerance)."""
 
     damping: float = 0.997
-    tolerance: Tolerance = Tolerance(cents=3.0, level=0.05, decay=0.1)
+    tolerance: Tolerance = Tolerance(cents=1.5, level=0.05, decay=0.1)
 
 
 @dataclass(frozen=True)

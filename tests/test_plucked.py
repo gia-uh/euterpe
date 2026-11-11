@@ -112,12 +112,16 @@ def test_a_string_without_tolerance_is_exact():
     assert Guitar(string=Steel(tolerance=Tolerance())).traits(1) == (0.0, 0.0, 0.0)
 
 
+def test_a_string_is_at_most_a_cent_and_a_half_out_of_tune_by_default():
+    assert Steel().tolerance.cents == 1.5
+
+
 def test_a_string_sounds_its_detuned_pitch_on_every_note():
     from euterpe.instruments import Guitar
     from euterpe.pitch import E5
     from tests.helpers import peak_hz
     dark = Finger(position=0.0, brightness=0.0, variation=0.0)
-    g = next(g for g in (Guitar(seed=s, body=None, exciter=dark) for s in range(50)) if abs(g.traits(1)[0]) > 2)
+    g = next(g for g in (Guitar(seed=s, body=None, exciter=dark) for s in range(50)) if abs(g.traits(1)[0]) > 1)
     expected = E5.freq * 2 ** (g.traits(1)[0] / 1200)
     for at in (0.0, 1.0):
         x = np.asarray(g.play(g.pick(1, 12, at=at, length=1.0)).take(at + 1.0))
