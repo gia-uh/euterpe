@@ -237,13 +237,17 @@ class Guitar(Fretted):
 class Tres(Fretted):
     """The Cuban tres: three courses of two steel strings tuned G4 C4 E4, played with a
     plectrum through a guitar body. Every note sounds on both strings of its course: the G
-    course pairs G4 with G3, an octave below, and the other two are unisons. The second string
-    of a pair sits a few cents off the first, drawn per note, which gives a doubled course its
-    chorus. This model has 17 frets.
+    course pairs G4 with G3, an octave below, and the other two are unisons. The two strings of
+    a pair sit a few cents apart, one above and one below the note, drawn per note, which gives
+    a doubled course its chorus while the course stays on its pitch. A note the chord leaves
+    without a course (more notes than courses) sounds on a single string. This model has 17 frets.
 
     courses: for each course in tab order, the second string's ratio to the first (0.5 is an
     octave below, 1.0 a unison); a tresero who tunes the E course in octaves passes
     (0.5, 1.0, 0.5).
+    chorus: the widest gap, in cents, between the two strings of a unison course; an octave
+    course gets half of it, since a mistuned octave is heard sooner than a mistuned unison.
+    0 tunes every pair exactly.
 
     Techniques: those of Guitar, strum and pick, over three courses.
 
@@ -259,20 +263,24 @@ class Tres(Fretted):
     def __init__(self, tuning: Sequence[Pitch] | None = None, capo: int = 0, exciter: Exciter = Plectrum(),
                  string: String = Steel(), body: Soundboard | None = GuitarBody(), let_ring: bool = True,
                  mute: float = 0.08, level: float = 0.6, courses: Sequence[float] = (0.5, 1.0, 1.0),
-                 seed: int = 0):
+                 chorus: float = 3.0, seed: int = 0):
         super().__init__(tuning, capo, exciter, string, body, let_ring, mute, level, seed)
         if len(courses) != len(self.tuning):
             raise ValueError(f"{len(courses)} course ratios for {len(self.tuning)} courses")
         self.courses = tuple(courses)
+        self.chorus = chorus
 
     def voice(self, note: Note) -> Unit:
         course = _string_of(self, note)
         n = len(self.tuning)
-        ratio = self.courses[n - course] if isinstance(course, int) and 1 <= course <= n else 1.0
         traits = self.traits(course)
         vary = self.vary(note)
-        cents = float(note.rng.uniform(-4.0, 4.0))
-        pair = self.pluck(note, note.freq, vary, traits) + self.pluck(note, note.freq * ratio * 2 ** (cents / 1200), vary, traits)
+        if not (isinstance(course, int) and 1 <= course <= n):
+            return self.finish(note, self.pluck(note, note.freq, vary, traits), vary[2] * (1 + traits[1]))
+        ratio = self.courses[n - course]
+        half = float(note.rng.uniform(-0.5, 0.5)) * self.chorus * (1.0 if ratio == 1.0 else 0.5)
+        pair = (self.pluck(note, note.freq * 2 ** (-half / 1200), vary, traits)
+                + self.pluck(note, note.freq * ratio * 2 ** (half / 1200), vary, traits))
         return self.finish(note, pair * (1 / math.sqrt(2)), vary[2] * (1 + traits[1]))
 
 
@@ -282,8 +290,8 @@ class Laud(Tres):
     them, in fourths except the major third between the sixth and fifth, and a shorter neck
     than the Spanish laud: this model has 16 frets.
 
-    Every note sounds on both strings of its course, and the second string sits a few cents
-    off the first, drawn per note, which gives a doubled course its chorus.
+    Every note sounds on both strings of its course, a few cents apart around the note, drawn
+    per note, which gives a doubled course its chorus (chorus, as for Tres).
 
     courses: for each course in tab order, the second string's ratio to the first (0.5 is an
     octave below, 1.0 a unison); the default is six unisons, as the sources describe the
@@ -304,8 +312,8 @@ class Laud(Tres):
     def __init__(self, tuning: Sequence[Pitch] | None = None, capo: int = 0, exciter: Exciter = Plectrum(),
                  string: String = Steel(), body: Soundboard | None = GuitarBody(), let_ring: bool = True,
                  mute: float = 0.08, level: float = 0.6, courses: Sequence[float] = (1.0,) * 6,
-                 seed: int = 0):
-        super().__init__(tuning, capo, exciter, string, body, let_ring, mute, level, courses, seed)
+                 chorus: float = 3.0, seed: int = 0):
+        super().__init__(tuning, capo, exciter, string, body, let_ring, mute, level, courses, chorus, seed)
 
 
 class Cuatro(Tres):
@@ -314,8 +322,8 @@ class Cuatro(Tres):
     courses in unison and the two lowest in octaves, so the fifth course pairs B2 with B3 and
     the fourth E3 with E4. This model has 17 frets.
 
-    Every note sounds on both strings of its course, and the second string sits a few cents off
-    the first, drawn per note, which gives a doubled course its chorus.
+    Every note sounds on both strings of its course, a few cents apart around the note, drawn
+    per note, which gives a doubled course its chorus (chorus, as for Tres).
 
     courses: for each course in tab order, the second string's ratio to the first (2.0 is an
     octave above, 1.0 a unison); the default is the modern cuatro's stringing, with the two
@@ -336,8 +344,8 @@ class Cuatro(Tres):
     def __init__(self, tuning: Sequence[Pitch] | None = None, capo: int = 0, exciter: Exciter = Plectrum(),
                  string: String = Steel(), body: Soundboard | None = GuitarBody(), let_ring: bool = True,
                  mute: float = 0.08, level: float = 0.6, courses: Sequence[float] = (2.0, 2.0, 1.0, 1.0, 1.0),
-                 seed: int = 0):
-        super().__init__(tuning, capo, exciter, string, body, let_ring, mute, level, courses, seed)
+                 chorus: float = 3.0, seed: int = 0):
+        super().__init__(tuning, capo, exciter, string, body, let_ring, mute, level, courses, chorus, seed)
 
 
 class BassGuitar(Fretted):

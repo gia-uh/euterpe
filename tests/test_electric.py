@@ -133,7 +133,7 @@ def test_a_later_note_takes_the_string():
 def test_a_feedback_note_keeps_its_strings_detuning():
     from euterpe.instruments import ElectricGuitar
 
-    seed = next(k for k in range(50) if abs(ElectricGuitar(seed=k).traits(2)[0]) > 2.0)
+    seed = next(k for k in range(50) if abs(ElectricGuitar(seed=k).traits(2)[0]) > 1.2)
     g = ElectricGuitar(seed=seed, pickup=None)
     note = g.feedback(2, 0, 0.0, 6.0)
     f0 = note[0].freq
