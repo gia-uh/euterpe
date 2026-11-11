@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 from euterpe.instruments import BassGuitar, Guitar, Note, Shape
-from euterpe.pitch import A2, A3, A4, B2, B3, B5, C2, C3, C4, Cs4, D2, D3, D4, D5, Ds4, E1, E2, E3, E4, E5, F2, F3, F4, Fs3, Fs4, G2, G3, G4
+from euterpe.pitch import A2, A3, A4, B2, B3, B4, B5, C2, C3, C4, Cs4, D2, D3, D4, D5, Ds4, E1, E2, E3, E4, E5, F2, F3, F4, Fs3, Fs4, G2, G3, G4
 from euterpe.sound.core import RATE
 
 A = Shape(None, 0, 2, 2, 2, 0)
@@ -176,3 +176,46 @@ def test_the_cuatro_has_five_courses_and_seventeen_frets():
     assert cuatro.tuning == (B2, E3, A3, D4, G4) and cuatro.frets == 17
     with pytest.raises(ValueError, match="4 course ratios for 5"):
         Cuatro(courses=(1.0,) * 4)
+
+
+def _string_cents(instrument, notes):
+    """Each pluck's frequency in cents from its note's written pitch, folded to the nearest octave."""
+    import math
+    from euterpe.instruments.plucked import Plucked
+    asked = []
+    pluck = Plucked.pluck
+
+    def spy(self, note, freq, vary=(1.0, 1.0, 1.0), traits=(0.0, 0.0, 0.0), damping=None):
+        c = 1200 * math.log2(freq * 2 ** (traits[0] / 1200) / note.freq)
+        asked.append((note, c - 1200 * round(c / 1200)))
+        return pluck(self, note, freq, vary, traits, damping)
+
+    Plucked.pluck = spy
+    try:
+        instrument.play(notes).take(0.01)
+    finally:
+        Plucked.pluck = pluck
+    return asked
+
+
+def test_a_course_straddles_its_written_pitch():
+    """The chorus splits the two strings of a course around the note, so the course stays in
+    tune with a piano: a unison pair sits at most chorus / 2 either way, an octave pair half that."""
+    from euterpe.instruments import Tres
+    from euterpe.instruments.plucked import Steel, Tolerance
+    tres = Tres(body=None, string=Steel(tolerance=Tolerance()), chorus=3.0)
+    notes = [n for k in range(20) for n in tres.pick(1 + k % 3, k % 5, at=0.05 * k, length=0.05)]
+    asked = _string_cents(tres, notes)
+    for (note, a), (_, b) in zip(asked[::2], asked[1::2]):
+        bound = 1.5 if tres.courses[3 - note.resource] == 1.0 else 0.75
+        assert abs(a) <= bound + 1e-9 and abs(a + b) < 1e-9
+
+
+def test_a_tres_note_without_a_course_sounds_on_one_string():
+    """A chord with more notes than courses leaves a note without a course; it must not become
+    a phantom doubled course with its own chorus."""
+    from euterpe.instruments import Tres
+    from euterpe.pitch import Gs4
+    tres = Tres(body=None)
+    asked = _string_cents(tres, [Note(0.0, p, 0.5, 0.8) for p in (Gs4, B4, D5, E5)])
+    assert len(asked) == 2 * 3 + 1
