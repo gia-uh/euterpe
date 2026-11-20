@@ -217,6 +217,7 @@ def _check_not_shared(top: Unit) -> None:
     """Refuse a graph that pulls one stateful unit along two paths: each pull would advance
     its state, so the samples would depend on the block size."""
     seen: set[int] = set()
+    shares: set[int] = set()
     stack = [top]
     while stack:
         u = stack.pop()
@@ -226,6 +227,10 @@ def _check_not_shared(top: Unit) -> None:
             raise ValueError(f"{type(u).__name__} is used twice in the graph; build a second one")
         seen.add(id(u))
         stack.extend(u.inputs())
+        share = getattr(u, "_share", None)  # a Share's taps: its source counts once, however many taps
+        if share is not None and id(share) not in shares:
+            shares.add(id(share))
+            stack.append(share.src)
 
 
 def render(

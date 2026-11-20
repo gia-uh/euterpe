@@ -5,6 +5,7 @@ from euterpe.sound.clip import Clip
 from euterpe.sound.core import BLOCK, RATE, Const, Gain, Mix, Unit, render, rng
 from euterpe.sound.env import ADSR, EnvelopeFollower, Segments
 from euterpe.sound.live import Live
+from euterpe.sound.share import Share, Tap
 from euterpe.sound.filters import (
     Allpass,
     BandPass,
@@ -40,6 +41,8 @@ from euterpe.sound.waveguide import Bore, Bow, Jet, Lips, Reed
 
 __all__ = [
     "Live",
+    "Share",
+    "Tap",
     "Amp",
     "Cabinet",
     "Additive",
