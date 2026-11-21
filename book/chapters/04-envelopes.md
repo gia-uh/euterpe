@@ -269,6 +269,23 @@ print(round(float(lowest), 3), round(float(20 * np.log10(lowest)), 1), "dB")
 
 In the second player the chords drop to about half their level, about 6 dB, on every kick, and swell back up between kicks: they *pump*, the sound of French house and of much dance music since. Chapter 8's compressor measures level the same way, with an RMS detector instead of peaks.
 
+## A value from a program
+
+An envelope knows its whole path before it starts. A game does not: the pitch of a car's engine follows the rpm its physics computes, frame by frame. `Live(read)` is a unit whose value comes from the program: it calls `read()` once per block, 1024 samples by default, and ramps in a straight line from the last value to the new one, so the parameter it moves never jumps. Here the program raises a saw's pitch by 1.5 Hz on every block, about 70 Hz a second.
+
+The engine is heard twice, through a low-pass and dry. A unit may appear only once in a graph, so `Share(unit)` holds it and hands out taps: each tap is a unit that reads the same samples, and the saw is computed once however many taps read it.
+
+```python {run continue}
+from euterpe.sound import Live, LowPass, Share
+
+steps = iter(range(10_000))
+engine = Share(Saw(Live(lambda: 40 + next(steps) * 1.5, start=40)))
+growl = LowPass(engine.tap(), 600.0) + engine.tap() * 0.1
+(growl * 0.3).take(2.0, "A saw whose pitch the program raises on every block, low-passed and dry")
+```
+
+A moving `Live` bends once per block, so its samples depend on the block size. That is the price of a value that is only known while the sound plays.
+
 ## Putting it all together
 
 Two more parts complete the groove, both on the *off-beats*, halfway between two kicks. The hi-hat is four *inharmonic* partials high up (not whole multiples of one frequency, like chapter 3's metal bar, but at new ratios chosen to sound like a small cymbal), under a 50 ms percussive envelope: a short metallic tick. The bass is a saw on the root of each chord (the first number of its tuple), an octave below it, plucked with a 0.3 s decay. Twelve bars, 24 seconds:
@@ -305,6 +322,7 @@ Every sound in it is an envelope on a wave: a pitch envelope makes the kick, a p
 - `curve` bends each stage by w(p) = (1 − e^(−6 × curve × p)) / (1 − e^(−6 × curve)). 0 is a straight line; positive values approach an exponential, which loses the same number of dB every second, as struck and plucked objects do.
 - Percussive instruments have a sustain of 0: they die away on their own. Sustained instruments hold a level until the gate ends. The envelope is part of an instrument's character, as its spectrum is.
 - An envelope is a unit, so it can move any parameter: pitch (a drum), duty (timbre), or another sound's gain. Units can be added, subtracted, multiplied and negated.
+- `Live(read)` takes its value from the program once per block and ramps to it; `Share(unit).tap()` lets several units read one unit, computed once.
 - `EnvelopeFollower(src, attack, release)` measures the envelope of an existing sound; `1 - follower` ducks one sound under another. `lint_audio` warns with `A-TAIL` when a sound is still playing as its file ends, and with `A-DC` when its average is not 0.
 
 ## Exercises
